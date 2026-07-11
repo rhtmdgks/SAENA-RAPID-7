@@ -1,0 +1,86 @@
+# protected-paths.txt — canonical protected path list (ADR-0019)
+#
+# This is the SINGLE SOURCE OF TRUTH consumed by:
+#   (i)   Claude Code PreToolUse hook (.claude/hooks — protect-paths.sh, see ADR-0019 #3)
+#   (ii)  pre-commit guard (tools/validation/check-protected-paths.sh)
+#   (iii) CI policy-symmetry job (tools/validation/check-policy-symmetry.sh)
+#
+# Format: one glob per line. Lines starting with '#' are comments and blank
+# lines are ignored. Glob syntax: shell-style, '**' matches any depth
+# (directory prefix match), '*' matches within a path segment.
+#
+# EDITS TO THIS FILE ARE THEMSELVES PROTECTED (self-referential — see the
+# tools/validation/policy/** entry below). Changes require human approval per
+# CLAUDE.md "Protected paths" and ADR-0019.
+#
+# Source: CLAUDE.md "Protected paths" section (2026-07-12 감사 반영).
+
+# --- Design originals / immutable specs ---
+docs/specs/**
+
+# --- Contracts, schemas, events (single-owner surfaces, CLAUDE.md principle 7) ---
+packages/contracts/**
+packages/schemas/**
+events/**
+
+# --- Orchestration / deployment ---
+workflows/**
+deploy/**
+
+# --- Database migrations (single-owner surface, CLAUDE.md principle 7) ---
+database/migrations/**
+
+# --- Cross-tool boundary protection (reverse-protection: Claude cannot loosen Cursor's rules) ---
+.cursor/rules/**
+
+# --- Claude Code permission surfaces ---
+.claude/settings.json
+.claude/settings.local.json
+.claude/settings.example.json
+
+# --- ADR Status transitions (accepted 전환은 인간 결정만) ---
+# NOTE: only the `- Status:` / `## Status` transition-to-accepted is gated
+# (see tools/validation/guards/check-adr-status.sh). Non-Status content edits
+# to ADR files go through normal review and are NOT blocked by this list —
+# this glob exists so hooks/CI route ANY edit to an ADR file through human
+# review ask-first, while the stricter accepted-transition block is enforced
+# by the dedicated status guard.
+docs/decisions/ADR-*.md
+
+# --- Self-referential: this policy directory and its consumers ---
+tools/validation/policy/**
+
+# pending-symmetry:
+# These ACTIVE globs above remain fully ENFORCED by
+# check-protected-paths.sh / the Claude Code hook / pre-commit — the
+# pending-symmetry note below does NOT remove protection. It records, for
+# check-policy-symmetry.sh, which of CLAUDE.md / .cursor/rules/20-protected-paths.mdc
+# / CODEOWNERS legitimately do not yet mirror the exact literal glob text, so
+# the symmetry check can pass honestly (allowlisted known gap) instead of
+# either (a) permanently red, or (b) silently skipping the glob. Do not "fix"
+# this by editing CLAUDE.md / .cursor/rules / CODEOWNERS from
+# tools/validation/** (those are not this unit's exclusive paths) — surface
+# the gap for human follow-up (see T08 verification report).
+#
+# database/migrations/** -> allow-missing: CLAUDE.md, CODEOWNERS
+#   CLAUDE.md principle 7 mentions "migrations" in prose only, not this
+#   literal path/glob; CODEOWNERS has no /database/migrations/ entry today.
+#
+# .cursor/rules/** -> allow-missing: cursor rule (.cursor/rules/20-protected-paths.mdc)
+#   The Cursor rule protects Claude-side `.claude/**` broadly but does not
+#   name itself as a protected target — no self-reference today.
+#
+# .claude/settings.json -> allow-missing: CLAUDE.md, cursor rule
+# .claude/settings.local.json -> allow-missing: CLAUDE.md, cursor rule
+# .claude/settings.example.json -> allow-missing: CLAUDE.md, cursor rule
+#   CLAUDE.md documents the glob form `.claude/settings*.json` and the
+#   Cursor rule documents the broader `.claude/**`; the exact literal
+#   filenames are functionally covered but not textually present.
+#
+# docs/decisions/ADR-*.md -> allow-missing: cursor rule
+#   No ADR-specific entry today; the Cursor rule protects specs but not
+#   decision records.
+#
+# tools/validation/policy/** -> allow-missing: CLAUDE.md, cursor rule, CODEOWNERS
+#   Brand-new self-referential path introduced by this unit / ADR-0019 #3;
+#   not yet propagated to the three human-readable surfaces.
