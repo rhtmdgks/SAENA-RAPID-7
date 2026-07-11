@@ -14,7 +14,8 @@ PROPOSED package set for monorepo reuse.
 
 ## Constraints
 
-- Algorithm must not depend on deploy profiles\n- Provider isolation mandatory
+- Algorithm must not depend on deploy profiles
+- Provider isolation mandatory
 
 ## Open decisions
 

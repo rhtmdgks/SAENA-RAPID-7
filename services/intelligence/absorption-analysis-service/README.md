@@ -8,8 +8,8 @@
 | Owned data | absorption labels |
 | Consumed contracts | citations; claims; observation text |
 | Published events | absorption.analyzed.v1 (PROPOSED) |
-| Consumed events | citation.normalized.v1 |
-| Upstream dependencies | citation-intelligence-service; claim-evidence-service |
+| Consumed events | citation.normalized.v1; observation.captured.v1 (PROPOSED — 무인용 브랜드 언급 분석 경로, Algorithm §3.3); claim.evidence.versioned.v1 (PROPOSED — upstream 선언과 정합화) |
+| Upstream dependencies | citation-intelligence-service; claim-evidence-service; chatgpt-observer-service |
 | Downstream consumers | digital-twin-service; experiment-attribution-service |
 | Security boundary | P1 feature flag; decision output gated until data ready |
 | Planned runtime | k3s Deployment (CONFIRMED intent); featureFlags.absorptionAnalysis |

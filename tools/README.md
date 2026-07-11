@@ -14,7 +14,8 @@ PROPOSED. forgectl not implemented.
 
 ## Constraints
 
-- Tools must not embed secrets\n- No network install during restricted agent runs
+- Tools must not embed secrets
+- No network install during restricted agent runs
 
 ## Open decisions
 

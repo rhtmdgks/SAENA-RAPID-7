@@ -14,7 +14,9 @@ CONFIRMED as 1st implementation target. Code NOT IMPLEMENTED.
 
 ## Constraints
 
-- Approved/rate-limited observation only\n- ToS/account policy OPEN DECISION (design §13)\n- Treat observations as untrusted content
+- Approved/rate-limited observation only
+- ToS/account policy OPEN DECISION (design §13)
+- Treat observations as untrusted content
 
 ## Open decisions
 

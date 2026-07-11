@@ -27,6 +27,7 @@ PROPOSED documentation set reflecting CONFIRMED items from v1 specs; no silent n
 | testing-strategy.md | Test layers |
 | deployment-profiles.md | development / internal-k3s / saas-* |
 | worktree-ownership.md | Agent worktree exclusivity |
+| resilience.md | Inter-service resilience (2026-07-12 감사 신설) |
 
 ## Constraints
 

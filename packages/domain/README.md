@@ -14,7 +14,8 @@ PROPOSED. Objects listed in Algorithm §3.1.
 
 ## Constraints
 
-- No deploy-profile conditionals\n- No LLM SDK imports
+- No deploy-profile conditionals
+- No LLM SDK imports
 
 ## Open decisions
 

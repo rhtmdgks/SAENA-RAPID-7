@@ -14,7 +14,8 @@ CONFIRMED adapter separation; v1 activates ChatGPT Search only.
 
 ## Constraints
 
-- Feature flags / scale 0 for non-ChatGPT in v1\n- No optimize/observe/claim for Google/Gemini in v1
+- Feature flags / scale 0 for non-ChatGPT in v1
+- No optimize/observe/claim for Google/Gemini in v1
 
 ## Open decisions
 

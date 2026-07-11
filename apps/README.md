@@ -14,7 +14,8 @@ PROPOSED app split. forge-console-api remains a service.
 
 ## Constraints
 
-- No production deploy credentials\n- ChatGPT Search only messaging in UI copy (future)
+- No production deploy credentials
+- ChatGPT Search only messaging in UI copy (future)
 
 ## Open decisions
 
@@ -22,7 +23,8 @@ PROPOSED app split. forge-console-api remains a service.
 
 ## Source specification references
 
-- `docs/specs/SAENA_AEO_Algorithm_and_Harness_Design_v1.md` §7\n- `docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md` §3.1
+- `docs/specs/SAENA_AEO_Algorithm_and_Harness_Design_v1.md` §7
+- `docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md` §3.1
 
 ## Status
 

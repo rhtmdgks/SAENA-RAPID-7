@@ -14,7 +14,8 @@ PROPOSED.
 
 ## Constraints
 
-- No provider SDKs\n- No infra clients that encode a deploy profile
+- No provider SDKs
+- No infra clients that encode a deploy profile
 
 ## Open decisions
 

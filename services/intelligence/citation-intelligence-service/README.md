@@ -8,8 +8,8 @@
 | Owned data | citation records |
 | Consumed contracts | observation snapshots |
 | Published events | citation.normalized.v1 |
-| Consumed events | observation.captured.v1 |
-| Upstream dependencies | chatgpt-observer-service |
+| Consumed events | observation.captured.v1; entity.graph.versioned.v1 (PROPOSED — 2026-07-12 감사: entity-resolution downstream 선언과 정합화) |
+| Upstream dependencies | chatgpt-observer-service; entity-resolution-service |
 | Downstream consumers | absorption-analysis-service; experiment-attribution-service |
 | Security boundary | raw snapshots as object refs; tenant-scoped |
 | Planned runtime | k3s Deployment (CONFIRMED intent) |

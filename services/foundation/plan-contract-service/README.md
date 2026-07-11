@@ -9,7 +9,7 @@
 | Consumed contracts | plan drafts; evidence IDs; patch unit candidates |
 | Published events | plan.contract.proposed.v1; plan.contract.approved.v1 |
 | Consumed events | intervention candidates; discovery/demand/claim artifacts (PROPOSED) |
-| Upstream dependencies | intervention-generator-service; forge-console-api |
+| Upstream dependencies | intervention-generator-service; forge-console-api; portfolio-optimizer-service (선택 포트폴리오 소비 — 2026-07-12 감사 정합화) |
 | Downstream consumers | agent-orchestrator-service; policy-gate-service |
 | Security boundary | human-approval-gated; signed contract immutability |
 | Planned runtime | k3s Deployment (CONFIRMED intent) |

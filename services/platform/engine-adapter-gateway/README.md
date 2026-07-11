@@ -9,8 +9,8 @@
 | Consumed contracts | engine-scoped observation/optimization requests |
 | Published events | adapter.config.updated.v1 (PROPOSED) |
 | Consumed events | — |
-| Upstream dependencies | chatgpt-observer-service; future adapters |
-| Downstream consumers | packages/provider-adapters/* |
+| Upstream dependencies | — (engine boundary edge; adapter 구현 코드 의존은 `packages/provider-adapters/*` — dependency-policy.md 소관, 런타임 upstream 아님) |
+| Downstream consumers | chatgpt-observer-service; future engine consumers |
 | Security boundary | v1: chatgpt-search ON; google/gemini feature flag OFF / scale 0 |
 | Planned runtime | k3s Deployment (CONFIRMED intent) |
 | Domain area | `platform` |

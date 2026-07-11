@@ -14,7 +14,8 @@ NOT IMPLEMENTED.
 
 ## Constraints
 
-- Idempotent activities\n- Tenant context propagation
+- Idempotent activities
+- Tenant context propagation
 
 ## Open decisions
 

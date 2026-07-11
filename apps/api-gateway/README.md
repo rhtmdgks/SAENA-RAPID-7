@@ -14,7 +14,8 @@ PROPOSED placeholder. Internal services use gRPC.
 
 ## Constraints
 
-- Least privilege\n- No customer source mutation
+- Least privilege
+- No customer source mutation
 
 ## Open decisions
 

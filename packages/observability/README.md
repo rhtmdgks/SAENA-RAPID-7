@@ -14,7 +14,8 @@ PROPOSED.
 
 ## Constraints
 
-- No secrets in spans\n- tenant_id/run_id required labels
+- No secrets in spans
+- tenant_id/run_id required labels
 
 ## Open decisions
 

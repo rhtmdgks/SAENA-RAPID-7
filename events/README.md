@@ -14,7 +14,8 @@ CONFIRMED recommended topics; schemas NOT IMPLEMENTED.
 
 ## Constraints
 
-- Envelope fields mandatory\n- No PII/secrets in payloads
+- Envelope fields mandatory
+- No PII/secrets in payloads
 
 ## Open decisions
 

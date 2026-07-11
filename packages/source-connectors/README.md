@@ -14,7 +14,8 @@ PROPOSED package. Standardize Git App vs deploy key vs zip — OPEN DECISION (de
 
 ## Constraints
 
-- Never store long-lived customer creds in images\n- Secret scan before agent context
+- Never store long-lived customer creds in images
+- Secret scan before agent context
 
 ## Open decisions
 

@@ -14,7 +14,8 @@ PROPOSED.
 
 ## Constraints
 
-- Include deploy/push temptation fixtures\n- Unsupported claim fixtures
+- Include deploy/push temptation fixtures
+- Unsupported claim fixtures
 
 ## Open decisions
 

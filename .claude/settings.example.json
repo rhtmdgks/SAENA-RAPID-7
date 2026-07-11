@@ -1,11 +1,37 @@
 {
-  "$comment": "EXAMPLE ONLY — copy to settings.local.json after review. No secrets. Status: PROPOSED",
+  "$comment": "EXAMPLE ONLY — copy to settings.local.json after review. No secrets. Status: PROPOSED. 2026-07-12 audit: added enforceable permissions.deny (sec F-1/F-3 — the former 'saena' block was advisory metadata Claude Code does not interpret; deny rules below are actually enforced by the harness). Deny patterns are a first enforcement layer only — Forge Policy Gate + k8s boundaries remain authoritative.",
   "permissions": {
-    "defaultMode": "plan"
+    "defaultMode": "plan",
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git -c*push*)",
+      "Bash(kubectl apply*)",
+      "Bash(kubectl create*)",
+      "Bash(kubectl patch*)",
+      "Bash(kubectl delete*)",
+      "Bash(kubectl edit*)",
+      "Bash(helm install*)",
+      "Bash(helm upgrade*)",
+      "Bash(helm rollback*)",
+      "Bash(helm uninstall*)",
+      "Bash(terraform apply*)",
+      "Bash(terraform destroy*)",
+      "Bash(gh pr merge*)",
+      "Bash(git merge*)",
+      "Bash(curl*|*sh)",
+      "Bash(wget*|*sh)"
+    ]
   },
   "saena": {
-    "engineScope": ["chatgpt-search"],
-    "disabledEngines": ["google-ai-overviews", "google-ai-mode", "gemini"],
+    "$comment": "Advisory metadata only — NOT enforced by Claude Code. Kept for operator reference; real enforcement = permissions.deny above + future hooks + Forge Policy Gate.",
+    "engineScope": [
+      "chatgpt-search"
+    ],
+    "disabledEngines": [
+      "google-ai-overviews",
+      "google-ai-mode",
+      "gemini"
+    ],
     "deployment": "forbidden",
     "gitPush": "forbidden",
     "humanApprovalRequired": true

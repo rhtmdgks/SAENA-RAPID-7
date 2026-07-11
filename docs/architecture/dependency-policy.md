@@ -31,6 +31,12 @@ deploy ✗→ algorithm source
 4. Infrastructure adapters (storage, queue, k8s) isolated from AEO scoring logic.
 5. No dependency install by agents without pin + allowlist (runtime policy).
 
+### 동기 호출·순환 규칙 (PROPOSED — 2026-07-12 감사)
+
+6. 동기 호출은 3종으로 한정: (a) console → control plane 명령 (b) runner → policy-gate 결정 질의 — rate-limit + allow/deny bool 응답만(정책 근거 미노출) + 질의 audit event화 (c) artifact fetch. 각 동기 경로는 **timeout + circuit breaker 정책 필수 명시** (policy-gate의 가용성 SPOF 방지).
+7. **동기 API 순환 금지.** 이벤트 피드백 루프는 명시 선언 시에만 허용 — 현재 선언된 루프 2개: ① 실행 saga 루프 (orchestrator→runner→quality-eval→orchestrator) ② cross-run 학습 루프 (runner→experiment-attribution→skill-bank→intervention-generator→plan-contract→orchestrator). CI에서 그래프 사이클 정적 검증 (선언 외 사이클 = 실패).
+8. **featureFlags 분기는 gateway/plan-contract 경계에서만** — intelligence/optimization 서비스(알고리즘 코드) 내부에 Helm flag 분기 금지 (배포 정책의 알고리즘 침투 차단, `packages/domain`의 no-deploy-conditionals 원칙을 서비스 계층으로 확장).
+
 ## Constraints
 
 - Bootstrap: no package manager lockfiles / manifests yet (OPEN DECISION language stack)

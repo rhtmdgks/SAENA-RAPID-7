@@ -9,7 +9,7 @@
 | Consumed contracts | observation cells; treatment/control defs |
 | Published events | experiment.outcome.observed.v1 |
 | Consumed events | observation.captured.v1; citation.normalized.v1; patch.unit.completed.v1 |
-| Upstream dependencies | chatgpt-observer-service; citation-intelligence-service |
+| Upstream dependencies | chatgpt-observer-service; citation-intelligence-service; agent-runner-service (patch.unit.completed.v1 소비와 정합화 — 2026-07-12 감사) |
 | Downstream consumers | strategy-skill-bank-service; digital-twin-service; forge-console-api |
 | Security boundary | no lift claim without registered evidence; conversion attribution not 7-day success |
 | Planned runtime | k3s Deployment; featureFlags.experimentAttribution |

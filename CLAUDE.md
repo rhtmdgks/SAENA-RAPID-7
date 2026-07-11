@@ -38,6 +38,15 @@ CONFIRMED from B-department prompt package + algorithm/harness design.
 - Secrets never in prompts, Helm values plaintext, audit payloads
 - Customer source only in isolated per-run workspace
 
+## Protected paths (Claude Code — 2026-07-12 감사 반영, .cursor/rules와 대칭)
+
+Claude Code는 다음을 인간 승인 없이 완화·수정하지 않는다:
+
+- `.cursor/rules/**` — Cursor 측 경계 완화 금지 (역방향 보호; Cursor는 이미 `.claude` 완화 금지)
+- `docs/specs/**` (불변 원본), `packages/contracts/**`, `packages/schemas/**`, `events/**`, `workflows/**`, `deploy/**`
+- `docs/decisions/ADR-*.md`의 Status 변경 (accepted 전환은 인간 결정만)
+- `.claude/settings*.json`의 permissions 완화
+
 ## Open decisions
 
 See design §13 and k3s §12. Do not silently decide.

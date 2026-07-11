@@ -14,7 +14,8 @@ PROPOSED.
 
 ## Constraints
 
-- Default deny helpers\n- UNTRUSTED_WEB_CONTENT tagging helpers (future)
+- Default deny helpers
+- UNTRUSTED_WEB_CONTENT tagging helpers (future)
 
 ## Open decisions
 

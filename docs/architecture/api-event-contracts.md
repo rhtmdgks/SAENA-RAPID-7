@@ -17,9 +17,21 @@ gRPC/Protobuf internal APIs; versioned events; JSON Schema Action Contract.
 - Events: versioned topics; at-least-once; idempotent consumers
 - Action Contract: JSON Schema validated; human approval required
 
-## Required event envelope fields (CONFIRMED)
+## Required event envelope fields (CONFIRMED — 예외 처리는 ADR-0006 대기)
 
 `event_id`, `tenant_id`, `run_id`, `schema_version`, `producer`, `occurred_at`, `trace_id`, `idempotency_key`
+
+**해소됨 (ADR-0006 accepted, 2026-07-12)**: envelope 8필드 유지. 비-run-scoped 이벤트(`tenant.policy.updated.v1`, `adapter.config.updated.v1`, `slo.alert.fired.v1`)만 `run_id` optional. `strategy.card.eligible.v1`의 익명화는 **payload 계층**(고객 식별 콘텐츠 제거 + skill-bank 집계 경계에서 cross-tenant 차단) — envelope `tenant_id`는 내부 감사 전용 유지. event schema 구현 차단 해제.
+
+`engine_id` (PROPOSED, 2026-07-12 감사): observation·citation·experiment 계열 이벤트에 엔진 차원 필드 추가 — v1 단일 엔진에서도 "Google/Gemini 이벤트 존재 시 즉시 탐지" 감사 능력 확보, 멀티엔진 확장 시 재버전 회피.
+
+## Service dependency 표기 규약 (PROPOSED — 감사 H-5 해소)
+
+service README의 `Upstream dependencies` / `Downstream consumers`는 **호출·소비 방향 기준**으로 통일:
+
+- Upstream = 내가 호출하거나 그 산출물(이벤트·계약)을 소비하는 대상
+- Downstream = 나를 호출하거나 내 산출물을 소비하는 대상
+- 라이브러리 패키지(`packages/*`)는 런타임 consumer 아님 — 이 필드 기재 금지 (코드 의존은 dependency-policy.md 소관)
 
 ## Recommended topics (CONFIRMED list from design)
 
@@ -36,6 +48,15 @@ gRPC/Protobuf internal APIs; versioned events; JSON Schema Action Contract.
 - `strategy.card.eligible.v1`
 
 Additional topics in service READMEs marked **PROPOSED**.
+
+## 신규 토픽 후보 (PROPOSED — 2026-07-12 감사)
+
+| Topic | 목적 | 근거 |
+|---|---|---|
+| `workspace.destroyed.v1` | per-run workspace TTL 파기 증명 — "TTL destroy 100%" SLO 감사 가능화 | sec Q8 |
+| `deployment.confirmed.v1` | 고객 배포 완료 = 7일 measurement clock 시작 조건의 이벤트화 | aeo F10, Algorithm §7.3 |
+| `policy.decision.recorded.v1` | policy-gate README에 이미 존재하던 토픽 — 카탈로그 등재 (boot B6) | ADR-0003 |
+| `experiment.outcome.observed.v1`에 `outcome_layer` 판별자 필드 | B 계층(≥2 독립 signal layer) vs C 지표 분리 — skill-bank는 B 검증 통과 outcome만 소비 | aeo F4, sec E3 |
 
 ## Core business identifiers (document now; schemas later)
 
@@ -58,6 +79,7 @@ All core data contracts MUST be able to carry:
 - `VisibilityScorer`
 - `TelemetryConnector`
 - `OptimizationPolicy`
+- `AnswerExtractor` (PROPOSED 추가, 2026-07-12 감사 — absorption 추출 인터페이스. citation≠absorption 원칙과 인터페이스 세트의 비대칭 해소. CrawlerPolicy/RetrievalEligibility 경계 정의도 필요)
 
 ## Constraints
 

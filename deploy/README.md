@@ -12,13 +12,16 @@ charts/, profiles/, policies/, environments/.
 
 CONFIRMED Helm/OCI packaging intent; chart contents NOT IMPLEMENTED (no deployable chart).
 
+**CONFIRMED (2026-07-12, user decision):** official Helm chart name is `saena-forge`. Not used: `forge` (collision-prone), `saena-forge-chart` (redundant suffix). Specs use both older forms; this decision supersedes them for implementation. No Chart.yaml/Helm resources created yet.
+
 ## Constraints
 
-- Agents: no kubectl apply / helm upgrade\n- Values reference secrets only
+- Agents: no kubectl apply / helm upgrade
+- Values reference secrets only
 
 ## Open decisions
 
-- Chart name saena-forge vs forge — spec uses both forms; OPEN DECISION on final chart identity string
+- (chart identity — RESOLVED, see Current decision above)
 
 ## Source specification references
 

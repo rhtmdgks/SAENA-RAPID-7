@@ -14,7 +14,8 @@ PROPOSED profile folder. Principles CONFIRMED in deployment-profiles.md.
 
 ## Constraints
 
-- Fixed or per-tenant tenant_id still required in contracts\n- Engine flags: ChatGPT on; Google/Gemini off in v1
+- Fixed or per-tenant tenant_id still required in contracts
+- Engine flags: ChatGPT on; Google/Gemini off in v1
 
 ## Open decisions
 

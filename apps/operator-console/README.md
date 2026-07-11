@@ -14,7 +14,8 @@ CONFIRMED need for console; stack OPEN DECISION.
 
 ## Constraints
 
-- No deploy button that calls production\n- Patch-unit-level approval UX required (spec)
+- No deploy button that calls production
+- Patch-unit-level approval UX required (spec)
 
 ## Open decisions
 

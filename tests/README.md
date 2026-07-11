@@ -14,7 +14,8 @@ PROPOSED layout. Suites NOT IMPLEMENTED.
 
 ## Constraints
 
-- Contract tests before wide implementation\n- Security fixtures mandatory before runner GA
+- Contract tests before wide implementation
+- Security fixtures mandatory before runner GA
 
 ## Open decisions
 

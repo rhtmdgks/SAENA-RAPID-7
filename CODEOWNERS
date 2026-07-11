@@ -1,0 +1,33 @@
+# ACTIVATED 2026-07-12 (audit sec F-10 — enforcement layer). Source: CODEOWNERS.example.
+# NOTE: @saena-* teams must exist in the GitHub org and branch protection must require
+# code-owner review for this to enforce anything. Until then this file is declarative.
+# Team creation + branch protection = OPEN DECISION (CONTRIBUTING.md).
+
+# Specs (immutable originals — changes require Architecture + Lead)
+/docs/specs/ @saena-architecture @saena-lead
+
+# Contracts & events
+/packages/contracts/ @saena-architecture @saena-backend
+/packages/schemas/ @saena-architecture @saena-backend
+/events/ @saena-architecture @saena-backend
+
+# Workflows & deploy
+/workflows/ @saena-platform
+/deploy/ @saena-platform @saena-security
+
+# Security-sensitive
+/.claude/ @saena-security @saena-lead
+/.cursor/ @saena-security @saena-lead
+/docs/architecture/security-model.md @saena-security
+/docs/decisions/ @saena-architecture @saena-lead
+
+# Domain services
+/services/foundation/ @saena-platform @saena-backend
+/services/acquisition/ @saena-backend @saena-aeo
+/services/intelligence/ @saena-aeo @saena-backend
+/services/optimization/ @saena-aeo @saena-backend
+/services/experimentation/ @saena-aeo @saena-backend
+/services/platform/ @saena-platform @saena-backend
+
+# Provider adapters
+/packages/provider-adapters/ @saena-integration @saena-architecture

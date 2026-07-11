@@ -14,7 +14,8 @@ CONFIRMED Temporal as workflow engine (k3s §1). Code NOT IMPLEMENTED.
 
 ## Constraints
 
-- Human approval pause is mandatory state\n- Agents must not change workflows without Platform owner
+- Human approval pause is mandatory state
+- Agents must not change workflows without Platform owner
 
 ## Open decisions
 

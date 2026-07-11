@@ -8,7 +8,7 @@
 | Owned data | intervention candidates |
 | Consumed contracts | QEEG artifacts; site inventory; observation gaps |
 | Published events | intervention.candidates.ready.v1 (PROPOSED) |
-| Consumed events | demand.graph.versioned.v1; claim.evidence.versioned.v1; citation.normalized.v1 |
+| Consumed events | demand.graph.versioned.v1; claim.evidence.versioned.v1; citation.normalized.v1; entity.graph.versioned.v1 (PROPOSED — G4 entity 가설군 생성 경로, Algorithm §3.4) |
 | Upstream dependencies | intelligence + acquisition services |
 | Downstream consumers | plan-contract-service; portfolio-optimizer-service |
 | Security boundary | evidence gate; no unsupported public claims |

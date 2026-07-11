@@ -8,7 +8,7 @@
 | Owned data | claim/evidence graph |
 | Consumed contracts | source-of-truth; site assets |
 | Published events | claim.evidence.versioned.v1 (PROPOSED) |
-| Consumed events | site.inventory.completed.v1; demand.graph.versioned.v1 |
+| Consumed events | site.inventory.completed.v1; demand.graph.versioned.v1; entity.graph.versioned.v1 (PROPOSED — 2026-07-12 감사: upstream 선언과 정합화) |
 | Upstream dependencies | entity-resolution-service; site-discovery-service |
 | Downstream consumers | intervention-generator-service; quality-eval-service |
 | Security boundary | unsupported claim = release-blocking; no fabricated evidence |

@@ -90,7 +90,7 @@ Names, domains, P0/P1, owned data. No implementation.
 ## Constraints
 
 - No shared DB table cross-service access
-- google/gemini adapters not separate microservices — behind `engine-adapter-gateway` + packages
+- google/gemini adapters not separate microservices — behind `engine-adapter-gateway` + packages **(CONFIRMED by ADR-0001 accepted 안 A, 2026-07-12 — Algorithm §6.1 문언 해석은 ADR-0001이 보유)**
 
 ## Source specification references
 

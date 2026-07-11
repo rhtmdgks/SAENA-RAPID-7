@@ -48,7 +48,7 @@ Limit Cursor to safe, small edits. Escalate to Claude Code otherwise.
 
 ## Bootstrap exception
 
-User-explicit Bootstrap Scaffolding may create initial skeleton files across many paths **once**. After bootstrap, this rule applies fully.
+**RETIRED (2026-07-12)** — bootstrap scaffolding completed at commit e763070. The one-time exception is closed; this rule now applies fully with no exceptions.
 
 ## Status
 

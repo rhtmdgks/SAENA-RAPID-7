@@ -14,7 +14,8 @@ CONFIRMED need; contents NOT IMPLEMENTED.
 
 ## Constraints
 
-- Breaking changes require ADR + compatibility tests\n- Must accept tenant/workspace/project/site/run/actor IDs
+- Breaking changes require ADR + compatibility tests
+- Must accept tenant/workspace/project/site/run/actor IDs
 
 ## Open decisions
 

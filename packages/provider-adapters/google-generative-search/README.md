@@ -6,7 +6,9 @@ Future Google generative search surface adapter.
 
 ## Scope
 
-Google Search indexing; AI Overviews; AI Mode; query fan-out; Search Console ingestion.
+AI Overviews; AI Mode (spec 근거: Algorithm §0 명시 제외 대상의 어댑터 경계). 기타 항목(Google Search indexing, query fan-out, Search Console ingestion)은 spec 외 추측 확장(boot B7) — PROPOSED, 활성화 결정 시 재검토.
+
+Spec 명칭 대응 (ADR-0001 §3): Algorithm §6.1 `google-ai-adapter` = 본 패키지, `gemini-adapter` = `packages/provider-adapters/gemini`.
 
 ## Current decision
 
@@ -14,7 +16,8 @@ Google Search indexing; AI Overviews; AI Mode; query fan-out; Search Console ing
 
 ## Constraints
 
-- No implementation code in bootstrap\n- Activation requires separate re-approval (design)
+- No implementation code in bootstrap
+- Activation requires separate re-approval (design)
 
 ## Open decisions
 
