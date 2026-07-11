@@ -1,45 +1,46 @@
-# ACTIVATED 2026-07-12 (audit sec F-10 — enforcement layer). Source: CODEOWNERS.example.
-# NOTE: @saena-* teams must exist in the GitHub org and branch protection must require
-# code-owner review for this to enforce anything. Until then this file is declarative.
-# Branch protection activation = W0 (user decision 2026-07-12, ADR-0018); team creation
-# in GitHub is a human operation.
+# ACTIVATED 2026-07-12 (audit sec F-10 — enforcement layer).
+# INTENDED owners: @saena-* GitHub Teams inside a SAENA org (format @ORG/team-slug).
+# CURRENT repo owner is personal user `rhtmdgks` — GitHub Teams require an Organization.
+# Until org+teams exist, every line includes @rhtmdgks as the enforceable code owner.
+# Team creation script: tools/bootstrap/create-github-teams.sh
+# Branch protection requires code-owner review (ADR-0018).
 
 # CI / enforcement surfaces (Integrator-owned files — ADR-0018)
-/.github/ @saena-security @saena-platform
-/CODEOWNERS @saena-security @saena-lead
-/.pre-commit-config.yaml @saena-security @saena-platform
+/.github/ @rhtmdgks @saena-security @saena-platform
+/CODEOWNERS @rhtmdgks @saena-security @saena-lead
+/.pre-commit-config.yaml @rhtmdgks @saena-security @saena-platform
 
 # Protected-path canonical policy (ADR-0019 — symmetry-checked in CI)
-/tools/validation/policy/ @saena-security @saena-lead
+/tools/validation/policy/ @rhtmdgks @saena-security @saena-lead
 
 # Future migrations (protected per CLAUDE.md)
-/database/migrations/ @saena-architecture @saena-backend
+/database/migrations/ @rhtmdgks @saena-architecture @saena-backend
 
 # Specs (immutable originals — changes require Architecture + Lead)
-/docs/specs/ @saena-architecture @saena-lead
+/docs/specs/ @rhtmdgks @saena-architecture @saena-lead
 
 # Contracts & events
-/packages/contracts/ @saena-architecture @saena-backend
-/packages/schemas/ @saena-architecture @saena-backend
-/events/ @saena-architecture @saena-backend
+/packages/contracts/ @rhtmdgks @saena-architecture @saena-backend
+/packages/schemas/ @rhtmdgks @saena-architecture @saena-backend
+/events/ @rhtmdgks @saena-architecture @saena-backend
 
 # Workflows & deploy
-/workflows/ @saena-platform
-/deploy/ @saena-platform @saena-security
+/workflows/ @rhtmdgks @saena-platform
+/deploy/ @rhtmdgks @saena-platform @saena-security
 
 # Security-sensitive
-/.claude/ @saena-security @saena-lead
-/.cursor/ @saena-security @saena-lead
-/docs/architecture/security-model.md @saena-security
-/docs/decisions/ @saena-architecture @saena-lead
+/.claude/ @rhtmdgks @saena-security @saena-lead
+/.cursor/ @rhtmdgks @saena-security @saena-lead
+/docs/architecture/security-model.md @rhtmdgks @saena-security
+/docs/decisions/ @rhtmdgks @saena-architecture @saena-lead
 
 # Domain services
-/services/foundation/ @saena-platform @saena-backend
-/services/acquisition/ @saena-backend @saena-aeo
-/services/intelligence/ @saena-aeo @saena-backend
-/services/optimization/ @saena-aeo @saena-backend
-/services/experimentation/ @saena-aeo @saena-backend
-/services/platform/ @saena-platform @saena-backend
+/services/foundation/ @rhtmdgks @saena-platform @saena-backend
+/services/acquisition/ @rhtmdgks @saena-backend @saena-aeo
+/services/intelligence/ @rhtmdgks @saena-aeo @saena-backend
+/services/optimization/ @rhtmdgks @saena-aeo @saena-backend
+/services/experimentation/ @rhtmdgks @saena-aeo @saena-backend
+/services/platform/ @rhtmdgks @saena-platform @saena-backend
 
 # Provider adapters
-/packages/provider-adapters/ @saena-integration @saena-architecture
+/packages/provider-adapters/ @rhtmdgks @saena-integration @saena-architecture
