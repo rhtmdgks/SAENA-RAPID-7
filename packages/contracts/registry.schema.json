@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/common/contracts-registry/v1/registry.schema.json",
+  "title": "SAENA contracts registry (v1)",
+  "description": "Machine-validated schema for packages/contracts/registry.json — the single-owner (Contracts Steward, ADR-0011) index of all versioned contract artifacts under packages/contracts/{json-schema,openapi,asyncapi}. One entry per contract major-version directory.",
+  "$comment": "Relational constraints NOT expressible in JSON Schema are enforced by tests/contract/validate/test_registry.py (W1 harness), not this schema — cohort-below-threshold precedent (packages/observability/registry/attributes.schema.json). Enforced there: (1) name+major uniqueness across contracts[]; (2) full_version's major-version prefix (X in X.Y.Z) equals the entry's major field; (3) $id path 1:1-maps to the on-disk file (ADR-0011 $id scheme); (4) category matches the $id path's category segment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "registry_version",
+    "contracts"
+  ],
+  "properties": {
+    "registry_version": {
+      "const": 1,
+      "description": "Registry document schema version (not a contract version). Bump requires an ADR per ADR-0011 layout stability constraint."
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      },
+      "description": "One entry per contract major-version directory. Empty until each schema unit lands its entry in the same commit as the schema file (ADR-0011 §Current decision, atomicity constraint)."
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "catalog_name",
+        "category",
+        "compat_class",
+        "signed",
+        "format",
+        "major",
+        "full_version",
+        "$id",
+        "owner",
+        "status"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "Contract slug, kebab-case, matches the file's directory name segment in packages/contracts/{json-schema,openapi,asyncapi}/<category>/<name>/."
+        },
+        "catalog_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Back-reference to the conceptual contract row in docs/architecture/contract-catalog.md (12 contracts). Distinct from name/file identity: e.g. the RunContext catalog row splits into two registry entries/files (run-context-lifecycle, run-context-experiment) that both carry catalog_name \"RunContext\" (ruling R10, ADR-0011 §RunContext split precedent)."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "envelope",
+            "context",
+            "domain",
+            "event",
+            "common"
+          ],
+          "description": "Contract category — matches the {category} path segment in both the on-disk layout and $id (ADR-0011 $id scheme)."
+        },
+        "compat_class": {
+          "type": "string",
+          "enum": [
+            "closed",
+            "open",
+            "frozen"
+          ],
+          "description": "Compatibility policy class (ADR-0012, ruling R6): closed = additionalProperties:false, all changes major (signed contracts and most domain/context contracts); open = event-payload style progressive evolution (optional-add = minor); frozen = envelope, any change requires a new ADR. Distinct from signed — compat_class governs schema evolution rules, signed governs human-signature semantics; a contract can be closed without being signed."
+        },
+        "signed": {
+          "type": "boolean",
+          "description": "True only for contracts representing a human signature artifact (ChangePlan, ApprovalDecision — ruling R6). All other contracts, including other closed-class contracts, are false. Not a compatibility class — see compat_class."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json-schema",
+            "openapi",
+            "asyncapi"
+          ],
+          "description": "Contract document format family (ADR-0008/ADR-0011)."
+        },
+        "major": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Major version — matches the v{major} path segment (directory-per-major layout, ADR-0011)."
+        },
+        "full_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Full semver of the current release for this major line, e.g. \"1.3.0\". Corresponding git tag: contracts/{name}/v{full_version} (ADR-0011)."
+        },
+        "$id": {
+          "type": "string",
+          "pattern": "^https://schemas\\.the-saena\\.ai/(envelope|context|domain|event|common)/[a-z0-9-]+/v[0-9]+/[a-z0-9-]+\\.(schema\\.json|yaml)$",
+          "description": "Canonical non-resolvable identifier (ADR-0011), 1:1 with the on-disk file path. .schema.json for json-schema contracts; .yaml for openapi/asyncapi documents."
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Single owner role slug (ADR-0011 single-owner principle), e.g. \"contracts-steward\"."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "active",
+            "deprecated"
+          ],
+          "description": "Entry lifecycle: draft (schema authored, pre-tag) -> active (at first/subsequent release tag) -> deprecated (superseded major, post-tag)."
+        },
+        "frozen_authority_adr": {
+          "type": "string",
+          "pattern": "^ADR-[0-9]{4}$",
+          "description": "ADR that authorizes this frozen contract's current field set (e.g. ADR-0013 for envelope). Required whenever compat_class is frozen (ADR-0012 envelope-frozen policy); absent otherwise."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "compat_class": {
+                "const": "frozen"
+              }
+            },
+            "required": [
+              "compat_class"
+            ]
+          },
+          "then": {
+            "required": [
+              "frozen_authority_adr"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signed": {
+                "const": true
+              }
+            },
+            "required": [
+              "signed"
+            ]
+          },
+          "then": {
+            "properties": {
+              "compat_class": {
+                "const": "closed"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
