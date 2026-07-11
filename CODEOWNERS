@@ -1,46 +1,48 @@
-# ACTIVATED 2026-07-12 (audit sec F-10 — enforcement layer).
-# INTENDED owners: @saena-* GitHub Teams inside a SAENA org (format @ORG/team-slug).
-# CURRENT repo owner is personal user `rhtmdgks` — GitHub Teams require an Organization.
-# Until org+teams exist, every line includes @rhtmdgks as the enforceable code owner.
-# Team creation script: tools/bootstrap/create-github-teams.sh
-# Branch protection requires code-owner review (ADR-0018).
+# CODEOWNERS — SAENA-Labs org teams (post-transfer)
+# Format: @SAENA-Labs/<team-slug>
+# Teams require Write (push) on this repo for ownership to enforce.
+# Branch protection / ruleset: require code owner review (ADR-0018).
 
-# CI / enforcement surfaces (Integrator-owned files — ADR-0018)
-/.github/ @rhtmdgks @saena-security @saena-platform
-/CODEOWNERS @rhtmdgks @saena-security @saena-lead
-/.pre-commit-config.yaml @rhtmdgks @saena-security @saena-platform
+# CI / enforcement surfaces
+/.github/ @SAENA-Labs/saena-security @SAENA-Labs/saena-platform
+/CODEOWNERS @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
+/.pre-commit-config.yaml @SAENA-Labs/saena-security @SAENA-Labs/saena-platform
 
-# Protected-path canonical policy (ADR-0019 — symmetry-checked in CI)
-/tools/validation/policy/ @rhtmdgks @saena-security @saena-lead
+# Protected-path canonical policy
+/tools/validation/policy/ @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
 
-# Future migrations (protected per CLAUDE.md)
-/database/migrations/ @rhtmdgks @saena-architecture @saena-backend
+# Future migrations
+/database/migrations/ @SAENA-Labs/saena-architecture @SAENA-Labs/saena-backend
 
-# Specs (immutable originals — changes require Architecture + Lead)
-/docs/specs/ @rhtmdgks @saena-architecture @saena-lead
+# Specs (immutable originals)
+/docs/specs/ @SAENA-Labs/saena-architecture @SAENA-Labs/saena-lead
 
 # Contracts & events
-/packages/contracts/ @rhtmdgks @saena-architecture @saena-backend
-/packages/schemas/ @rhtmdgks @saena-architecture @saena-backend
-/events/ @rhtmdgks @saena-architecture @saena-backend
+/packages/contracts/ @SAENA-Labs/saena-contracts @SAENA-Labs/saena-architecture
+/packages/schemas/ @SAENA-Labs/saena-contracts @SAENA-Labs/saena-architecture
+/events/ @SAENA-Labs/saena-contracts @SAENA-Labs/saena-architecture
 
 # Workflows & deploy
-/workflows/ @rhtmdgks @saena-platform
-/deploy/ @rhtmdgks @saena-platform @saena-security
+/workflows/ @SAENA-Labs/saena-platform
+/deploy/ @SAENA-Labs/saena-platform @SAENA-Labs/saena-security
 
 # Security-sensitive
-/.claude/ @rhtmdgks @saena-security @saena-lead
-/.cursor/ @rhtmdgks @saena-security @saena-lead
-/docs/architecture/security-model.md @rhtmdgks @saena-security
-/docs/decisions/ @rhtmdgks @saena-architecture @saena-lead
+/.claude/ @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
+/.cursor/ @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
+/docs/architecture/security-model.md @SAENA-Labs/saena-security
+/docs/decisions/ @SAENA-Labs/saena-architecture @SAENA-Labs/saena-lead
+/docs/architecture/ @SAENA-Labs/saena-architecture
 
 # Domain services
-/services/foundation/ @rhtmdgks @saena-platform @saena-backend
-/services/acquisition/ @rhtmdgks @saena-backend @saena-aeo
-/services/intelligence/ @rhtmdgks @saena-aeo @saena-backend
-/services/optimization/ @rhtmdgks @saena-aeo @saena-backend
-/services/experimentation/ @rhtmdgks @saena-aeo @saena-backend
-/services/platform/ @rhtmdgks @saena-platform @saena-backend
+/services/foundation/ @SAENA-Labs/saena-platform @SAENA-Labs/saena-backend
+/services/acquisition/ @SAENA-Labs/saena-backend @SAENA-Labs/saena-aeo
+/services/intelligence/ @SAENA-Labs/saena-aeo @SAENA-Labs/saena-backend
+/services/optimization/ @SAENA-Labs/saena-aeo @SAENA-Labs/saena-backend
+/services/experimentation/ @SAENA-Labs/saena-aeo @SAENA-Labs/saena-backend
+/services/platform/ @SAENA-Labs/saena-platform @SAENA-Labs/saena-backend
 
 # Provider adapters
-/packages/provider-adapters/ @rhtmdgks @saena-integration @saena-architecture
+/packages/provider-adapters/ @SAENA-Labs/saena-integration @SAENA-Labs/saena-architecture
+
+# Default catch-all — platform + architecture
+* @SAENA-Labs/saena-platform @SAENA-Labs/saena-architecture
