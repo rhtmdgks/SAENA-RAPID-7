@@ -52,6 +52,14 @@ _ask_json() {
 }
 
 _deny() {
+    # Audit the denial (ADR-0019: block AND log). Best-effort — audit failure
+    # must never turn a deny into an allow.
+    _adir="$_hook_dir/../../../audit/agent-hooks"
+    mkdir -p "$_adir" 2>/dev/null
+    _dts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%S)"
+    _reason_esc="$(printf '%s' "$1" | tr '"' "'" | cut -c1-160)"
+    printf '{"ts":"%s","tool_name":"Bash","hook":"deny-unpinned-install","decision":"deny","reason":"%s"}\n' \
+        "$_dts" "$_reason_esc" >>"$_adir/$(date -u +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d).jsonl" 2>/dev/null || true
     echo "deny-unpinned-install: blocked — $1" >&2
     exit 2
 }

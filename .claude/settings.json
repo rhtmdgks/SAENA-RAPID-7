@@ -1,0 +1,61 @@
+{
+  "$comment": "W0 wiring (ADR-0019, T13). Deny rules promoted from settings.example.json (17 rules, strengthening-only). Hooks = dev-repo safety layer, NOT a full security boundary — Forge Policy Gate + k8s remain authoritative. Kill switch: create .claude/hooks/DISABLED (no session restart needed). NOTE: deny includes git merge/push — Integrator merges after W0 are human-run or via documented DISABLED window with audit line.",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "teammateMode": "iterm2",
+  "permissions": {
+    "defaultMode": "plan",
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git -c*push*)",
+      "Bash(kubectl apply*)",
+      "Bash(kubectl create*)",
+      "Bash(kubectl patch*)",
+      "Bash(kubectl delete*)",
+      "Bash(kubectl edit*)",
+      "Bash(helm install*)",
+      "Bash(helm upgrade*)",
+      "Bash(helm rollback*)",
+      "Bash(helm uninstall*)",
+      "Bash(terraform apply*)",
+      "Bash(terraform destroy*)",
+      "Bash(gh pr merge*)",
+      "Bash(git merge*)",
+      "Bash(curl*|*sh)",
+      "Bash(wget*|*sh)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "sh .claude/hooks/scripts/deny-deploy-push.sh" },
+          { "type": "command", "command": "sh .claude/hooks/scripts/deny-unpinned-install.sh" }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "sh .claude/hooks/scripts/protect-paths.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "sh .claude/hooks/scripts/audit-log.sh" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh .claude/hooks/scripts/secret-scan.sh" }
+        ]
+      }
+    ]
+  }
+}
