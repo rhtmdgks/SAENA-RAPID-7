@@ -34,7 +34,9 @@ tenant.policy.updated.v1, audit.event.appended.v1, entity.graph.versioned.v1, cl
 
 workspace.destroyed.v1 (TTL 파기 증명), deployment.confirmed.v1 (7일 clock 시작 조건) — 근거·목적은 `docs/architecture/api-event-contracts.md` 신규 토픽 표 참조.
 
-**ADR-0006 accepted (2026-07-12)**: envelope 규칙 확정 — 8필드 유지, 비-run 이벤트만 run_id optional, strategy.card는 payload 필터. schema 구현 가능.
+**ADR-0006 rev.2 accepted (2026-07-12)**: envelope 규칙 확정 — **3-context 모델** (TenantContext/SystemContext/AggregateContext). strategy.card 등 cross-tenant 이벤트는 AggregateContext(tenant_id·run_id 금지 + k-anonymity 필드 + lineage_audit_ref). 구체 필드·판별 방식·`event_type` 9번째 필드·`engine_id` 닫힌 enum은 **ADR-0013** 참조. schema 구현 가능 (W1).
+
+> 정정 기록 (2026-07-12, W0 T16): 본 절의 이전 문구("8필드 유지, strategy.card는 payload 필터")는 폐기된 ADR-0006 **rev.1** 결정문의 잔재였음 — rev.2가 권위.
 
 ## Constraints
 
