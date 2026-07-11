@@ -1,9 +1,17 @@
 # ADR-0006: Event envelope mandatory IDs vs Strategy Card anonymity (SPEC-CONFLICT)
 
-- Status: **accepted**
-- Date: 2026-07-12 (decided: 2026-07-12, 사용자 승인 — spec 저자 권한)
+- Status: **accepted (rev.2)** — 2026-07-12 외부 리뷰 R4 반영 개정, 사용자 승인
+- Date: 2026-07-12
 - Deciders: 사용자 (repo owner)
-- Decision: **안 A 채택** — envelope 8필드 유지 (비-run-scoped 이벤트만 `run_id` optional). strategy.card 익명화는 payload 계층: 고객 식별 콘텐츠 제거 + cross-tenant 공유는 skill-bank 집계 경계에서 차단. envelope `tenant_id`는 내부 감사 전용 (열람 role 정의는 후속). **SPEC-CONFLICT 해소 — 본 ADR가 k3s §4.1과 Algorithm §8.4의 해석 우선순위를 보유. events/schemas 구현 차단 해제.**
+- Decision (rev.2): **3-context 모델** — rev.1 안 A(payload 필터 단일 규칙)를 개정:
+
+| Context | 대상 | envelope 규칙 |
+|---|---|---|
+| **TenantContext** | tenant-scoped raw 이벤트 (관측·계약·patch·audit 등) | `tenant_id` 필수 유지 |
+| **SystemContext** | global metadata (adapter config, policy bundle, SLO alert) | `tenant_id`·`run_id` 면제 |
+| **AggregateContext** | cross-tenant Strategy Card | `tenant_id` **제거**. 필수 필드: `aggregate_scope_id`, `cohort_size`, `privacy_threshold`(최소 cohort 미달 시 발행 금지 — k-anonymity 게이트), `de_identification_status` |
+
+원 tenant lineage는 **접근 제한(audit role 전용) audit-ledger reference로만** 보존 — 감사 추적성(security 요구)과 재식별 방지(architecture 요구)를 동시 충족. rev.1 대비 개선: payload 필터 단독 대신 envelope 계층에서 aggregate 익명성을 구조화하되, lineage 단절 없음. **SPEC-CONFLICT 해소 유지 — 본 ADR가 k3s §4.1과 Algorithm §8.4의 해석 우선순위 보유. events/schemas 구현 가능.**
 
 ## Purpose
 

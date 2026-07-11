@@ -38,10 +38,14 @@ k3s spec also describes Developer / Internal Staging / Internal Production / Air
 - Agent runners: Jobs with TTL destroy
 - OUT OF SCOPE now: real SaaS auth/billing/metering code
 
+## Environments 축 통합 (ADR-0007, 2026-07-12)
+
+구 `deploy/environments/`는 삭제됨 — 환경 구분(dev/staging/prod/airgap 오버레이)은 **profiles × values overlay 단일 축**으로 표현한다 (k3s §5 운영 프로파일은 각 profile 폴더의 values 오버레이로 매핑). 축 중복(plat D6) 종결.
+
 ## Open decisions
 
 - Air-gap as subset of internal-k3s vs separate profile folder — OPEN DECISION
-- SaaS tenancy billing model — OUT OF SCOPE / OPEN DECISION
+- SaaS tenancy billing model — OUT OF SCOPE / OPEN DECISION (usage/quota 소유는 tenant-control로 확정 — ADR-0007)
 
 ## Source specification references
 

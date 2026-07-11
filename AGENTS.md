@@ -1,9 +1,9 @@
-# AGENTS.md — Role catalog (bootstrap)
+# AGENTS.md — Role catalog
 
 ## Purpose
 
 Host-portable agent role definitions for SAENA FORGE development and B-department runs.  
-Full `.claude/agents/*.md` bodies are **deferred** — this file is the role contract sketch.
+런타임 MAS 역할(Discovery/Planner/critic 등)은 `.claude/agents/**`에 **정의 완료** (2026-07-12) — 이 파일은 host-portable **개발 역할** 계약. Codex `.codex`·Cursor 이식 시 동등 경계 유지 (Prompt pkg §10).
 
 ## Scope
 
@@ -11,7 +11,7 @@ Lead/Orchestrator, Architecture, AEO Science, Platform, Backend, Security, Test/
 
 ## Current decision
 
-PROPOSED role boundaries for harness development. Runtime MAS roles (Discovery/Planner/etc.) remain in design §9.
+PROPOSED 개발 역할 경계. 런타임 MAS 역할(design §9.1)은 `.claude/agents/{research,implementation,review}/*.md`로 이식 완료 — 강제는 hook + Policy Gate (NOT IMPLEMENTED).
 
 ---
 

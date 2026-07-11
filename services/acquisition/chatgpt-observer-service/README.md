@@ -5,7 +5,7 @@
 | Service name | `chatgpt-observer-service` |
 | Bounded context | ChatGPT Search observation |
 | Primary responsibility | approved ChatGPT Search observation; raw snapshot capture |
-| Owned data | observation ledger (ROL) |
+| Owned data | observation ledger (ROL) — **계약은 엔진 중립 `PlatformObservation`(+engine_id), 본 서비스는 그 첫 구현체 (ADR-0007). 2번째 엔진 = 동일 계약의 신규 observer, core 재작업 0** |
 | Consumed contracts | observation cells; locale/browser policy |
 | Published events | observation.captured.v1 |
 | Consumed events | plan.contract.approved.v1 (measurement phase); baseline registration (PROPOSED) |

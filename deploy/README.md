@@ -6,7 +6,7 @@ Helm charts, profiles, policies, environments. Protected path.
 
 ## Scope
 
-charts/, profiles/, policies/, environments/.
+charts/, profiles/, policies/. (environments/는 ADR-0007로 삭제 — 환경 구분은 profiles × values overlay 단일 축)
 
 ## Current decision
 

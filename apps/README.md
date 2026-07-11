@@ -10,7 +10,7 @@ operator-console, api-gateway skeletons.
 
 ## Current decision
 
-PROPOSED app split. forge-console-api remains a service.
+operator-console = v1 UI (CONFIRMED need). api-gateway = **FUTURE (SaaS)** — v1 edge는 forge-console-api 단독 (ADR-0007, 2026-07-12).
 
 ## Constraints
 
@@ -19,7 +19,7 @@ PROPOSED app split. forge-console-api remains a service.
 
 ## Open decisions
 
-- Whether api-gateway owns BFF vs forge-console-api — OPEN DECISION
+- ~~Whether api-gateway owns BFF vs forge-console-api~~ — RESOLVED (ADR-0007)
 
 ## Source specification references
 

@@ -18,15 +18,23 @@ unit / contract / integration / e2e / security / performance (+ eval fixtures).
 | Layer | Intent |
 |---|---|
 | unit | pure domain logic (future) |
-| contract | protobuf/json-schema/event compatibility |
+| contract | JSON Schema/OpenAPI/AsyncAPI compatibility (ADR-0008 — proto 이연) |
 | integration | service + bus + db testcontainers (future) |
 | e2e | synthetic tenant Plan→Approve→Patch→Handoff |
 | security | injection, secret, deploy-temptation fixtures |
 | performance | runner/browser quotas, gate latency |
+| architecture | **모듈 추출 불변식** — worker 분리 시 코드 변경 0, 경계 이벤트·published interface 위반 검출 (ADR-0002 rev.3 규칙 12; evals/regression-suites) |
 
 ## Completion categories (CONFIRMED)
 
 AEO correctness; patch correctness; safety; reproducibility; measurement; business integrity
+
+## 감사 반영 추가 요구 (2026-07-12)
+
+- **failure-mode 9종(k3s §10) ↔ `tests/security` fixture 1:1 매핑 표** — runner GA 게이트 (sec F-8)
+- **rollback 동작 검증 gate**: patch unit revert 적용 후 build/test 통과 확인 — quality gate 목록에 추가 (sec F-7)
+- deny 우회 회귀 세트 (`git -c … push`, `kubectl patch`, `helm upgrade` 등 — C-1)
+- W2A exit: policy-gate fail-closed 데모 필수
 
 ## Constraints
 

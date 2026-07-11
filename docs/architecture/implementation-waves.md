@@ -1,0 +1,57 @@
+# Implementation waves
+
+## Purpose
+
+승인된 Synthesis rev.2의 구현 순서. Wave 진입·종료 기준·테스트·롤백 명시.
+
+## Scope
+
+계획만 — 코드·manifest는 각 Wave 착수 승인 후.
+
+## Current decision (CONFIRMED — 2026-07-12 Synthesis rev.2 §10)
+
+### W0 — 결정·거버넌스 (잔여)
+언어 스택·monorepo 툴링 / design §13 7건 (GRS·ToS·source access·LLM retention·법무 SLA·PR 권한·k3s 사양) / bootstrap 요구 문서 원문 / PII vs immutable audit 법무.
+
+### W1 — 계약
+P0 12종 (contract-catalog.md) + 3-context envelope + engine_id + compatibility tests. 포맷 = ADR-0008 (proto 매핑 없음). Entry: 언어 확정. Exit: P0 스키마 12종 + 호환성 테스트 green.
+
+### W2A — 승인 코어
+forge-console-api, tenant-control, plan-contract, policy-gate, audit-ledger + PostgreSQL + 승인 플로우(제안→승인, per-unit).
+- Entry: W1 exit. / Exit: 승인 E2E(제안→Gate 검증→승인→audit chain), **policy-gate fail-closed 데모**(gate 다운 시 승인 불가), deny 우회 회귀(kubectl patch·`git -c` push 등) 통과.
+- Tests: 상태머신, hash chain, RBAC, 계약 호환. / Rollback: helm rollback + expand/contract migration (destructive 금지).
+- 이벤트는 **transactional outbox 기록까지** — bus 배선은 2C.
+
+### W2B — 오케스트레이션·아티팩트
+agent-orchestrator + Temporal + artifact-registry + MinIO + engine-adapter-gateway.
+- Entry: 2A exit + Temporal persistence DB (owner=orchestrator). / Exit: WAITING_APPROVAL→EXECUTING **signal 경로** E2E (ADR-0003 — Gate 거부 시 Temporal 전이 불가 검증), blob 단일 관문 검증, Activity `startToCloseTimeout ≥ 7200s+buffer` + heartbeat 정합.
+- Tests: §4.3 전 상태 전이, signal 재시도, blob 우회 차단. / Rollback: workflow 버전 롤백 + manifest 불변성.
+
+### W2C — 버스·관측·패키징
+Redpanda + OTel 스택 + `saena-forge` Helm chart + forgectl + control-plane synthetic E2E.
+- Entry: 2A/2B exit. / Exit: outbox drain→토픽 발행(3-context envelope 검증), 대시보드 6종 최소 구동, `forgectl preflight` 통과(Google flag on 시 fail 포함).
+- Tests: envelope 회귀, consumer idempotency, preflight 실패 케이스. / Rollback: chart 전체 helm rollback + event replay freeze (k3s §8.4).
+
+### W3 — Execution
+Job 5종(runner/intake/quality-eval + observer/discovery, SA 3분리 — ADR-0004) + hooks 5종 실장 + synthetic tenant Plan→승인→patch→handoff E2E + evals 가동(추출 아키텍처 테스트 포함) + failure-mode 9종↔fixture 매핑 + rollback 동작 검증 gate.
+
+### W4 — Intelligence
+intelligence-worker P0 4 모듈 + chatgpt-observer(browser pool) + QEEG read-only projection + **ClickHouse·vector 도입** (시간 파티션+ORDER BY 규칙 — ADR-0007 rev.2) + 실험 등록 원장(hash 앵커링).
+
+### W5 — Measurement·B계층
+optimization-worker measurement 기능 활성(DiD) + `deployment.confirmed.v1` 7일 clock + `outcome_layer` B-gate(skill-bank는 B 검증 통과만 소비) + evidence bundle + GRS 정책(§13 결정 후). measurement-worker 추출은 트리거 충족 시 (ADR-0002 rev.3).
+
+### Future
+P1 flag-on 승격(absorption, digital-twin, portfolio-opt, skill-bank), SaaS(request-scoped 테넌시 + RLS 2차 + api-gateway), air-gap, 2nd provider adapter(별도 재승인 후만).
+
+## Constraints
+
+- 각 Wave 착수 = 인간 승인. Critical gate skip 금지. Wave 내 실패 시 rollback 절차 우선.
+
+## Source specification references
+
+- Algorithm spec §12; k3s spec §5, §8, §11; Synthesis rev.2 §10; ADR-0002 rev.3, 0003, 0004, 0007, 0008
+
+## Status
+
+CONFIRMED 계획 / NOT IMPLEMENTED

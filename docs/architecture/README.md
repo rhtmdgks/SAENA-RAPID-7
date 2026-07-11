@@ -28,6 +28,9 @@ PROPOSED documentation set reflecting CONFIRMED items from v1 specs; no silent n
 | deployment-profiles.md | development / internal-k3s / saas-* |
 | worktree-ownership.md | Agent worktree exclusivity |
 | resilience.md | Inter-service resilience (2026-07-12 감사 신설) |
+| contract-catalog.md | 계약 21종 카탈로그 (Synthesis rev.2 신설) |
+| implementation-waves.md | W0~W5+Future, 2A/2B/2C entry·exit·tests·rollback (신설) |
+| agent-authority-boundaries.md | Cursor vs Claude Code 권한 경계 (신설) |
 
 ## Constraints
 

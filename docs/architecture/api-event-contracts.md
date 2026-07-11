@@ -10,18 +10,27 @@ gRPC/Protobuf internal APIs; versioned events; JSON Schema Action Contract.
 
 ## Current decision
 
-**CONFIRMED**
+**CONFIRMED (포맷은 ADR-0008로 v1 개정)**
 
-- Internal API: gRPC + Protobuf
+- Internal API: ~~gRPC + Protobuf~~ → **v1 = OpenAPI + JSON** (ADR-0008, 2026-07-12 — k3s §1 편차를 ADR가 보유. Proto/gRPC는 측정 트리거 충족 시 별도 ADR로 재도입)
 - External console API: REST/GraphQL as required
-- Events: versioned topics; at-least-once; idempotent consumers
-- Action Contract: JSON Schema validated; human approval required
+- Events: versioned topics; at-least-once; idempotent consumers — **AsyncAPI + 공통 JSON Schema** (ADR-0008)
+- Action Contract·서명 계약: JSON Schema validated; human approval required
+- **JSON↔Proto 이중 매핑 v1 제거** (ADR-0008)
 
 ## Required event envelope fields (CONFIRMED — 예외 처리는 ADR-0006 대기)
 
 `event_id`, `tenant_id`, `run_id`, `schema_version`, `producer`, `occurred_at`, `trace_id`, `idempotency_key`
 
-**해소됨 (ADR-0006 accepted, 2026-07-12)**: envelope 8필드 유지. 비-run-scoped 이벤트(`tenant.policy.updated.v1`, `adapter.config.updated.v1`, `slo.alert.fired.v1`)만 `run_id` optional. `strategy.card.eligible.v1`의 익명화는 **payload 계층**(고객 식별 콘텐츠 제거 + skill-bank 집계 경계에서 cross-tenant 차단) — envelope `tenant_id`는 내부 감사 전용 유지. event schema 구현 차단 해제.
+**해소됨 (ADR-0006 rev.2, 2026-07-12) — 3-context envelope 모델**:
+
+| Context | 대상 | envelope 규칙 |
+|---|---|---|
+| TenantContext | tenant-scoped raw 이벤트 | `tenant_id` 필수 |
+| SystemContext | global metadata (`tenant.policy.updated.v1`, `adapter.config.updated.v1`, `slo.alert.fired.v1`) | `tenant_id`·`run_id` 면제 |
+| AggregateContext | cross-tenant Strategy Card (`strategy.card.eligible.v1`) | `tenant_id` 제거. 필수: `aggregate_scope_id`, `cohort_size`, `privacy_threshold`(미달 시 발행 금지), `de_identification_status` |
+
+원 tenant lineage = 접근 제한(audit role) audit-ledger reference로만. event schema 구현 가능.
 
 `engine_id` (PROPOSED, 2026-07-12 감사): observation·citation·experiment 계열 이벤트에 엔진 차원 필드 추가 — v1 단일 엔진에서도 "Google/Gemini 이벤트 존재 시 즉시 탐지" 감사 능력 확보, 멀티엔진 확장 시 재버전 회피.
 

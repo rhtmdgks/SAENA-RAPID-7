@@ -83,9 +83,23 @@ Names, domains, P0/P1, owned data. No implementation.
 | Topic | Notes |
 |---|---|
 | Domain folder vs 4-plane naming | Packaging taxonomy PROPOSED; do not treat folders as runtime plane IDs |
-| `forge-console-api` vs `apps/api-gateway` | Split edge vs domain API — OPEN DECISION |
+| `forge-console-api` vs `apps/api-gateway` | **RESOLVED (ADR-0007)**: v1 edge = forge-console-api 단독. api-gateway는 FUTURE(SaaS) |
 | Event topic names beyond recommended list | Several marked PROPOSED in service READMEs |
 | When P1 services emit decision outputs | Feature flags exist; learning telemetry may run earlier (k3s §7) |
+
+## v1 토폴로지 — 24 logical capabilities × rendering class (CONFIRMED — ADR-0002 rev.3, 2026-07-12)
+
+용어 (외부 리뷰 R9): "24개 마이크로서비스" = **24 logical capabilities (bounded contexts)** — Gate A 계약 대상, 불변. 배포 형태(rendering)는 별개 운영 결정. **Worker host 2종은 배포 아티팩트 — capability로 세지 않음.**
+
+| Rendering class | 수 | 구성 |
+|---|---|---|
+| Independent Deployment | 8 | control 6: forge-console-api, plan-contract, policy-gate, agent-orchestrator, audit-ledger(RBAC 상위 tier), tenant-control / artifact-registry / engine-adapter-gateway |
+| Worker-hosted module | 10 | intelligence-worker: demand-graph, entity-resolution, claim-evidence, citation-intelligence, absorption-analysis(off) / **optimization-worker**: intervention-generator, digital-twin(off), portfolio-optimizer(off), experiment-attribution, strategy-skill-bank(off) — own schema + 모듈별 DB credential(논리 경계 — 보안 경계 아님) + 경계 이벤트 규칙(dependency-policy 9~13) |
+| Job | 5 | runner pool: agent-runner, repository-intake, quality-eval (SA 3분리) / browser pool: chatgpt-observer, site-discovery |
+| Merged infra capability | 1 | observability → OTel Collector + 기성 스택 (계약·책임 유지, 구현체 기성) |
+| Future capability | — | api-gateway(SaaS), google-generative-search, gemini |
+
+합계 8+10+5+1 = 24. 총 Deployment 10 = independent 8 + worker host 2 (compute pool). measurement-worker 추출 트리거는 ADR-0002 rev.3 참조.
 
 ## Constraints
 

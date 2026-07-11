@@ -18,10 +18,11 @@
 - policy-gate 앞: rate-limit + 결정 캐싱 (게이트키퍼의 가용성 SPOF 방지).
 - Temporal Activity ↔ K8s Job 정합: runner Job을 감싸는 Activity는 `startToCloseTimeout ≥ activeDeadlineSeconds(7200s) + buffer`, heartbeat interval = Job 상태 poll 주기.
 
-### 이벤트 소비
+### 이벤트 발행·소비
 
-- at-least-once + idempotent consumer는 CONFIRMED (k3s §4.1). 추가 필요: poison-message/DLQ 정책, consumer lag 알람, 이벤트 버스 장애 시 producer 동작(버퍼/차단) 정의.
-- partition key 규약: tenant_id 기본, run-scoped 토픽은 run_id — OPEN DECISION.
+- **Transactional outbox 필수** (ADR-0002 rev.3): 경계 이벤트는 DB 쓰기와 원자적으로 outbox 기록 → relay가 발행. bus 장애 시 producer는 outbox 적재 지속(차단 아님), drain은 복구 후. Wave 2A(bus 부재기)에도 동일 패턴.
+- at-least-once + idempotent consumer는 CONFIRMED (k3s §4.1). 추가 필요: poison-message/DLQ 정책, consumer lag 알람.
+- partition key 규약: 스토어·토픽별 결정 (ADR-0007 rev.2 — tenant discriminator는 논리 필수, physical key는 별개) — OPEN DECISION.
 
 ### 배포 안전장치
 

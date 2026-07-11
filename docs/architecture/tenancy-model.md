@@ -45,8 +45,9 @@ Identifiers, isolation, namespaces, source isolation.
 ## Constraints
 
 - Cross-tenant access target: 0
-- Strategy Skill Bank: aggregate_only; no proprietary customer text sharing
+- Strategy Skill Bank: aggregate_only; no proprietary customer text sharing — envelope tenant_id는 유지, 익명화는 payload 계층 (ADR-0006 안 A)
 - Redis not a cross-tenant source of truth
+- **Tenant discriminator 규칙 (ADR-0007 rev.2 — blanket 파티션 규칙 철회)**: 모든 tenant-scoped 레코드·이벤트에 `tenant_id` 논리 필수. physical partitioning은 스토어별 결정 (ClickHouse는 시간 파티션 — tenant 파티션 금지). global system metadata(SystemContext)는 면제. 3-context 분류는 ADR-0006 rev.2 참조
 
 ## Open decisions
 

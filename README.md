@@ -20,8 +20,9 @@ SAENA Labs 내부 B부서가 사용하는 k3s-based package 저장소.
 
 - **CONFIRMED:** 24 microservices named in design specs; ChatGPT Search only for v1 engine activation
 - **CONFIRMED:** human-approval-gated Action Contract before write
-- **PROPOSED:** monorepo layout in this bootstrap (directory skeleton)
-- **OPEN DECISION:** see `docs/architecture/` and design §13 / k3s §12
+- **CONFIRMED (2026-07-12):** architecture 계층 최종화 — 24 logical capabilities = 8 Deployment + 10 worker-hosted module (2 workers) + 5 Job + 1 merged infra; 계약 포맷 = JSON Schema/OpenAPI/AsyncAPI (proto 이연); ADR-0001~0008. 상세: `docs/architecture/`, `docs/decisions/`
+- **PROPOSED:** monorepo layout (directory skeleton)
+- **OPEN DECISION:** 언어 스택 / design §13 7건 / `docs/architecture/` 잔여 OPEN
 
 ## Constraints
 

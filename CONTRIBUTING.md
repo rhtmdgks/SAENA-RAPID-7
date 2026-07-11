@@ -32,12 +32,12 @@ PROPOSED contribution flow. CI/CD not yet implemented.
 ## Open decisions
 
 - Branch protection rules — OPEN DECISION
-- CODEOWNERS final mapping — see `CODEOWNERS.example`
+- CODEOWNERS final mapping — **활성 `CODEOWNERS` 존재** (2026-07-12; `.example` 삭제). teams 생성 + branch protection 활성화 전까지 선언적
 
 ## Source specification references
 
 - Design specs under `docs/specs/`
-- `docs/architecture/dependency-policy.md`
+- `docs/architecture/dependency-policy.md`; `agent-authority-boundaries.md`
 
 ## Status
 
