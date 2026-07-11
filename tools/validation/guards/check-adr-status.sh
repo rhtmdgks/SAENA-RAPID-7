@@ -51,14 +51,31 @@ fi
 
 : > "$TMP_HITS"
 current_file="(unknown)"
+# Newly added ADR files (--- /dev/null) may land already-accepted when a human
+# authored the decision in the same change set. Block only Status flips on
+# *existing* ADRs (automation cannot promote proposed→accepted).
+is_new_file=0
 
 while IFS= read -r line; do
     case "$line" in
+        "diff --git "*)
+            is_new_file=0
+            continue
+            ;;
+        "--- /dev/null")
+            is_new_file=1
+            continue
+            ;;
         "+++ b/"*)
             current_file=${line#+++ b/}
             continue
             ;;
     esac
+
+    # Skip Status checks for brand-new ADR files.
+    if [ "$is_new_file" -eq 1 ]; then
+        continue
+    fi
 
     case "$line" in
         "+- Status:"*)
