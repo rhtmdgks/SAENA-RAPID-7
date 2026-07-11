@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w1-00: git -C /tmp/x status (expect exit 0)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git -C /tmp/x status"
+    }
+  },
+  "expect_exit": 0
+}

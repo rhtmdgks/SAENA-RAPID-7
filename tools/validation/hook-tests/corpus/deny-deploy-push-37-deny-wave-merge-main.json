@@ -1,0 +1,12 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w1-00: git merge main (expect exit 2)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git merge main"
+    }
+  },
+  "env": { "HOOK_TEST_MOCK_BRANCH": "wave1-contracts" },
+  "expect_exit": 2
+}

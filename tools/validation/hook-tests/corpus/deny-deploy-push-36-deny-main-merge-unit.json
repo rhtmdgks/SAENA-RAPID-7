@@ -1,0 +1,12 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w1-00: git merge --no-ff unit/w1-01-registry (expect exit 2)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git merge --no-ff unit/w1-01-registry"
+    }
+  },
+  "env": { "HOOK_TEST_MOCK_BRANCH": "main" },
+  "expect_exit": 2
+}

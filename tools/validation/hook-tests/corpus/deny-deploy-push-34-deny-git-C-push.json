@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w1-00: git -C /tmp/x push origin main (expect exit 2)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git -C /tmp/x push origin main"
+    }
+  },
+  "expect_exit": 2
+}
