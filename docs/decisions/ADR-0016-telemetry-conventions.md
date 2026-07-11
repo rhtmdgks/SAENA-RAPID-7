@@ -53,14 +53,14 @@ Out: Collector/backend 배포 토폴로지(W2C), Prometheus 변환 세부(W2C ex
 
 - Secret은 telemetry payload에 절대 포함 금지(observability.md 원칙 유지)
 - Audit completeness 100% 요구는 telemetry 규약으로 대체되지 않음 — audit event는 별도 채널(k3s §9.3)
-- `saena.context` 값과 envelope의 `context_type`(ADR-0013 예정 discriminator)은 동일 어휘 사용 — 별도 vocabulary 생성 금지
+- `saena.context` 값과 envelope의 `context_type`(ADR-0013 discriminator)은 동일 어휘 사용 — 별도 vocabulary 생성 금지
 - registry 변경은 `packages/observability` 소유 경계 내(단일 owner 원칙, CLAUDE.md 원칙 7 준용) — 스키마 자체는 아니지만 계약적 성격이므로 임의 팀 편집 금지
 
 ## Open decisions
 
 - Prometheus 이름 변환 규칙 상세(W2C exporter 설계 시점)
 - registry lint를 CI 어느 stage에 배치할지(ADR-0018 gate matrix와 연동, T17에서 확정)
-- ADR-0013 확정 전까지 context-rules 표는 envelope 초안 기준 잠정치 — ADR-0013 accepted 시 본 ADR의 context-rules 서술을 대조 검증 필요
+- context-rules 표는 ADR-0013의 context별 필수/금지 규칙과 대조 검증 완료(2026-07-12 independent critic 교차 확인) — 이후 envelope 변경 시(=ADR 경로) 본 표 동기 갱신 의무
 
 ## Source specification references
 
@@ -71,3 +71,5 @@ Out: Collector/backend 배포 토폴로지(W2C), Prometheus 변환 세부(W2C ex
 ## Status
 
 accepted (2026-07-12, 사용자 — Wave 0 계획 G2 사전 승인)
+
+> 검증 기록: independent critic conformance review PASS (2026-07-12) — 사용자 G2 처리 지침("계획·결정 부합 시 사전 승인")의 조건 충족 확인.

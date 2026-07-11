@@ -25,7 +25,7 @@ ADR-0012).
   coverage 수치는 OPEN DECISION으로 남겨두었다.
 - W0는 코드가 아니라 기반 결정 단계 — W1(계약 12종) entry에 "contract harness 골격 green"
   요구가 있으므로 harness 구조는 W0에서 확정해야 W1이 무결정 착수 가능.
-- 계약 호환성 판정은 이원 정책(닫힌 계약/열린 event payload, ADR-0012 예정)의 소관이며,
+- 계약 호환성 판정은 이원 정책(닫힌 계약/열린 event payload, ADR-0012)의 소관이며,
   "규칙 = Contracts Steward 권한, harness 코드 = testing 소유"로 역할이 분리되어야
   단일 owner 원칙(CLAUDE.md 원칙 7)과 충돌하지 않는다.
 - 사용자 확정(2026-07-12): coverage 정책은 초안 80% 대신 **핵심 모듈 90%+diff 90%+ratchet**
@@ -108,3 +108,5 @@ W3. k3s §10 failure-mode 9종 ↔ `tests/security` fixture 1:1 매핑표는 run
 ## Status
 
 accepted (2026-07-12, 사용자 — Wave 0 계획 G2 사전 승인, coverage 정책 확정 반영)
+
+> 검증 기록: independent critic conformance review PASS (2026-07-12) — 사용자 G2 처리 지침("계획·결정 부합 시 사전 승인")의 조건 충족 확인.
