@@ -1,0 +1,16 @@
+{
+  "_expected_violation": "engine_id must be a closed enum of [\"chatgpt-search\"] only (ADR-0013 v1; CLAUDE.md Engine scope v1: ChatGPT Search only — Google AI Overviews/AI Mode/Gemini optimize/observe/claim prohibited). payload.engine_id='google-ai-overviews' must fail schema validation at the contract level.",
+  "event_id": "018f3a1f-2b1c-7d4a-8e6f-1a2b3c4d5e6f",
+  "context_type": "system",
+  "schema_version": "1.0.0",
+  "producer": "policy-gate",
+  "occurred_at": "2026-07-12T10:02:11Z",
+  "trace_id": "7d3f1a9c8e2b4f6a0d5c3b1e9f7a2d4c",
+  "idempotency_key": "adapter-config:google-ai-overviews:v1.3.0",
+  "event_type": "adapter.config.updated.v1",
+  "payload": {
+    "engine_id": "google-ai-overviews",
+    "adapter_version": "1.3.0",
+    "changed_fields": ["rate_limit_per_minute"]
+  }
+}
