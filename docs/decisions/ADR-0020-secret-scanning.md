@@ -76,3 +76,5 @@ Out: trufflehog 등 2차 검증 계층의 상시 활성화(옵트인 대상, 아
 ## Status
 
 accepted (2026-07-12, 사용자 — Wave 0 계획 G2 사전 승인)
+
+> 검증 기록: independent critic conformance review PASS (2026-07-12) — 사용자 G2 처리 지침("계획·결정 부합 시 사전 승인")의 조건 충족 확인.
