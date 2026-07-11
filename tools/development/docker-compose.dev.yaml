@@ -1,0 +1,66 @@
+# Local Tier-2 profile (ADR-0022). Customer source FORBIDDEN here — synthetic
+# fixtures only (k3s spec §5.1). Never used in production; deploy/ charts are
+# the deployment SSOT.
+#
+# Scope: stateful Tier-2 infra dependencies that run OUTSIDE k3d (ADR-0022
+# "Tier2 k3d dev" row) — k3d hosts the workload containers, this compose file
+# hosts the backing services they connect to. Invoke via
+# `uv run just dev-up <service...>` (subset rule: only the target service +
+# its ≤3 direct sync dependencies per docs/architecture/dependency-policy.md
+# rule 6 — do not start the full stack for a single-service task).
+#
+# W2A is the first real consumer (postgres). Do not add live services beyond
+# postgres in this patch unit (T15) — temporal-dev and redpanda are left as
+# commented placeholders below for their owning waves to activate.
+
+name: saena-dev
+
+services:
+  postgres:
+    image: postgres:16
+    # TODO(adoption): pin to sha256 digest once the first consumer (W2A)
+    # lands and the image is verified against the supply-chain policy
+    # (docs/architecture/security-model.md, k3s spec §6.3).
+    container_name: saena-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: saena_dev
+      POSTGRES_PASSWORD: saena_dev_local_only
+      POSTGRES_DB: saena_dev
+    ports:
+      # 15432 (non-default) to avoid colliding with a host-local postgres on 5432.
+      - "15432:5432"
+    volumes:
+      - saena-dev-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saena_dev -d saena_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # --- placeholder: Temporal dev server (W2B — orchestrator/workflow engine) ---
+  # temporal-dev:
+  #   image: temporalio/auto-setup:<pinned-tag>
+  #   container_name: saena-dev-temporal
+  #   ports:
+  #     - "17233:7233"   # gRPC frontend, non-default host port
+  #     - "18080:8080"   # Temporal UI, non-default host port
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   healthcheck: TBD (W2B)
+
+  # --- placeholder: Redpanda (W2C — event bus, Kafka-API compatible) ---
+  # redpanda:
+  #   image: redpandadata/redpanda:<pinned-tag>
+  #   container_name: saena-dev-redpanda
+  #   ports:
+  #     - "19092:9092"   # Kafka API, non-default host port
+  #     - "19644:9644"   # admin/metrics, non-default host port
+  #   volumes:
+  #     - saena-dev-redpanda-data:/var/lib/redpanda/data
+  #   healthcheck: TBD (W2C)
+
+volumes:
+  saena-dev-postgres-data:
+  # saena-dev-redpanda-data:   # activate with the redpanda placeholder (W2C)

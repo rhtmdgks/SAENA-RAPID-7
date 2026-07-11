@@ -1,0 +1,158 @@
+# SAENA telemetry attribute registry (v1) — source of truth (ADR-0016).
+#
+# Human-edited SSOT. Validate against attributes.schema.json (JSON Schema
+# 2020-12, $id: https://schemas.the-saena.ai/common/observability-attribute-registry/v1/attributes.schema.json).
+#
+# MACHINE-READ MIRROR NOTE: PyYAML is not part of the current dependency
+# surface reachable from packages/observability (no local pyproject.toml —
+# this package is intentionally not a uv workspace member, ADR-0016 scope).
+# attributes.json in this same directory is a generated mirror of this file,
+# kept in sync MANUALLY until W1 introduces registry codegen/lint automation
+# (see ADR-0016 "Open decisions" — CI lint stage placement, ADR-0018 gate
+# matrix, T17). Tests under packages/observability/tests validate the JSON
+# mirror with stdlib + jsonschema only. If you edit this file, update
+# attributes.json to match in the same patch unit.
+#
+# Context columns follow the 3-context discriminator (ADR-0006 rev.2 /
+# ADR-0013 context_type: tenant | system | aggregate). Values:
+#   required  — attribute MUST be present in this context
+#   optional  — attribute MAY be present in this context
+#   forbidden — attribute MUST NOT be present in this context (exporter/
+#               redaction-rules level enforcement target, ADR-0016)
+
+- name: saena.tenant_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: required
+    system: forbidden
+    aggregate: forbidden
+  description: >
+    Tenant identifier attribute, mirrors envelope tenant_id (ADR-0013).
+    pii=false (not a name/email/etc.) but IS a re-identifying / identifying
+    value under the 3-context model — ADR-0006 rev.2 requires its removal
+    (not mere optionality) from AggregateContext to prevent re-identification,
+    and it is exempted (forbidden) from SystemContext per ADR-0013. Treat as
+    identifying for redaction/export-policy purposes even though the pii flag
+    on this entry is false.
+
+- name: saena.run_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: required
+    system: forbidden
+    aggregate: forbidden
+  description: >
+    Run identifier attribute, mirrors envelope run_id (ADR-0013). Marked
+    required for TenantContext because W0 registry scope covers run-scoped
+    telemetry; ADR-0013 leaves the nullable allowance for non-run
+    TenantContext events OPEN (user decision pending, see ADR-0013 "Open
+    decisions") — this registry entry does not resolve that OPEN item and
+    must be revisited once ADR-0013 is amended or a follow-up ADR lands.
+    Forbidden in SystemContext (property-level exemption) and AggregateContext
+    (property-level removal, re-identification prevention), per ADR-0013's
+    context_type table.
+
+- name: saena.engine_id
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Search engine identifier, closed vocabulary aligned to envelope payload
+    engine_id (ADR-0013): v1 closed enum ["chatgpt-search"] only — CLAUDE.md
+    Engine scope v1 (Google AI Overviews/AI Mode/Gemini disabled for
+    optimize/observe/claim). Optional at the general attribute level in all
+    three contexts, but REQUIRED for the observation/citation/experiment
+    event families specifically (ADR-0013 payload requirement) — that
+    per-family requirement is stricter than this general per-context default
+    and must be enforced at the event/payload contract level (packages/contracts,
+    W1), not solely via this registry entry.
+
+- name: saena.context
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: required
+    system: required
+    aggregate: required
+  description: >
+    Attribute-level mirror of the envelope context_type discriminator
+    (ADR-0013 enum: tenant|system|aggregate). Same vocabulary as
+    context_type — no separate vocabulary is created (ADR-0016 constraint).
+    Low cardinality (3 values) — safe for span/metric naming inputs if ever
+    needed, though ADR-0016 keeps identifiers out of names regardless.
+    Required in all three contexts: every span/log/metric must declare which
+    context it was emitted under.
+
+- name: saena.patch_unit_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: forbidden
+  description: >
+    Identifies the implementation patch unit (worktree/unit-of-work) that
+    produced the telemetry, e.g. "w1-04-quality-adrs" (see ADR-0013 example
+    instance, patch.unit.completed.v1 payload). Operationally useful in
+    TenantContext (workflow lead-time dashboards, observability.md dashboard
+    themes) and SystemContext (adapter/config change attribution). Forbidden
+    in AggregateContext: a patch unit ID is a high-cardinality, potentially
+    re-identifying operational detail with no legitimate role in de-identified
+    aggregate telemetry.
+
+- name: saena.contract_hash
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Hash of the applicable contract/schema version in force at emission time
+    (contracts SSOT per ADR-0011, packages/contracts). Useful for correlating
+    telemetry with a specific contract revision across all three contexts;
+    not identifying to a natural person or tenant lineage, so optional
+    (not forbidden) in AggregateContext.
+
+- name: saena.policy_bundle_hash
+  type: string
+  cardinality: medium
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Hash of the policy bundle in force, mirrors the run trace envelope field
+    policy_bundle_hash (observability.md CONFIRMED fields, k3s §9.1). Optional
+    in TenantContext (and, by consistency with the low re-identification risk
+    of a policy bundle version marker, optional rather than forbidden in
+    System/AggregateContext) — a bundle hash identifies a policy version, not
+    a tenant or individual.
+
+- name: saena.aggregate_scope_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: forbidden
+    system: forbidden
+    aggregate: required
+  description: >
+    Mirrors the envelope AggregateContext required field aggregate_scope_id
+    (ADR-0013) — identifies the de-identified cohort/aggregate scope, never
+    an individual tenant or run. Required only in AggregateContext; forbidden
+    in TenantContext and SystemContext since it has no meaning outside an
+    aggregate/de-identified scope and its presence there would signal
+    aggregate-context leakage into non-aggregate telemetry.

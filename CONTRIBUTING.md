@@ -10,7 +10,21 @@
 
 ## Current decision
 
-PROPOSED contribution flow. CI/CD not yet implemented.
+CONFIRMED contribution flow (W0). CI = GitHub Actions (`.github/workflows/ci.yml`, `security.yml` — ADR-0018). 로컬 게이트 = `uv run just verify` (CI와 동일 명령 집합).
+
+### 로컬 설정 (W0 이후)
+
+```sh
+uv sync --locked                                    # 의존성 (uv.lock 고정)
+uvx --from pre-commit pre-commit install            # pre-commit 훅 설치
+uv run just verify                                  # 전체 로컬 게이트
+```
+
+Worktree 규약(ADR-0023): patch unit마다 `sh tools/development/worktree.sh create w<wave>-<seq2>-<slug> --paths '<glob>' --owner <agent>`.
+
+### 인간 수행 체크리스트 (branch protection — 사용자 결정 2026-07-12)
+
+GitHub Settings → Branches → main 보호 규칙: required status checks = `lint`, `schema-validate`, `boundaries`, `unit`, `contract-compat`, `guards`, `secret-scan`, `sbom`, `vuln-scan`, `actions-lint`; require code-owner review; force-push 금지. @saena-* teams 생성 전까지 CODEOWNERS는 선언적.
 
 ## Constraints
 
@@ -31,7 +45,7 @@ PROPOSED contribution flow. CI/CD not yet implemented.
 
 ## Open decisions
 
-- Branch protection rules — OPEN DECISION
+- ~~Branch protection rules~~ — **확정 (사용자 2026-07-12, ADR-0018)**: W0 즉시 활성. required checks = ci(lint, schema-validate, boundaries, unit, contract-compat) + security(guards, secret-scan, sbom, vuln-scan, actions-lint). GitHub 설정 변경은 인간 수행 (아래 체크리스트)
 - CODEOWNERS final mapping — **활성 `CODEOWNERS` 존재** (2026-07-12; `.example` 삭제). teams 생성 + branch protection 활성화 전까지 선언적
 
 ## Source specification references

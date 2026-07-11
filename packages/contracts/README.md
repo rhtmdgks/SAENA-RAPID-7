@@ -19,14 +19,18 @@ CONFIRMED need; contents NOT IMPLEMENTED.
 - Must accept tenant/workspace/project/site/run/actor IDs
 - P0 계약 12종 (Synthesis rev.2 §7): Tenant/Actor/Workspace/Project/Site/Run Context + SourceSnapshot, ChangePlan, ApprovalDecision, PatchArtifact, VerificationResult, AuditEvent
 
+## Ownership (ADR-0011)
+
+본 디렉토리가 **유일한 수기 편집 계약 SSOT**다 (단일 owner = Contracts Steward). `packages/schemas`는 파생(codegen) 산출 전용 — 수기 스키마 반입 금지.
+
 ## Open decisions
 
 - ~~Proto package naming~~ — 이연 (ADR-0008)
-- OpenAPI/JSON Schema 네이밍 규약 — Wave 1 착수 시
+- ~~OpenAPI/JSON Schema 네이밍 규약~~ — **확정 (ADR-0011, 2026-07-12)**: JSON Schema 2020-12 단일 방언, `$id = https://schemas.the-saena.ai/{category}/{name}/v{major}/…`, directory-per-major + `registry.json` + git tag `contracts/{name}/vX.Y.Z`. 호환성 정책 = ADR-0012, envelope = ADR-0013.
 
 ## Source specification references
 
-- k3s §4
+- k3s §4; ADR-0011/0012/0013
 
 ## Status
 

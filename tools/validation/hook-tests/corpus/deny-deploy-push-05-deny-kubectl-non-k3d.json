@@ -1,0 +1,14 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "kubectl patch deploy x must be denied when context is not k3d-* (mocked non-k3d context)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "kubectl patch deploy x"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_CONTEXT": "prod-cluster"
+  },
+  "expect_exit": 2
+}

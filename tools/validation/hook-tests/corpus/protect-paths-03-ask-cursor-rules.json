@@ -1,0 +1,12 @@
+{
+  "hook": "protect-paths",
+  "description": ".cursor/rules/z.mdc must route to ask (reverse-boundary protection symmetric with .claude)",
+  "stdin": {
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": ".cursor/rules/z.mdc"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+}

@@ -32,19 +32,21 @@ __pycache__/
 coverage/
 *.egg-info/
 
-# Lockfiles intentionally ignored until package managers chosen (OPEN DECISION)
-# Do not commit accidental local lockfiles during bootstrap
-package-lock.json
+# Lockfile policy (ADR-0009/0010/0021): uv.lock is the committed single lockfile.
+# Other ecosystems' lockfiles stay ignored until that ecosystem is adopted by ADR
+# (un-ignore per file when adopted — e.g. package-lock.json when contract tooling lands).
 pnpm-lock.yaml
 yarn.lock
 Cargo.lock
 poetry.lock
-uv.lock
+package-lock.json
 
 # Runtime / local
 .tmp/
 .tmp-*/
-.saena/run-*/
+# .saena/ = MAS runtime coordination state, never committed (ADR-0023);
+# still inside secret-scan scope (gitleaks scans the working tree).
+.saena/
 *.log
 .turbo/
 .next/
@@ -55,7 +57,9 @@ uv.lock
 
 # Local tool / agent state
 .serena/
-.claude/settings.json
+# .claude/settings.json is CHECKED IN since W0 (team-wide hook wiring + deny
+# rules — ADR-0019). Personal overrides go to settings.local.json (ignored).
+.claude/settings.local.json
 audit/
 
 # Customer source workspaces (never commit)

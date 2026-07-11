@@ -1,0 +1,11 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "pip install with a URL argument must be hard denied (unauditable source)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "pip install https://example.com/pkg.tar.gz"
+    }
+  },
+  "expect_exit": 2
+}

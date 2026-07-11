@@ -1,0 +1,14 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "helm upgrade x y must be denied when context is not k3d-* (mocked non-k3d context)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "helm upgrade x y"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_CONTEXT": "prod-cluster"
+  },
+  "expect_exit": 2
+}

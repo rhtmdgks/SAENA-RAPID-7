@@ -1,0 +1,11 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "uv tool install ruff==0.5.0 (version-pinned) must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "uv tool install ruff==0.5.0"
+    }
+  },
+  "expect_exit": 0
+}

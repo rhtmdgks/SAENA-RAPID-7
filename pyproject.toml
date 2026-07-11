@@ -1,0 +1,59 @@
+[project]
+name = "saena-monorepo"
+version = "0.0.0"
+description = "SAENA RAPID-7 workspace root (virtual — not a package)"
+requires-python = ">=3.12,<3.13"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+# Members are listed explicitly: several packages/* dirs (contracts, schemas,
+# events mirrors) are schema/doc trees without pyproject.toml by design.
+# Add each new member here in the patch unit that creates it.
+members = [
+    "packages/shared",
+    "packages/testing",
+]
+
+[dependency-groups]
+dev = [
+    "rust-just>=1.36,<3",
+    "ruff>=0.14,<0.15",
+    "mypy>=1.14,<2",
+    "pytest>=9.0.3,<10",
+    "pytest-cov>=6,<7",
+    "diff-cover>=9,<10",
+    "import-linter>=2.1,<3",
+    "check-jsonschema>=0.30,<1",
+    "saena-shared",
+    "saena-testing",
+]
+
+[tool.uv.sources]
+saena-shared = { workspace = true }
+saena-testing = { workspace = true }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+files = ["packages"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "tests"]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["packages"]
+# Exclusions must be explicit per ADR-0017 — no implicit patterns.
+omit = []

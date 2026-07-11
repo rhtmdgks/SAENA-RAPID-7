@@ -1,0 +1,12 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "uv add requests must route to ask (human approval), not hard deny/allow",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "uv add requests"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+}

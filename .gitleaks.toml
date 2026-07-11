@@ -1,0 +1,35 @@
+# gitleaks configuration — SAENA RAPID-7
+#
+# Authority: docs/decisions/ADR-0020-secret-scanning.md (accepted 2026-07-12)
+#
+# Policy (ADR-0020 "Allowlist 정책"):
+#   - This file's [[allowlists]] section is intentionally EMPTY.
+#   - Verified false positives are suppressed ONLY via fingerprint entries in
+#     .gitleaksignore (one finding per line: <commit>:<file>:<rule-id>:<line>).
+#   - Path-level allowlisting (paths = [...] in [[allowlists]], or a global
+#     path exclusion) is FORBIDDEN by policy: a path allowlist makes that
+#     entire path permanently unscanned, which lets a real secret hide behind
+#     a broad exclusion added to silence one false positive.
+#   - Any addition to this file's rules or to .gitleaksignore requires a PR
+#     with security CODEOWNERS review — no solo merge (ADR-0020).
+#
+# Path allowlist decision (uv.lock / lockfile hash noise):
+#   - No path allowlist has been added for uv.lock or any other lockfile.
+#   - Rationale: as of this config's authoring, no lockfile exists yet in this
+#     repo (language decision ADR-0009 is still open) and gitleaks 8.30.0's
+#     embedded default ruleset produced zero findings on a full scan of the
+#     current tree (see T09 verification log in the commit message). If a
+#     future lockfile format triggers entropy-based false positives, the
+#     correct fix under ADR-0020 is a fingerprint entry in .gitleaksignore
+#     for that specific finding, NOT a path exclusion here.
+
+[extend]
+# Extend (not replace) the gitleaks built-in default ruleset, so upstream
+# rule updates (github.com/gitleaks/gitleaks config/gitleaks.toml) keep
+# applying without this file needing to mirror every upstream rule.
+useDefault = true
+
+# Intentionally no [[allowlists]] tables here — see policy note above.
+# Intentionally no [[rules]] here — no repo-specific rules identified yet;
+# add via PR + security CODEOWNERS review if a project-specific secret
+# pattern is later identified.

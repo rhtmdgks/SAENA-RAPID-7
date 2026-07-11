@@ -1,0 +1,19 @@
+# tools/validation/hook-tests/fixtures/protected-paths.txt
+#
+# Corpus-local COPY of the canonical protected-paths policy list, used by
+# protect-paths.sh test fixtures via POLICY_FILE so the T12 hook-tests
+# corpus does not depend on the T08 canonical policy file landing first.
+#
+# Mirrors: .cursor/rules/20-protected-paths.mdc + CLAUDE.md "Protected paths".
+# The real canonical list is delivered by T08
+# (tools/validation/policy/protected-paths.txt) — this file is a test
+# double only, not a source of truth.
+
+docs/specs/**
+packages/contracts/**
+packages/schemas/**
+events/**
+workflows/**
+deploy/**
+.cursor/rules/**
+.claude/*

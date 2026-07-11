@@ -1,0 +1,12 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "pip install requests must route to ask",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "pip install requests"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+}

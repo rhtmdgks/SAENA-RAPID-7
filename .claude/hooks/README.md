@@ -6,7 +6,9 @@ SAENA FORGE 안전 게이트의 Claude Code hook 설계 + 설정 예시. Prompt 
 
 ## Status
 
-**설계 문서 (NOT IMPLEMENTED).** 이 디렉토리에 **활성 hook 스크립트·배선은 없다.** 아래는 설계와 예시이며, 실제로 동작하지 않는다. Hook은 완전한 보안 경계도 아니다 — 최종 통제는 Forge Policy Gate + k3s(namespace·NetworkPolicy·non-root·short-lived credential·branch protection). 정직 표기 원칙: "hook 활성" 주장 금지.
+**W0 dev-repo 안전 hook 5종 IMPLEMENTED + 배선 (2026-07-12, ADR-0019/T13).** `scripts/` 5종(deny-deploy-push, deny-unpinned-install, protect-paths, audit-log, secret-scan)이 체크인 `settings.json`에 배선되어 신규 세션부터 동작한다. Kill switch = `.claude/hooks/DISABLED` 파일 생성(세션 재시작 불요, 사용 사실 audit 기록). FORGE runtime hook ladder(§11 전체)는 **여전히 W3 NOT IMPLEMENTED**. Hook은 완전한 보안 경계가 아니다 — 최종 통제는 Forge Policy Gate + k3s(namespace·NetworkPolicy·non-root·short-lived credential·branch protection).
+
+**검증 증거 (2026-07-12, T13)**: ① hook-tests corpus 33/33 PASS (`sh tools/validation/hook-tests/run-corpus.sh`, bash 3.2·dash 교차 실행) ② sandbox bare-repo 통합 테스트 — hook 배선된 headless Claude 세션의 `git push origin main` 시도가 `deny-deploy-push` 발화로 차단, remote ref 불변(d4d733e 유지), hook 발화 = 배선·등록의 직접 증거 ③ deny 시 audit 라인 기록 실증 (`audit/agent-hooks/*.jsonl`, decision:"deny"). 커버리지: **W0 dev-repo 안전 hook 5종만** — FORGE runtime hook ladder(action contract·policy signature·role lease)는 여전히 W3 미구현 (ADR-0019).
 
 ## Hook 이벤트 매핑 (설계 — Prompt pkg §11)
 

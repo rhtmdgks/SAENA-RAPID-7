@@ -1,0 +1,11 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "non-install commands (git status) are out of scope for this hook and must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git status"
+    }
+  },
+  "expect_exit": 0
+}

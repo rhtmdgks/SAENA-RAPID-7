@@ -1,0 +1,53 @@
+# pre-commit config (ADR-0018). Principle: pre-commit is convenience, CI is
+# authority — every hook here re-runs in CI. Exception: secret-scan also
+# blocks locally (leak prevention is the point — ADR-0020).
+# Third-party hook repos: full commit SHA pins only (ADR-0021).
+# Managed via: uvx --from pre-commit==4.4.0 pre-commit install
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-yaml
+        exclude: ^tools/development/k3d-dev\.yaml$ # k3d config uses custom schema; validated by k3d itself
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check
+        language: system
+        types: [python]
+
+      - id: ruff-format-check
+        name: ruff format --check
+        entry: uv run ruff format --check
+        language: system
+        types: [python]
+
+      - id: schema-validate
+        name: JSON Schema metaschema validation
+        entry: uv run check-jsonschema --check-metaschema
+        language: system
+        files: \.schema\.json$
+
+      - id: gitleaks-staged
+        name: gitleaks staged scan (blocking — ADR-0020)
+        entry: gitleaks protect --staged --no-banner --redact
+        language: system
+        pass_filenames: false
+
+      - id: protected-paths-warn
+        name: protected-path warning (non-blocking locally — CI + hooks enforce)
+        entry: sh -c 'sh tools/validation/check-protected-paths.sh "$@" || echo "WARNING - protected path staged; human approval + CODEOWNERS review required (CLAUDE.md)"; exit 0' --
+        language: system
+        verbose: true
+
+      - id: adr-status-guard
+        name: ADR Status->accepted guard (blocking)
+        entry: sh tools/validation/guards/check-adr-status.sh
+        language: system
+        pass_filenames: false

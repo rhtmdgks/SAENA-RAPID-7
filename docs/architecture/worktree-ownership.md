@@ -33,7 +33,7 @@ Customer source worktrees and monorepo development worktrees.
 
 ## Open decisions
 
-- Worktree path naming convention — PROPOSED `.saena` / runner ephemeral paths TBD
+- ~~Worktree path naming convention~~ — **확정 (ADR-0023, 2026-07-12)**: 형제 디렉토리 `../<repo>.worktrees/<unit-id>` + 브랜치 `unit/<unit-id>` + `.saena/` registry (`tools/development/worktree.sh`). runner ephemeral `/workspace/<tenant_id>/<run_id>/`는 W3 PLANNED
 
 ## Source specification references
 

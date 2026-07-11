@@ -1,0 +1,16 @@
+[importlinter]
+root_packages =
+    saena_shared
+    saena_testing
+
+; dependency-policy Allowed directions, W0 minimal form.
+; Grows one contract per new workspace member (ADR-0002 module isolation
+; contracts arrive with the first worker package).
+
+[importlinter:contract:shared-is-a-leaf]
+name = saena_shared must not import other saena packages
+type = forbidden
+source_modules =
+    saena_shared
+forbidden_modules =
+    saena_testing

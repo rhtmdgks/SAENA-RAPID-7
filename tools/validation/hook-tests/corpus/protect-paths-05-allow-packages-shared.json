@@ -1,0 +1,12 @@
+{
+  "hook": "protect-paths",
+  "description": "packages/shared/src/x.py must be allowed (not under packages/contracts or packages/schemas)",
+  "stdin": {
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "packages/shared/src/x.py"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_not_contains": "permissionDecision"
+}

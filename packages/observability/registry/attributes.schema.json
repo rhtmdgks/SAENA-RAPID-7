@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/common/observability-attribute-registry/v1/attributes.schema.json",
+  "title": "SAENA telemetry attribute registry (v1)",
+  "description": "Machine-validated schema for packages/observability/registry/attributes.yaml (and its JSON mirror, attributes.json). Defines the SAENA custom telemetry attribute namespace per ADR-0016, aligned to the 3-context envelope model (ADR-0013). Each entry describes one saena.* attribute: its type, cardinality, PII status, and per-context (tenant|system|aggregate) requirement rule.",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/attributeEntry"
+  },
+  "$defs": {
+    "attributeEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "cardinality",
+        "pii",
+        "contexts",
+        "description"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^saena\\.[a-z0-9_.]+$",
+          "description": "Fully-qualified saena.* attribute name. Identifiers (run_id/tenant_id/etc.) must never appear in span/metric names — attribute-only per ADR-0016."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "int",
+            "double",
+            "boolean"
+          ],
+          "description": "OTel attribute value type."
+        },
+        "cardinality": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "description": "Expected distinct-value cardinality. Attributes used in span/metric names must be low."
+        },
+        "pii": {
+          "type": "boolean",
+          "description": "Whether the attribute value itself is (or may contain) personally identifiable / re-identifying information. Note: an attribute may be pii=false yet still be tenant-identifying (see description field for such cases) — pii tracks direct PII content, not identifiability."
+        },
+        "contexts": {
+          "$ref": "#/$defs/contextRules"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable purpose, source-of-truth cross-reference, and any context-specific notes (e.g. OPEN decisions, identifying-but-not-PII caveats)."
+        }
+      }
+    },
+    "contextRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant",
+        "system",
+        "aggregate"
+      ],
+      "properties": {
+        "tenant": {
+          "$ref": "#/$defs/contextRule"
+        },
+        "system": {
+          "$ref": "#/$defs/contextRule"
+        },
+        "aggregate": {
+          "$ref": "#/$defs/contextRule"
+        }
+      }
+    },
+    "contextRule": {
+      "type": "string",
+      "enum": [
+        "required",
+        "optional",
+        "forbidden"
+      ],
+      "description": "Requirement rule for this attribute within the named context_type (tenant|system|aggregate), derived from the event envelope discriminator (ADR-0013)."
+    }
+  }
+}

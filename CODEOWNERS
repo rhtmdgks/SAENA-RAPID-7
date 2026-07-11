@@ -1,33 +1,48 @@
-# ACTIVATED 2026-07-12 (audit sec F-10 — enforcement layer). Source: CODEOWNERS.example.
-# NOTE: @saena-* teams must exist in the GitHub org and branch protection must require
-# code-owner review for this to enforce anything. Until then this file is declarative.
-# Team creation + branch protection = OPEN DECISION (CONTRIBUTING.md).
+# CODEOWNERS — SAENA-Labs org teams (post-transfer)
+# Format: @SAENA-Labs/<team-slug>
+# Teams require Write (push) on this repo for ownership to enforce.
+# Branch protection / ruleset: require code owner review (ADR-0018).
 
-# Specs (immutable originals — changes require Architecture + Lead)
-/docs/specs/ @saena-architecture @saena-lead
+# CI / enforcement surfaces
+/.github/ @SAENA-Labs/saena-security @SAENA-Labs/saena-platform
+/CODEOWNERS @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
+/.pre-commit-config.yaml @SAENA-Labs/saena-security @SAENA-Labs/saena-platform
+
+# Protected-path canonical policy
+/tools/validation/policy/ @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
+
+# Future migrations
+/database/migrations/ @SAENA-Labs/saena-architecture @SAENA-Labs/saena-backend
+
+# Specs (immutable originals)
+/docs/specs/ @SAENA-Labs/saena-architecture @SAENA-Labs/saena-lead
 
 # Contracts & events
-/packages/contracts/ @saena-architecture @saena-backend
-/packages/schemas/ @saena-architecture @saena-backend
-/events/ @saena-architecture @saena-backend
+/packages/contracts/ @SAENA-Labs/saena-contracts @SAENA-Labs/saena-architecture
+/packages/schemas/ @SAENA-Labs/saena-contracts @SAENA-Labs/saena-architecture
+/events/ @SAENA-Labs/saena-contracts @SAENA-Labs/saena-architecture
 
 # Workflows & deploy
-/workflows/ @saena-platform
-/deploy/ @saena-platform @saena-security
+/workflows/ @SAENA-Labs/saena-platform
+/deploy/ @SAENA-Labs/saena-platform @SAENA-Labs/saena-security
 
 # Security-sensitive
-/.claude/ @saena-security @saena-lead
-/.cursor/ @saena-security @saena-lead
-/docs/architecture/security-model.md @saena-security
-/docs/decisions/ @saena-architecture @saena-lead
+/.claude/ @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
+/.cursor/ @SAENA-Labs/saena-security @SAENA-Labs/saena-lead
+/docs/architecture/security-model.md @SAENA-Labs/saena-security
+/docs/decisions/ @SAENA-Labs/saena-architecture @SAENA-Labs/saena-lead
+/docs/architecture/ @SAENA-Labs/saena-architecture
 
 # Domain services
-/services/foundation/ @saena-platform @saena-backend
-/services/acquisition/ @saena-backend @saena-aeo
-/services/intelligence/ @saena-aeo @saena-backend
-/services/optimization/ @saena-aeo @saena-backend
-/services/experimentation/ @saena-aeo @saena-backend
-/services/platform/ @saena-platform @saena-backend
+/services/foundation/ @SAENA-Labs/saena-platform @SAENA-Labs/saena-backend
+/services/acquisition/ @SAENA-Labs/saena-backend @SAENA-Labs/saena-aeo
+/services/intelligence/ @SAENA-Labs/saena-aeo @SAENA-Labs/saena-backend
+/services/optimization/ @SAENA-Labs/saena-aeo @SAENA-Labs/saena-backend
+/services/experimentation/ @SAENA-Labs/saena-aeo @SAENA-Labs/saena-backend
+/services/platform/ @SAENA-Labs/saena-platform @SAENA-Labs/saena-backend
 
 # Provider adapters
-/packages/provider-adapters/ @saena-integration @saena-architecture
+/packages/provider-adapters/ @SAENA-Labs/saena-integration @SAENA-Labs/saena-architecture
+
+# Default catch-all — platform + architecture
+* @SAENA-Labs/saena-platform @SAENA-Labs/saena-architecture

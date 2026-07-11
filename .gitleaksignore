@@ -1,0 +1,20 @@
+# gitleaksignore — SAENA RAPID-7
+#
+# Authority: docs/decisions/ADR-0020-secret-scanning.md (accepted 2026-07-12)
+#
+# This file is the ONLY place verified-false-positive findings may be
+# suppressed. Format: one fingerprint per line, exactly as gitleaks prints it:
+#
+#   <commit>:<file>:<rule-id>:<line>
+#
+# Path-level allowlisting is FORBIDDEN (ADR-0020 "Allowlist 정책") — do not
+# add glob/path patterns here or in .gitleaks.toml [[allowlists]] to suppress
+# an entire file or directory. Suppress by exact fingerprint only.
+#
+# Every addition requires a PR with security CODEOWNERS review — no solo
+# merge. If the finding was a REAL secret (not a false positive), do not add
+# it here until rotation is confirmed — see SECURITY.md "Verified secret
+# response runbook (ADR-0020)".
+#
+# Baseline: empty. Full-history scan on this baseline reported 0 findings
+# (see T09 verification log in the commit message that introduced this file).

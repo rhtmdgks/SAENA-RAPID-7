@@ -1,0 +1,52 @@
+# k3d cluster config — Local Tier-2 profile (ADR-0022).
+#
+# Single-node k3d cluster for local workload execution (services, agent
+# runners under synthetic fixtures only — k3s spec §5.1 Developer profile).
+# Stateful infra dependencies (postgres, and later temporal-dev/redpanda) run
+# OUTSIDE this cluster via tools/development/docker-compose.dev.yaml — this
+# file does not declare those services.
+#
+# Usage: k3d cluster create --config tools/development/k3d-dev.yaml
+# Teardown: k3d cluster delete saena-dev
+#
+# Never used in production; deploy/ charts + deploy/profiles/development are
+# the deployment SSOT (this config only stands up the local dev substrate).
+
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: saena-dev
+
+servers: 1
+agents: 0
+
+image: rancher/k3s:v1.30.4-k3s1
+
+# No local registry yet — deferred to W2C (image push/pull workflow for
+# service containers is not needed until the workload wave lands).
+# registries:
+#   create:
+#     name: saena-dev-registry
+#     host: "0.0.0.0"
+#     hostPort: "15000"
+
+ports:
+  # Minimal host port mappings — expand only when a workload actually needs
+  # ingress from the host. loadbalancer is k3d's default ingress entrypoint.
+  - port: 18443:443
+    nodeFilters:
+      - loadbalancer
+  - port: 18080:80
+    nodeFilters:
+      - loadbalancer
+
+# No extraArgs override yet — bundled Traefik stays enabled (default).
+# Add options.k3s.extraArgs entries here if a workload needs a different
+# ingress controller later.
+options:
+  k3d:
+    wait: true
+    timeout: "60s"
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: false
