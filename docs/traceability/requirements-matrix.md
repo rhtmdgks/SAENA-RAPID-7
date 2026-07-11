@@ -44,6 +44,12 @@ PROPOSED matrix for scaffolding verification.
 | 승인 전이 권위 경로 | k3s §4.3 | ADR-0003 | accepted (2026-07-12) |
 | envelope 필수 ID vs Strategy Card 익명성 | k3s §4.1 vs Algorithm §8.4 | ADR-0006 | accepted 안 A (2026-07-12) — 충돌 해소, events 구현 가능 |
 
+| 언어·monorepo 툴링 (W0) | Synthesis rev.2 §10 W0 | ADR-0009/0010 | accepted (2026-07-12, G1 사전 승인 + critic 검증) |
+| 계약 규약·호환성·envelope·tenant·error (W0) | k3s §4.1, Algorithm §8 | ADR-0011~0015 | accepted (2026-07-12, G2 사전 승인 + critic 검증) — envelope 스키마 실물은 W1 |
+| telemetry·테스트·CI 규약 (W0) | k3s §6·§9.1, Algorithm §9-10 | ADR-0016~0018 | accepted (2026-07-12) — coverage 90/90/ratchet 사용자 확정 |
+| dev-repo 안전 hook·secret·SBOM·devenv (W0) | Prompt pkg §10-11, k3s §5.1 | ADR-0019~0022 | accepted (2026-07-12) — hook 배선은 T13/G3 게이트 |
+| worktree 실행 규약 (W0) | Algorithm §9.2, Prompt pkg §7 | ADR-0023 | accepted (2026-07-12) — worktree-ownership.md open 종결 |
+
 ## Constraints
 
 - Spec originals unchanged

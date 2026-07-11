@@ -19,7 +19,7 @@ PROPOSED package set for monorepo reuse.
 
 ## Open decisions
 
-- Language/package manager — OPEN DECISION
+- ~~Language/package manager~~ — **확정 (ADR-0009/0010)**: Python 3.12 + uv workspaces. 수기 계약 SSOT = `packages/contracts`, 파생 산출 = `packages/schemas` (ADR-0011)
 
 ## Source specification references
 

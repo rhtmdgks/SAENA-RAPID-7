@@ -47,12 +47,12 @@ deploy ✗→ algorithm source
 
 ## Constraints
 
-- Bootstrap: no package manager lockfiles / manifests yet (OPEN DECISION language stack)
+- 단일 lockfile = `uv.lock` (커밋 대상, `uv sync --locked`가 CI 정합 게이트 — ADR-0009). 타 생태계 lockfile은 해당 생태계 ADR 채택 시 un-ignore.
 
 ## Open decisions
 
-- Primary languages per service — OPEN DECISION
-- Monorepo tooling (Nx/Bazel/etc.) — OPEN DECISION
+- ~~Primary languages per service~~ — **확정 (ADR-0009, 2026-07-12)**: Python 3.12 + uv 단일 primary, TS는 operator-console 한정 예약
+- ~~Monorepo tooling (Nx/Bazel/etc.)~~ — **확정 (ADR-0010, 2026-07-12)**: uv workspaces + just + import-linter; build-graph 도구는 측정 트리거 4종 충족 시 별도 ADR. 규칙 11의 lint 강제 = `.importlinter` (CI `boundaries` job)
 
 ## Source specification references
 

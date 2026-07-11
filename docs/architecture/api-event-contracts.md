@@ -97,8 +97,8 @@ All core data contracts MUST be able to carry:
 
 ## Open decisions
 
-- Exact protobuf package naming — OPEN DECISION
-- AsyncAPI vs protobuf-only for events — OPEN DECISION (k3s repo sketch includes asyncapi/)
+- ~~Exact protobuf package naming~~ — 이연 (ADR-0008; proto/ 예약·비움)
+- ~~AsyncAPI vs protobuf-only for events~~ — **확정 (ADR-0008/0011)**: AsyncAPI 3.0 + JSON Schema 2020-12. envelope 구체(9필드·3-context·engine_id 닫힌 enum) = ADR-0013, 호환성 = ADR-0012
 
 ## Source specification references
 
