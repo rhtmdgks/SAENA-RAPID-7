@@ -1,0 +1,12 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w1-00: git merge --no-ff -q unit/w1-01-registry -m integrate (expect exit 0)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git merge --no-ff -q unit/w1-01-registry -m integrate"
+    }
+  },
+  "env": { "HOOK_TEST_MOCK_BRANCH": "wave1-contracts" },
+  "expect_exit": 0
+}

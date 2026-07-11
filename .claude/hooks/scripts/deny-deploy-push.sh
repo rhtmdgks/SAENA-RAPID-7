@@ -102,7 +102,31 @@ printf '%s\n' "$_segments" | while IFS= read -r _seg; do
                     _deny "git push is forbidden in dev-repo sessions (CLAUDE.md #10)"
                     ;;
                 merge)
-                    _deny "git merge is forbidden in dev-repo sessions"
+                    # Precision rule (W1, user-approved 2026-07-12): the ONLY
+                    # permitted merge is Integrator wave-branch integration —
+                    # current branch matches ^wave[0-9]+- AND the merge source
+                    # is a unit/* branch AND no main/master/origin token
+                    # appears. Everything else stays denied (main protection
+                    # continues at hook level after the deny-rule removal).
+                    _cur_branch="${HOOK_TEST_MOCK_BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
+                    case "$_cur_branch" in
+                        wave[0-9]*-*)
+                            case "$_seg" in
+                                *\ main|*\ main\ *|*origin/*|*\ master|*\ master\ *)
+                                    _deny "git merge of main/master/origin is forbidden even on wave branches (human PR only)"
+                                    ;;
+                                *unit/w[0-9]*)
+                                    : # allowed — integration merge of a patch-unit branch
+                                    ;;
+                                *)
+                                    _deny "git merge on wave branches is allowed only from unit/* branches"
+                                    ;;
+                            esac
+                            ;;
+                        *)
+                            _deny "git merge is forbidden outside wave integration branches (current: '${_cur_branch:-<none>}')"
+                            ;;
+                    esac
                     ;;
                 remote)
                     _sub2="$(printf '%s' "$_seg" | awk '{print $3}')"
@@ -120,7 +144,7 @@ printf '%s\n' "$_segments" | while IFS= read -r _seg; do
                             ;;
                     esac
                     ;;
-                status|log|diff|show|add|commit|branch|checkout|switch|restore|fetch|stash|worktree|rev-parse|merge-base|describe|tag|blame|grep|ls-files|check-ignore|config)
+                status|log|diff|show|add|commit|branch|checkout|switch|restore|fetch|stash|worktree|rev-parse|merge-base|describe|tag|blame|grep|ls-files|check-ignore|config|cat-file|ls-tree|rev-list|show-ref)
                     : # allowed subcommands (tag: read tag -l and tag creation both allowed per spec; config: read-only intent, not enforced further here)
                     ;;
                 "")

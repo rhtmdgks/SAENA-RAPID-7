@@ -174,10 +174,12 @@ FAIL | $_fixture_name | (could not parse 'stdin' field)"
 
     _env_json="$(_extract_raw_field "$_fixture_text" "env")"
     _mock_context=""
+    _mock_branch=""
     _policy_file_override=""
     if [ -n "$_env_json" ]; then
         _mock_context="$(_extract_raw_field "$_env_json" "HOOK_TEST_MOCK_CONTEXT")"
         _policy_file_override="$(_extract_raw_field "$_env_json" "POLICY_FILE")"
+        _mock_branch="$(_extract_raw_field "$_env_json" "HOOK_TEST_MOCK_BRANCH")"
     fi
 
     # protect-paths fixtures use the corpus-local policy copy by default
@@ -186,7 +188,7 @@ FAIL | $_fixture_name | (could not parse 'stdin' field)"
         _policy_file_override="$_fixtures_dir/protected-paths.txt"
     fi
 
-    _actual_stdout="$(printf '%s' "$_stdin_json" | HOOK_TEST_MOCK_CONTEXT="$_mock_context" POLICY_FILE="$_policy_file_override" sh "$_hook_script" 2>/tmp/run-corpus.stderr.$$)"
+    _actual_stdout="$(printf '%s' "$_stdin_json" | HOOK_TEST_MOCK_CONTEXT="$_mock_context" POLICY_FILE="$_policy_file_override" HOOK_TEST_MOCK_BRANCH="$_mock_branch" sh "$_hook_script" 2>/tmp/run-corpus.stderr.$$)"
     _actual_exit=$?
     rm -f /tmp/run-corpus.stderr.$$ 2>/dev/null
 

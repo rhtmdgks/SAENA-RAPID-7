@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w1-00: git cat-file -t HEAD (expect exit 0)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git cat-file -t HEAD"
+    }
+  },
+  "expect_exit": 0
+}

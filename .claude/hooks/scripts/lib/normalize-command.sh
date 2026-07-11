@@ -160,23 +160,37 @@ _nc_normalize_one_segment() {
             ;;
     esac
 
-    # Collapse `git -c key=val` pairs: drop each `-c key=val` token pair
-    # that immediately follows `git`, keep verb + subcommand.
+    # Strip ALL leading git global options so the policy layer sees the real
+    # subcommand (w1-00 fix — `git -C <path> status` previously mis-parsed
+    # -C as the subcommand and fail-closed on legitimate read-only use).
+    # Options WITH an argument: -C, -c, --git-dir, --work-tree, --namespace,
+    # --super-prefix, --config-env, --exec-path (also their --opt=val forms).
+    # Bare flags: --no-pager, -p, -P, --paginate, --bare, --literal-pathspecs,
+    # --glob-pathspecs, --noglob-pathspecs, --icase-pathspecs,
+    # --no-replace-objects, --no-optional-locks, --no-lazy-fetch, --no-advice.
+    # Unknown leading options are KEPT (they land in the subcommand slot and
+    # the policy layer fail-closes) — unknown-option direction stays deny.
     case "$_nos_seg" in
-        git\ -c\ *)
+        git\ -*)
             _nos_seg="$(printf '%s' "$_nos_seg" | awk '
                 {
                     n = split($0, parts, " ")
                     out = parts[1]
                     i = 2
                     while (i <= n) {
-                        if (parts[i] == "-c" && i + 1 <= n) {
-                            i += 2
-                            continue
+                        p = parts[i]
+                        if ((p == "-C" || p == "-c" || p == "--git-dir" || p == "--work-tree" || p == "--namespace" || p == "--super-prefix" || p == "--config-env" || p == "--exec-path") && i + 1 <= n) {
+                            i += 2; continue
                         }
-                        out = out " " parts[i]
-                        i++
+                        if (p ~ /^--(git-dir|work-tree|namespace|super-prefix|config-env|exec-path)=/) {
+                            i++; continue
+                        }
+                        if (p == "--no-pager" || p == "-p" || p == "-P" || p == "--paginate" || p == "--bare" || p == "--literal-pathspecs" || p == "--glob-pathspecs" || p == "--noglob-pathspecs" || p == "--icase-pathspecs" || p == "--no-replace-objects" || p == "--no-optional-locks" || p == "--no-lazy-fetch" || p == "--no-advice") {
+                            i++; continue
+                        }
+                        break
                     }
+                    for (j = i; j <= n; j++) { out = out " " parts[j] }
                     print out
                 }
             ')"
