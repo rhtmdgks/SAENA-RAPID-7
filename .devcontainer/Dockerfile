@@ -15,13 +15,13 @@ FROM mcr.microsoft.com/devcontainers/python:3.12-bookworm
 # ---------------------------------------------------------------------------
 # Tool versions — MUST match .tool-versions exactly (sync duty, ADR-0022).
 # ---------------------------------------------------------------------------
-ARG UV_VERSION=0.5.11
-ARG JUST_VERSION=1.36.0
+ARG UV_VERSION=0.10.4
+ARG JUST_VERSION=1.56.0
 ARG KUBECTL_VERSION=1.31.4
 ARG HELM_VERSION=3.16.4
 ARG K3D_VERSION=5.7.5
 ARG OASDIFF_VERSION=1.11.6
-ARG GITLEAKS_VERSION=8.21.2
+ARG GITLEAKS_VERSION=8.30.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -30,7 +30,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # (no shell install script, no checksum step needed: the binary provenance
 # is the image digest reference itself).
 # ---------------------------------------------------------------------------
-COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.10.4 /uv /uvx /usr/local/bin/
 
 # ---------------------------------------------------------------------------
 # just, kubectl, helm, k3d, oasdiff, gitleaks — installed via curl + published
