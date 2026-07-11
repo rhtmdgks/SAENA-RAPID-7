@@ -44,8 +44,8 @@ AEO correctness; patch correctness; safety; reproducibility; measurement; busine
 
 ## Open decisions
 
-- Coverage thresholds — OPEN DECISION
-- Browser harness vendor details — OPEN DECISION
+- ~~Coverage thresholds~~ — **확정 (ADR-0017, 사용자 2026-07-12)**: 핵심 모듈(validation/policy/compatibility) line ≥90% blocking + changed-lines ≥90% blocking + 전역 coverage 하락 금지(ratchet, blocking) + exclusion은 명시적 목록만(단순 데이터/generated/migration boilerplate). 게이트 활성 = 첫 실코드(W1 harness 포함)부터
+- Browser harness vendor details — OPEN DECISION (W4 chatgpt-observer 착수 시; Playwright for Python이 ADR-0009 기본 후보)
 
 ## Source specification references
 
