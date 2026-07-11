@@ -81,3 +81,5 @@ Out: `TenantContext` JSON Schema 파일 작성(W1 P0 #1), saas-shared JWT claim 
 ## Status
 
 accepted (2026-07-12, 사용자)
+
+> 검증 기록: independent critic conformance review PASS (2026-07-12) — 사용자 G2 처리 지침("계획·결정 부합 시 사전 승인")의 조건 충족 확인.

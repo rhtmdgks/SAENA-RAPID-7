@@ -85,3 +85,5 @@ Node 사용은 devcontainer 내 "계약 lint 전용"으로 격리한다(ADR-0009
 ## Status
 
 accepted (2026-07-12, 사용자)
+
+> 검증 기록: independent critic conformance review PASS (2026-07-12) — 사용자 G2 처리 지침("계획·결정 부합 시 사전 승인")의 조건 충족 확인.

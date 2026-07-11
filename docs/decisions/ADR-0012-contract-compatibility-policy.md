@@ -69,3 +69,5 @@ Out: 개별 스키마 파일(W1), envelope 필드 목록 자체(ADR-0013), `regi
 ## Status
 
 accepted (2026-07-12, 사용자)
+
+> 검증 기록: independent critic conformance review PASS (2026-07-12) — 사용자 G2 처리 지침("계획·결정 부합 시 사전 승인")의 조건 충족 확인.
