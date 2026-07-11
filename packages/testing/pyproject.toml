@@ -1,0 +1,16 @@
+[project]
+name = "saena-testing"
+version = "0.1.0"
+description = "SAENA shared test utilities and fixtures"
+requires-python = ">=3.12,<3.13"
+dependencies = ["saena-shared"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_testing"]
+
+[tool.uv.sources]
+saena-shared = { workspace = true }
