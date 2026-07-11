@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "k3d cluster create t must be allowed (k3d itself is always allowed)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "k3d cluster create t"
+    }
+  },
+  "expect_exit": 0
+}

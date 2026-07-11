@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "git commit -m x && git push must be denied (later segment in chain)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git commit -m x && git push"
+    }
+  },
+  "expect_exit": 2
+}

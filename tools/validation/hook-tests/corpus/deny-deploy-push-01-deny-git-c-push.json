@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "git -c http.extraHeader=x push origin main must be denied (C-1 bypass via -c injection)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git -c http.extraHeader=x push origin main"
+    }
+  },
+  "expect_exit": 2
+}

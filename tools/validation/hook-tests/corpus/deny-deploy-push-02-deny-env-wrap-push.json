@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "env GIT_SSH=x git push must be denied (C-1 bypass via env wrapping)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "env GIT_SSH=x git push"
+    }
+  },
+  "expect_exit": 2
+}

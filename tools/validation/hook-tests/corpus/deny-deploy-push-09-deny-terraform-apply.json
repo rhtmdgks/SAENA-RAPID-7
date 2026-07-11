@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "terraform apply must be denied",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "terraform apply"
+    }
+  },
+  "expect_exit": 2
+}

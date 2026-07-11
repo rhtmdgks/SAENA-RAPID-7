@@ -1,0 +1,11 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "npm ci must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "npm ci"
+    }
+  },
+  "expect_exit": 0
+}

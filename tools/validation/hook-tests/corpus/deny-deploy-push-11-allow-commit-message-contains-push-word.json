@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "git commit -m \"push docs update\" must be allowed — the word 'push' in the commit message must NOT trigger the push subcommand deny (verb-scoped, not blacklist-string matching, per C-1)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git commit -m \"push docs update\""
+    }
+  },
+  "expect_exit": 0
+}

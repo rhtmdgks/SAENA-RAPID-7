@@ -1,0 +1,9 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "malformed stdin JSON (no tool_input.command field) must fail-closed to deny",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {}
+  },
+  "expect_exit": 2
+}

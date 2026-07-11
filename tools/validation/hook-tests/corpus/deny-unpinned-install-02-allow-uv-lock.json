@@ -1,0 +1,11 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "uv lock must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "uv lock"
+    }
+  },
+  "expect_exit": 0
+}
