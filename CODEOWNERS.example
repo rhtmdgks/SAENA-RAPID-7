@@ -1,0 +1,29 @@
+# EXAMPLE ONLY — not active until copied to CODEOWNERS and teams exist.
+# Status: PROPOSED
+
+# Specs (immutable originals — changes require Architecture + Lead)
+/docs/specs/ @saena-architecture @saena-lead
+
+# Contracts & events
+/packages/contracts/ @saena-architecture @saena-backend
+/packages/schemas/ @saena-architecture @saena-backend
+/events/ @saena-architecture @saena-backend
+
+# Workflows & deploy
+/workflows/ @saena-platform
+/deploy/ @saena-platform @saena-security
+
+# Security-sensitive
+/.claude/ @saena-security @saena-lead
+/docs/architecture/security-model.md @saena-security
+
+# Domain services (examples)
+/services/foundation/ @saena-platform @saena-backend
+/services/acquisition/ @saena-backend @saena-aeo
+/services/intelligence/ @saena-aeo @saena-backend
+/services/optimization/ @saena-aeo @saena-backend
+/services/experimentation/ @saena-aeo @saena-backend
+/services/platform/ @saena-platform @saena-backend
+
+# Provider adapters
+/packages/provider-adapters/ @saena-integration @saena-architecture

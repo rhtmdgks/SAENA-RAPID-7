@@ -1,0 +1,63 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+**/credentials*.json
+
+# Dependencies / builds (when added later)
+node_modules/
+dist/
+build/
+.target/
+target/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+*.egg-info/
+
+# Lockfiles intentionally ignored until package managers chosen (OPEN DECISION)
+# Do not commit accidental local lockfiles during bootstrap
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+Cargo.lock
+poetry.lock
+uv.lock
+
+# Runtime / local
+.tmp/
+.tmp-*/
+.saena/run-*/
+*.log
+.turbo/
+.next/
+
+# Terraform / local state (if added)
+**/.terraform/
+*.tfstate*
+
+# Local tool / agent state
+.serena/
+.claude/settings.json
+audit/
+
+# Customer source workspaces (never commit)
+workspaces/
+customer-repos/

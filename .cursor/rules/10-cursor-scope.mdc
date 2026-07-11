@@ -1,0 +1,55 @@
+---
+description: Cursor allow/deny scope and handoff to Claude Code
+alwaysApply: true
+---
+
+# Cursor scope
+
+## Purpose
+
+Limit Cursor to safe, small edits. Escalate to Claude Code otherwise.
+
+## Allowed (Cursor)
+
+- Documentation cleanup
+- File/directory scaffolding
+- Typos
+- Comments
+- Small UI tweaks
+- Clear single-file refactor
+- Test supplements that do **not** change existing contracts
+
+## Denied (Cursor)
+
+- Service boundary changes
+- API / event contract changes
+- DB schema or migration changes
+- AuthZ / tenant isolation changes
+- Temporal Workflow changes
+- k3s / Helm / RBAC / NetworkPolicy changes
+- AEO scoring changes
+- evidence policy changes
+- Arbitrary relaxation of `.claude` security settings
+- Automatic deployment
+- git push
+- merge
+
+## Stop and hand off to Claude Code if ANY
+
+- More than 3 files modified
+- Impact spans 2+ services
+- Changes under `packages/contracts`
+- Changes under `packages/schemas`
+- Changes under `events`
+- Changes under `workflows`
+- Changes under `deploy`
+- Security or data-isolation impact
+- Architecture judgment required
+
+## Bootstrap exception
+
+User-explicit Bootstrap Scaffolding may create initial skeleton files across many paths **once**. After bootstrap, this rule applies fully.
+
+## Status
+
+CONFIRMED

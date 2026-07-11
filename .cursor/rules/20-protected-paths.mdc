@@ -1,0 +1,39 @@
+---
+description: Protected paths require human approval before Cursor edits
+alwaysApply: true
+---
+
+# Protected paths
+
+## Purpose
+
+Prevent silent changes to high-risk surfaces.
+
+## Protected (require explicit user approval before Cursor edit)
+
+- `docs/specs/**`
+- `packages/contracts/**`
+- `packages/schemas/**`
+- `events/**`
+- `workflows/**`
+- `deploy/**`
+- `.claude/**`
+- `database/migrations/**` (or future migration paths under `deploy/**/migrations`)
+- AuthN/Z and tenant-isolation related code (when present)
+
+## Behavior
+
+If a task requires editing a protected path:
+
+1. Stop
+2. List paths and why
+3. Request user approval
+4. Prefer Claude Code for multi-file / contract work
+
+## Spec originals
+
+`docs/specs/SAENA_*_v1.md` are immutable design originals — do not modify; propose ADR instead.
+
+## Status
+
+CONFIRMED

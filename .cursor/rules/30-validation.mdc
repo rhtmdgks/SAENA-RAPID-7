@@ -1,0 +1,37 @@
+---
+description: Validation and completion evidence requirements
+alwaysApply: true
+---
+
+# Validation
+
+## Purpose
+
+No completion claims without evidence.
+
+## Rules
+
+- Do not declare done without verification evidence
+- Do not claim ChatGPT Search lift without registered observation + causal setup
+- Do not skip critical quality gates
+- Prefer contract tests before implementation expansion
+- Independent critic / second pass for release-affecting changes
+
+## Bootstrap validation checklist
+
+1. Requested dirs/files exist
+2. Spec originals unchanged
+3. No application implementation code
+4. No `package.json` / `pyproject.toml` / `Dockerfile` (until explicitly allowed)
+5. No secrets
+6. Cursor allow/deny documented
+7. Provider adapter boundaries separated
+8. Deployment profiles separated
+9. Tenant-aware principles documented
+10. Service boundaries traceable to specs
+11. Protected paths defined
+12. No git commit/push/merge by agent unless user asked
+
+## Status
+
+CONFIRMED

@@ -1,0 +1,51 @@
+---
+description: SAENA foundation principles for all Cursor work
+alwaysApply: true
+---
+
+# SAENA foundation
+
+## Purpose
+
+Enforce product principles during any Cursor edit.
+
+## Scope
+
+Entire repository.
+
+## Current decision
+
+CONFIRMED principles from design specs.
+
+## Principles (must reflect in structure/docs)
+
+1. API-first
+2. contract-first
+3. event-contract-first
+4. tenant-aware (`tenant_id`, `workspace_id`, `project_id`, `site_id`, `run_id`, `actor_id`)
+5. evidence-first
+6. human-approval-gated
+7. deployment-profile separation
+8. algorithm/infrastructure separation
+9. provider adapter separation
+10. least privilege
+11. immutable audit trail
+12. observable-by-default
+13. test-first
+14. no deployment by execution agents
+15. customer source isolation
+
+## Engine (v1)
+
+- ChatGPT Search only
+- Google AI Overviews / AI Mode / Gemini: OUT OF SCOPE for optimize/observe/claim
+
+## Constraints
+
+- Do not invent specs not in `docs/specs/`
+- Do not implement AEO algorithms, APIs, crawlers, Temporal, live Helm in bootstrap follow-ups without Plan
+- Never commit secrets
+
+## Status
+
+CONFIRMED

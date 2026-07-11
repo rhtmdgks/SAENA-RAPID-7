@@ -1,0 +1,13 @@
+{
+  "$comment": "EXAMPLE ONLY — copy to settings.local.json after review. No secrets. Status: PROPOSED",
+  "permissions": {
+    "defaultMode": "plan"
+  },
+  "saena": {
+    "engineScope": ["chatgpt-search"],
+    "disabledEngines": ["google-ai-overviews", "google-ai-mode", "gemini"],
+    "deployment": "forbidden",
+    "gitPush": "forbidden",
+    "humanApprovalRequired": true
+  }
+}
