@@ -58,4 +58,4 @@ See design §13 and k3s §12. Do not silently decide.
 
 ## Status
 
-CONFIRMED principles / NOT IMPLEMENTED runtime hooks
+CONFIRMED principles / W0 dev-repo 안전 hook 5종 배선 완료 (ADR-0019, 2026-07-12 — 증거: hooks/README.md) / FORGE runtime hook ladder는 W3 NOT IMPLEMENTED

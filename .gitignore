@@ -57,7 +57,9 @@ package-lock.json
 
 # Local tool / agent state
 .serena/
-.claude/settings.json
+# .claude/settings.json is CHECKED IN since W0 (team-wide hook wiring + deny
+# rules — ADR-0019). Personal overrides go to settings.local.json (ignored).
+.claude/settings.local.json
 audit/
 
 # Customer source workspaces (never commit)
