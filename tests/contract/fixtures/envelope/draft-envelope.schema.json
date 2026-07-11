@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/envelope/event-envelope/v1/event-envelope.schema.json",
+  "$comment": "DRAFT fixture for harness bootstrap — authoritative schema lands in packages/contracts in W1 via Contracts Steward",
+  "title": "SAENA event envelope v1 (draft)",
+  "description": "Implements ADR-0013 event envelope v1: 9 common fields + context_type discriminator (tenant | system | aggregate). Non-authoritative harness fixture — see $comment.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/tenantContextEnvelope" },
+    { "$ref": "#/$defs/systemContextEnvelope" },
+    { "$ref": "#/$defs/aggregateContextEnvelope" }
+  ],
+  "$defs": {
+    "commonFields": {
+      "event_id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "UUIDv7, sortable event identifier."
+      },
+      "context_type": {
+        "type": "string",
+        "enum": ["tenant", "system", "aggregate"]
+      },
+      "schema_version": {
+        "type": "string",
+        "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+        "description": "semver contract version (ADR-0012 compatibility policy target)."
+      },
+      "producer": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Publishing service identifier."
+      },
+      "occurred_at": {
+        "type": "string",
+        "format": "date-time",
+        "description": "RFC3339 UTC timestamp."
+      },
+      "trace_id": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}$",
+        "description": "W3C trace context format, 32-hex."
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Dedup key under at-least-once delivery."
+      },
+      "event_type": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,3}\\.v[0-9]+$",
+        "description": "9th field (ADR-0013 deviation from k3s §4.1 8-field list). Identical to AsyncAPI topic name."
+      },
+      "payload": {
+        "type": "object",
+        "description": "Event-specific payload body.",
+        "properties": {
+          "engine_id": {
+            "type": "string",
+            "enum": ["chatgpt-search"],
+            "description": "Closed enum, v1 single value (ADR-0013). Required for observation/citation/experiment event families; present here as an optional property so non-engine events remain valid. Any value outside the enum (e.g. Google/Gemini) is rejected at the schema level (CLAUDE.md Engine scope v1)."
+          }
+        }
+      }
+    },
+    "tenantContextEnvelope": {
+      "type": "object",
+      "properties": {
+        "event_id": { "$ref": "#/$defs/commonFields/event_id" },
+        "context_type": { "const": "tenant" },
+        "tenant_id": {
+          "type": "string",
+          "description": "Required for tenant context (ADR-0013, ADR-0014 slug format)."
+        },
+        "run_id": {
+          "type": "string",
+          "description": "Required for run-scoped tenant events. Non-run tenant event nullability is OPEN per ADR-0013."
+        },
+        "schema_version": { "$ref": "#/$defs/commonFields/schema_version" },
+        "producer": { "$ref": "#/$defs/commonFields/producer" },
+        "occurred_at": { "$ref": "#/$defs/commonFields/occurred_at" },
+        "trace_id": { "$ref": "#/$defs/commonFields/trace_id" },
+        "idempotency_key": { "$ref": "#/$defs/commonFields/idempotency_key" },
+        "event_type": { "$ref": "#/$defs/commonFields/event_type" },
+        "payload": { "$ref": "#/$defs/commonFields/payload" }
+      },
+      "required": [
+        "event_id",
+        "context_type",
+        "tenant_id",
+        "schema_version",
+        "producer",
+        "occurred_at",
+        "trace_id",
+        "idempotency_key",
+        "event_type",
+        "payload"
+      ],
+      "unevaluatedProperties": false
+    },
+    "systemContextEnvelope": {
+      "type": "object",
+      "properties": {
+        "event_id": { "$ref": "#/$defs/commonFields/event_id" },
+        "context_type": { "const": "system" },
+        "schema_version": { "$ref": "#/$defs/commonFields/schema_version" },
+        "producer": { "$ref": "#/$defs/commonFields/producer" },
+        "occurred_at": { "$ref": "#/$defs/commonFields/occurred_at" },
+        "trace_id": { "$ref": "#/$defs/commonFields/trace_id" },
+        "idempotency_key": { "$ref": "#/$defs/commonFields/idempotency_key" },
+        "event_type": { "$ref": "#/$defs/commonFields/event_type" },
+        "payload": { "$ref": "#/$defs/commonFields/payload" }
+      },
+      "required": [
+        "event_id",
+        "context_type",
+        "schema_version",
+        "producer",
+        "occurred_at",
+        "trace_id",
+        "idempotency_key",
+        "event_type",
+        "payload"
+      ],
+      "not": {
+        "anyOf": [
+          { "required": ["tenant_id"] },
+          { "required": ["run_id"] }
+        ]
+      },
+      "unevaluatedProperties": false
+    },
+    "aggregateContextEnvelope": {
+      "type": "object",
+      "properties": {
+        "event_id": { "$ref": "#/$defs/commonFields/event_id" },
+        "context_type": { "const": "aggregate" },
+        "schema_version": { "$ref": "#/$defs/commonFields/schema_version" },
+        "producer": { "$ref": "#/$defs/commonFields/producer" },
+        "occurred_at": { "$ref": "#/$defs/commonFields/occurred_at" },
+        "trace_id": { "$ref": "#/$defs/commonFields/trace_id" },
+        "idempotency_key": { "$ref": "#/$defs/commonFields/idempotency_key" },
+        "event_type": { "$ref": "#/$defs/commonFields/event_type" },
+        "aggregate_scope_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cohort_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "privacy_threshold": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "de_identification_status": {
+          "type": "string",
+          "enum": ["k_anonymized", "suppressed", "pending_review"]
+        },
+        "lineage_audit_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Opaque audit-ledger hash reference. Audit-role-only viewing at the application layer; schema cannot enforce access control."
+        },
+        "payload": { "$ref": "#/$defs/commonFields/payload" }
+      },
+      "required": [
+        "event_id",
+        "context_type",
+        "schema_version",
+        "producer",
+        "occurred_at",
+        "trace_id",
+        "idempotency_key",
+        "event_type",
+        "aggregate_scope_id",
+        "cohort_size",
+        "privacy_threshold",
+        "de_identification_status",
+        "lineage_audit_ref",
+        "payload"
+      ],
+      "not": {
+        "anyOf": [
+          { "required": ["tenant_id"] },
+          { "required": ["run_id"] }
+        ]
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

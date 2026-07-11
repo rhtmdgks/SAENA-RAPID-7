@@ -1,0 +1,22 @@
+{
+  "_expected_violation": "cohort_size (3) < privacy_threshold (5) violates the k-anonymity relational invariant. ADR-0013 states this relation is NOT expressible in JSON Schema 2020-12 (no cross-field comparison operator) — schema-level validation alone WILL pass this instance. A publish-side runtime gate (W2A) is required to reject it. This fixture is preserved permanently as a regression/documentation artifact, not as a schema-validation-failure case.",
+  "_note": "not schema-detectable, runtime-gate case per ADR-0013 — permanent fixture, do not delete when W2A gate ships.",
+  "event_id": "018f3a20-9e4d-7a1b-b3c5-2d6f8a1c4e9b",
+  "context_type": "aggregate",
+  "schema_version": "1.0.0",
+  "producer": "intelligence-worker",
+  "occurred_at": "2026-07-12T11:47:03Z",
+  "trace_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+  "idempotency_key": "strategy-card:aggregate-scope-014:2026-07-12",
+  "event_type": "strategy.card.eligible.v1",
+  "aggregate_scope_id": "aggregate-scope-014",
+  "cohort_size": 3,
+  "privacy_threshold": 5,
+  "de_identification_status": "k_anonymized",
+  "lineage_audit_ref": "sha256:8f2e1c9a7b3d5f4e6a8c2b1d9f7e3a5c4b6d8f2e1c9a7b3d5f4e6a8c2b1d9f7e",
+  "payload": {
+    "engine_id": "chatgpt-search",
+    "strategy_card_id": "card-0142",
+    "intervention_category": "structured-data-markup"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "event_id": "018f3a1e-7c2b-7c3e-9b1a-4e2f1a9d3c7b",
+  "context_type": "tenant",
+  "tenant_id": "acme-co",
+  "run_id": "run-2026-0712-0007",
+  "schema_version": "1.0.0",
+  "producer": "agent-runner",
+  "occurred_at": "2026-07-12T09:14:32Z",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "idempotency_key": "acme-co:run-2026-0712-0007:patch-unit-042",
+  "event_type": "patch.unit.completed.v1",
+  "payload": {
+    "patch_unit_id": "w1-04-quality-adrs",
+    "worktree_commit": "9f1c2e7",
+    "quality_gate_status": "passed"
+  }
+}
