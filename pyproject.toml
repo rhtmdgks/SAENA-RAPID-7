@@ -50,7 +50,7 @@ disallow_untyped_defs = true
 files = ["packages"]
 
 [tool.pytest.ini_options]
-testpaths = ["packages"]
+testpaths = ["packages", "tests"]
 addopts = "-ra"
 
 [tool.coverage.run]
