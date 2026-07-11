@@ -1,7 +1,19 @@
 # ACTIVATED 2026-07-12 (audit sec F-10 — enforcement layer). Source: CODEOWNERS.example.
 # NOTE: @saena-* teams must exist in the GitHub org and branch protection must require
 # code-owner review for this to enforce anything. Until then this file is declarative.
-# Team creation + branch protection = OPEN DECISION (CONTRIBUTING.md).
+# Branch protection activation = W0 (user decision 2026-07-12, ADR-0018); team creation
+# in GitHub is a human operation.
+
+# CI / enforcement surfaces (Integrator-owned files — ADR-0018)
+/.github/ @saena-security @saena-platform
+/CODEOWNERS @saena-security @saena-lead
+/.pre-commit-config.yaml @saena-security @saena-platform
+
+# Protected-path canonical policy (ADR-0019 — symmetry-checked in CI)
+/tools/validation/policy/ @saena-security @saena-lead
+
+# Future migrations (protected per CLAUDE.md)
+/database/migrations/ @saena-architecture @saena-backend
 
 # Specs (immutable originals — changes require Architecture + Lead)
 /docs/specs/ @saena-architecture @saena-lead
