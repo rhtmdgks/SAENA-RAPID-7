@@ -41,10 +41,23 @@ Do **not** report vulnerabilities via:
 
 Security email: **PROPOSED** `security@saenalabs.com` — **not an active channel yet**. Do not use it for reports until the mailbox is created and passes a receipt test; upgrade to CONFIRMED only after that verification.
 
+## Verified secret response runbook (ADR-0020)
+
+CONFIRMED (2026-07-12, accepted ADR-0020). If gitleaks (pre-commit, CI, or SessionStart hook) or any other means surfaces a **verified** secret (not a false positive), follow this order:
+
+1. **Rotate immediately.** Revoke and reissue the credential at its issuing system first. Deleting the secret from the file or even the commit is **not sufficient** — the value remains live and recoverable from git history until the credential itself is rotated.
+2. **Report via GitHub Private Vulnerability Reporting.** Use the same private channel as all other vulnerability reports (see "Reporting" above). **Never** open a public GitHub Issue or Discussion to report a leaked secret.
+3. **History purge is a human-only decision.** Tools such as `git filter-repo` require a force-push to take effect. Per CLAUDE.md operating principle 10 (배포·push·merge 금지), agents are forbidden from running history-rewriting or force-push operations. Whether and when to purge history is decided and executed by a human.
+4. **Record an audit line with fingerprint/rule-id/path only.** Log the gitleaks fingerprint (`<commit>:<file>:<rule-id>:<line>`), rule id, and file path. **Never** record the secret value itself in any audit log, issue, PR description, or commit message.
+5. **Add to `.gitleaksignore` only after rotation is confirmed.** Once the credential has been rotated and the leak is fully remediated, the fingerprint may be added to `.gitleaksignore` — but only via a PR that receives security CODEOWNERS review. No solo merge.
+
+See `docs/decisions/ADR-0020-secret-scanning.md` for the full decision record, including the 3-point gitleaks coverage (pre-commit / CI / SessionStart hook) and the fingerprint-only allowlist policy.
+
 ## Source specification references
 
 - `docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md` §6, §10
 - `docs/specs/SAENA_AEO_Algorithm_and_Harness_Design_v1.md` §5.4–5.5
+- `docs/decisions/ADR-0020-secret-scanning.md`
 
 ## Status
 
