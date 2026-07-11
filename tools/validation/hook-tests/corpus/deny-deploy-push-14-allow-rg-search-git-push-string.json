@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "rg \"git push\" docs/ must be allowed — searching for the literal string 'git push' is not itself a git push invocation",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "rg \"git push\" docs/"
+    }
+  },
+  "expect_exit": 0
+}

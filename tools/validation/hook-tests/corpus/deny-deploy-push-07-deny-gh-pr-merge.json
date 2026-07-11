@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "gh pr merge 5 must be denied",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "gh pr merge 5"
+    }
+  },
+  "expect_exit": 2
+}

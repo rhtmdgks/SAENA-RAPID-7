@@ -1,0 +1,12 @@
+{
+  "hook": "protect-paths",
+  "description": "packages/contracts/x.json must route to ask (single-owner contracts path)",
+  "stdin": {
+    "tool_name": "Edit",
+    "tool_input": {
+      "file_path": "packages/contracts/x.json"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+}

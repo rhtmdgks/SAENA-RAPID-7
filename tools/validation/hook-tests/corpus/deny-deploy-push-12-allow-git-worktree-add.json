@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "git worktree add ... must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git worktree add ../wt-example some-branch"
+    }
+  },
+  "expect_exit": 0
+}

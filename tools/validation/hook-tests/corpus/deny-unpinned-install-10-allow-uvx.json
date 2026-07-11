@@ -1,0 +1,11 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "uvx --from somepkg sometool must be allowed (ephemeral, uv-locked)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "uvx --from somepkg sometool"
+    }
+  },
+  "expect_exit": 0
+}

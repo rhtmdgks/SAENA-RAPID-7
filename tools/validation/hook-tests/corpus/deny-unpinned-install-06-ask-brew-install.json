@@ -1,0 +1,12 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "brew install jq must route to ask",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "brew install jq"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+}

@@ -1,0 +1,12 @@
+{
+  "hook": "deny-unpinned-install",
+  "description": "uv tool install ruff (no version pin) must route to ask",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "uv tool install ruff"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+}

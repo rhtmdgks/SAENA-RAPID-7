@@ -1,0 +1,14 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "kubectl get pods must be allowed when current-context is k3d-* (mocked)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "kubectl get pods"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_CONTEXT": "k3d-dev"
+  },
+  "expect_exit": 0
+}

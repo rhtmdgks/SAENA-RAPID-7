@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "sh -c \"git push origin main\" must be denied (C-1 bypass via sh -c wrapping)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "sh -c \"git push origin main\""
+    }
+  },
+  "expect_exit": 2
+}

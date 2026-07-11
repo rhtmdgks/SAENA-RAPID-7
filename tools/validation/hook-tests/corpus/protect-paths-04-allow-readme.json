@@ -1,0 +1,12 @@
+{
+  "hook": "protect-paths",
+  "description": "README.md must be allowed (not a protected path)",
+  "stdin": {
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "README.md"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_not_contains": "permissionDecision"
+}

@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "git status must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git status"
+    }
+  },
+  "expect_exit": 0
+}

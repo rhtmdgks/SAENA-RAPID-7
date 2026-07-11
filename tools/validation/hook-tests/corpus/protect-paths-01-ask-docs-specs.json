@@ -1,0 +1,12 @@
+{
+  "hook": "protect-paths",
+  "description": "docs/specs/a.md must route to ask (protected, immutable spec originals)",
+  "stdin": {
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "docs/specs/a.md"
+    }
+  },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+}
