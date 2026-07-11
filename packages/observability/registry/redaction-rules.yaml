@@ -1,0 +1,89 @@
+# SAENA telemetry redaction rules (v1) — ADR-0016.
+#
+# Allowlist-first export policy: ONLY attributes registered in
+# attributes.yaml (/attributes.json mirror) may be exported by any
+# exporter/collector pipeline. This file adds a secret/PII denylist on top
+# of the allowlist as defense-in-depth, plus explicit context-violation
+# rules derived from the 3-context model (ADR-0006 rev.2 / ADR-0013).
+#
+# W0 scope: this file defines the rule SSOT + rule ids. Exporter-level
+# wiring (OTel Collector processor config) is a W2C deliverable
+# (observability.md "Rendering" decision, ADR-0016 "배포" row) — no runtime
+# enforcement ships in this patch unit.
+
+export_policy: allowlist
+# Effective meaning: an attribute key is only eligible for export if it
+# appears by exact name in packages/observability/registry/attributes.yaml
+# (attributes.json mirror). Unregistered saena.* keys — and any non-saena.*
+# key not part of the OTel semantic conventions baseline the collector is
+# configured to pass through — are dropped before export, independent of
+# the denylist rules below.
+
+denylist_patterns:
+  # Secret/PII regex denylist, matched case-insensitively against attribute
+  # KEY and, where noted, VALUE. Applied even to allowlisted attributes as
+  # defense-in-depth (an allowlisted attribute must never carry a value
+  # matching these patterns; a match indicates a producer bug that must be
+  # fixed at the source, not silently exported).
+  - id: R-SECRET-TOKEN
+    pattern: '(?i)token'
+    applies_to: [key, value]
+    description: >
+      Matches any attribute key or string value containing "token"
+      (access/refresh/session/api tokens, etc.). No legitimate telemetry
+      attribute should carry raw token material.
+
+  - id: R-SECRET-PASSWORD
+    pattern: '(?i)password'
+    applies_to: [key, value]
+    description: Matches "password" in key or value — never telemetry-safe.
+
+  - id: R-SECRET-AUTHORIZATION
+    pattern: '(?i)authorization'
+    applies_to: [key, value]
+    description: >
+      Matches "authorization" (HTTP Authorization header contents/keys and
+      similar). Covers header dumps accidentally attached as attributes.
+
+  - id: R-SECRET-API-KEY
+    pattern: '(?i)api[_-]?key'
+    applies_to: [key, value]
+    description: Matches "api_key", "api-key", "apikey" in key or value.
+
+  - id: R-SECRET-BEARER
+    pattern: '(?i)bearer'
+    applies_to: [key, value]
+    description: >
+      Matches "bearer" (Bearer <token> scheme strings) in key or value.
+
+  - id: R-PII-EMAIL
+    pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    applies_to: [value]
+    description: >
+      Matches email-like strings in attribute values (RFC-5322-ish
+      simplified pattern, sufficient for redaction triage — not a full
+      email validator). No telemetry attribute should carry a raw email
+      address; identifying data belongs in the audit channel
+      (observability.md constraint: "Audit completeness 100%" is a separate
+      channel from telemetry, k3s §9.3), not general telemetry.
+
+violation_rules:
+  # Structural (context x attribute) violations, independent of the regex
+  # denylist above. These encode the ADR-0013 context_type table's
+  # "forbidden" cells for the highest-risk identifiers.
+  - id: V-AGG-TENANT
+    context: aggregate
+    forbidden_attributes:
+      - saena.tenant_id
+      - saena.run_id
+    description: >
+      AggregateContext telemetry (saena.context=aggregate) MUST NOT contain
+      saena.tenant_id or saena.run_id. Presence of either is a violation:
+      ADR-0006 rev.2 requires tenant lineage to be REMOVED (not merely
+      optional) from aggregate/de-identified telemetry to prevent
+      re-identification; ADR-0013's context_type table marks both
+      properties as forbidden (property-level absence, not "empty/null")
+      for context_type=aggregate. Exporter-level enforcement is the W2C
+      target (ADR-0016 "Context별 요구 규칙" row); this rule is the
+      registry-level source of truth that exporter config and CI lint must
+      implement against.
