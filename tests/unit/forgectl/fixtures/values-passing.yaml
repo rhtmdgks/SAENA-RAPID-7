@@ -1,0 +1,114 @@
+# A fully-passing forgectl preflight fixture — mirrors the k3s spec §7
+# Helm values skeleton, populated so every one of the six §8.1 checks
+# passes. Used as the "clean baseline" every values-fail-*.yaml fixture is
+# a single-condition mutation of.
+global:
+  environment: production
+  imageRegistry: registry.saena.internal/saena
+  imagePullPolicy: IfNotPresent
+  engineScope:
+    chatgptSearch: true
+    googleAiOverviews: false
+    googleAiMode: false
+    gemini: false
+  policyBundle:
+    version: 1.0.0
+    digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  skillBundle:
+    version: 1.0.0
+    digest: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  network:
+    defaultDeny: true
+
+networkPolicy:
+  defaultDeny: true
+  runner:
+    ingress: []
+    egress:
+      - internal-policy-gate
+      - internal-artifact-registry
+      - approved-git-host
+      - approved-model-provider
+      - approved-customer-domain
+  browser:
+    egress:
+      - approved-observation-hosts
+      - customer-domain-read-only
+    denied:
+      - git-write
+      - kubernetes-api
+      - cloud-metadata
+
+images:
+  - name: forge-console-api
+    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    signature: "cosign-bundle:forge-console-api@sha256:aaaa"
+  - name: agent-runner
+    digest: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    signature: "cosign-bundle:agent-runner@sha256:bbbb"
+
+externalSecrets:
+  - name: tenant-db-credentials
+    source: external-secrets-operator
+    valueFrom: SecretStore
+  - name: model-provider-api-key
+    source: external-secrets-operator
+    valueFrom: ClusterSecretStore
+
+agentRunner:
+  enabled: true
+  job:
+    serviceAccount: saena-agent-runner
+    activeDeadlineSeconds: 7200
+    ttlSecondsAfterFinished: 1800
+    rbac:
+      clusterAdmin: false
+      productionDeploy: false
+      rules:
+        - apiGroups: [""]
+          resources: [pods]
+          verbs: [get, list]
+    securityContext:
+      runAsNonRoot: true
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  limits:
+    maxConcurrentRunsPerTenant: 3
+    maxCostUsdPerRun: 100
+    maxArtifactsMiBPerRun: 1024
+
+migrations:
+  - id: 2026_07_add_tenant_column
+    strategy: expand-contract
+    reversible: true
+    reviewedBy: alice
+
+temporal:
+  enabled: true
+  externalDatabase: true
+
+eventBus:
+  type: redpanda
+  replicas: 3
+
+postgres:
+  external: true
+clickhouse:
+  enabled: true
+  shards: 1
+  replicas: 2
+objectStorage:
+  external: true
+
+observability:
+  openTelemetry: true
+  prometheus: true
+  loki: true
+  tempo: true
+
+featureFlags:
+  absorptionAnalysis: false
+  digitalTwin: false
+  portfolioOptimizer: false
+  experimentAttribution: false
+  strategySkillBank: false
