@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/repo-intaken/v1/repo-intaken.schema.json",
+  "title": "repo.intaken.v1 payload",
+  "description": "Payload of the repo.intaken.v1 event — notification that a repository/source intake snapshot has been captured. Thin notification projection of domain/source-snapshot; never carries source content or file listings.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: approved plan §2 event row (docs/... virtual-cooking-map.md §2, §5 'event/ 6종', deliverable 5 — 'field names match domain/source-snapshot exactly'); events/catalog/README.md CONFIRMED topic list (repo.intaken.v1, producer repository-intake-service). Field names copied verbatim from domain/source-snapshot/v1: repo_commit ($ref git_sha), content_hash ($ref sha256_ref, sole ledger anchor per contract-catalog.md 'hash만 ledger'), snapshot_uri ($ref uri_ref). NO additionalProperties:false (open class).",
+  "type": "object",
+  "required": [
+    "repo_commit",
+    "content_hash"
+  ],
+  "properties": {
+    "repo_commit": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/git_sha",
+      "$comment": "domain/source-snapshot/v1#/properties/repo_commit exact field name and shape (git_sha, 40-hex)."
+    },
+    "content_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "domain/source-snapshot/v1#/properties/content_hash exact field name and shape — idempotency key + sole ledger anchor (contract-catalog.md:25 'hash만 ledger')."
+    },
+    "snapshot_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "domain/source-snapshot/v1#/properties/snapshot_uri exact field name and shape — uri_ref forbids query/fragment (ADR-0024(f), R9-5 presigned-token smuggling defense)."
+    }
+  }
+}

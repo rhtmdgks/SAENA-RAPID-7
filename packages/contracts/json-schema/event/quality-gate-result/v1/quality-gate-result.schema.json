@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/quality-gate-result/v1/quality-gate-result.schema.json",
+  "title": "quality.gate.passed|failed.v1 payload",
+  "description": "Shared payload shape for BOTH the quality.gate.passed.v1 and quality.gate.failed.v1 events (single payload file, two channels — approved plan §2 event row). Thin notification projection of domain/verification-result.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: approved plan §2 event row (docs/... virtual-cooking-map.md §2, §5 'event/ 6종', quality-gate-result deliverable 2); field shapes mirror domain/verification-result/v1 where present there (patch_unit_id, gate_id, failures[$ref common/error-detail], report_uri). Deliberately NO status field here — the discriminator between passed/failed lives at the envelope's event_type / AsyncAPI channel address level (two channels sharing this one payload schema), not duplicated as a payload property. R4 channel-layer enforcement (approved plan §1.1 R4, R8): failed.v1 ⇒ failures required / passed.v1 ⇒ failures key absent is NOT expressed in THIS file (this file only declares failures as optional+open) — it is enforced by the AsyncAPI allOf-overlay at the channel/operation layer in packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml (see quality.gate.passed / quality.gate.failed channel message payload overlays), mirroring domain/verification-result's own bidirectional if/then at the single-file layer. NO additionalProperties:false (open class).",
+  "type": "object",
+  "required": [
+    "patch_unit_id",
+    "gate_id"
+  ],
+  "properties": {
+    "patch_unit_id": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "mirrors domain/verification-result/v1#/properties/patch_unit_id shape (free string, minLength 1); contract-catalog.md idempotency key component."
+    },
+    "gate_id": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "mirrors domain/verification-result/v1#/properties/gate_id shape — deliberately not an enum (canonical gate list lives in quality-gates.yaml, not this schema)."
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "$ref": "../../../common/error-detail/v1/error-detail.schema.json"
+      },
+      "minItems": 1,
+      "$comment": "mirrors domain/verification-result/v1#/properties/failures — each item is the closed common/error-detail shape (error_code/retryable/summary only). Channel-layer overlay (see file $comment) constrains presence per passed|failed channel; this file alone only declares the shape."
+    },
+    "report_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "mirrors domain/verification-result/v1#/properties/report_uri — optional pointer to a full gate report artifact; uri_ref forbids query/fragment (ADR-0024(f))."
+    }
+  }
+}
