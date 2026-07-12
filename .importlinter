@@ -13,6 +13,7 @@ root_packages =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_forgectl
 
 ; dependency-policy Allowed directions (W0 minimal form, extended by w2-00).
 ; Allowed import directions (ADR-0002 rule 11 / dependency-policy):
@@ -21,6 +22,12 @@ root_packages =
 ;   saena_observability -> saena_shared
 ;   saena_shared / saena_schemas are leaves. Services never import each other
 ;   (service-to-service boundary = published contracts only: events/HTTP).
+;   saena_forgectl (tools/forgectl, w2-19/w2-20) -> saena_schemas only (the
+;   v1 EngineId closed enum for its engine-flags preflight check). It is a
+;   standalone k3s operator CLI, not a service or a domain/observability
+;   dependency — saena_domain, saena_observability, and every service must
+;   never import it (forbidden-modules entries below), and it must never
+;   import saena_domain or any service (its own leaf contract below).
 
 [importlinter:contract:shared-is-a-leaf]
 name = saena_shared must not import other saena packages
@@ -59,6 +66,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_forgectl
 
 [importlinter:contract:domain-below-services]
 name = saena_domain must not import services, observability or testing
@@ -76,6 +84,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_forgectl
 
 [importlinter:contract:observability-below-services]
 name = saena_observability must not import domain, services or testing
@@ -93,6 +102,44 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_forgectl
+
+[importlinter:contract:forgectl-is-a-standalone-leaf]
+name = saena_forgectl may only import saena_schemas; nothing may import saena_forgectl
+type = forbidden
+source_modules =
+    saena_forgectl
+forbidden_modules =
+    saena_shared
+    saena_testing
+    saena_domain
+    saena_observability
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+
+[importlinter:contract:nothing-imports-forgectl]
+name = domain, observability and services must not import saena_forgectl
+type = forbidden
+source_modules =
+    saena_shared
+    saena_domain
+    saena_observability
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+forbidden_modules =
+    saena_forgectl
 
 [importlinter:contract:services-are-independent]
 name = services must not import each other (boundary = published contracts: events/HTTP)

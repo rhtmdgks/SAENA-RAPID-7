@@ -9,6 +9,7 @@ members = [
     "saena-domain",
     "saena-engine-gateway",
     "saena-forge-console",
+    "saena-forgectl",
     "saena-monorepo",
     "saena-observability",
     "saena-orchestrator",
@@ -1300,6 +1301,21 @@ requires-dist = [
 ]
 
 [[package]]
+name = "saena-forgectl"
+version = "0.1.0"
+source = { editable = "tools/forgectl" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "saena-schemas" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyyaml", specifier = ">=6,<7" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+]
+
+[[package]]
 name = "saena-monorepo"
 version = "0.0.0"
 source = { virtual = "." }
@@ -1322,6 +1338,7 @@ dev = [
     { name = "saena-domain" },
     { name = "saena-engine-gateway" },
     { name = "saena-forge-console" },
+    { name = "saena-forgectl" },
     { name = "saena-observability" },
     { name = "saena-orchestrator" },
     { name = "saena-plan-contract" },
@@ -1355,6 +1372,7 @@ dev = [
     { name = "saena-domain", editable = "packages/domain" },
     { name = "saena-engine-gateway", editable = "services/platform/engine-adapter-gateway" },
     { name = "saena-forge-console", editable = "services/platform/forge-console-api" },
+    { name = "saena-forgectl", editable = "tools/forgectl" },
     { name = "saena-observability", editable = "packages/observability" },
     { name = "saena-orchestrator", editable = "services/platform/agent-orchestrator-service" },
     { name = "saena-plan-contract", editable = "services/foundation/plan-contract-service" },

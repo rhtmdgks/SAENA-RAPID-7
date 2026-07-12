@@ -54,4 +54,9 @@ P1 flag-on 승격(absorption, digital-twin, portfolio-opt, skill-bank), SaaS(req
 
 ## Status
 
-CONFIRMED 계획 / NOT IMPLEMENTED
+CONFIRMED 계획 / W0-W1 구현 완료 / **W2A/W2B/W2C 구현 완료 (w2-01..w2-21,
+wave2-runtime, 2026-07-13) — 코드 레벨 exit 조건 전 항목 PASS, 증거는
+`docs/architecture/wave2-exit-report.md` 참조. deploy/infra 레벨 항목
+(saena-forge Helm chart, 대시보드 6종, 프로덕션 Temporal/MinIO/Redpanda 배포,
+helm rollback drill)은 BLOCKED(human) — `deploy/**` 보호 경로 + 라이브
+클러스터 부재, 동일 문서 참조** / W3+ NOT IMPLEMENTED

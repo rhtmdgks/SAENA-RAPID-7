@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from saena_domain.events._uuid7 import generate_uuid7, is_valid_uuid7
+from saena_domain.events._uuid7 import _next_rand_a, generate_uuid7, is_valid_uuid7
 
 # Mirrors the envelope contract's event_id pattern exactly
 # (packages/contracts/json-schema/envelope/event-envelope/v1/event-envelope.schema.json
@@ -63,14 +63,31 @@ def test_generate_uuid7_timestamp_prefix_is_non_decreasing_across_process() -> N
 
 
 def test_generate_uuid7_ordering_is_monotonic_within_same_millisecond() -> None:
-    """Values generated back-to-back within the same millisecond (rand_a
-    increments deterministically, no reseed) are strictly lexically ordered
-    -- the guarantee `_next_rand_a` actually provides.
+    """`_next_rand_a`, called repeatedly with the SAME `ts_ms` (the "same
+    millisecond as the previous call" branch, module docstring), returns a
+    strictly increasing (mod-wraparound-aside) sequence -- the guarantee
+    `generate_uuid7`'s lexical ordering relies on.
+
+    w2-20 fix (critic-discovered flake under full-suite load, unrelated to
+    this unit's named orchestrator/Temporal flake but blocking the same
+    `just verify` determinism requirement): the original version of this
+    test called `generate_uuid7()` in a loop and asserted `len(same_ms) >=
+    2` -- i.e. it required at least 2 of 50 REAL wall-clock calls to
+    coincidentally land in the same 1ms window, which is a genuine timing
+    race, not a property of the code under test. It passed reliably in a
+    fast, uncontended run and intermittently failed under CPU contention
+    (slower wall-clock stepping through the loop --> fewer/no same-ms
+    collisions in 50 iterations). Calling the internal `_next_rand_a(ts_ms)`
+    counter directly with a FIXED, caller-controlled `ts_ms` tests the exact
+    same monotonic-counter guarantee with zero wall-clock dependency --
+    deterministic by construction, not by luck.
     """
-    values = [generate_uuid7() for _ in range(50)]
-    same_ms = [v for v in values if _ts_ms_prefix(v) == _ts_ms_prefix(values[0])]
-    assert len(same_ms) >= 2, "expected at least 2 values in the same millisecond to compare"
-    assert same_ms == sorted(same_ms)
+    ts_ms = 1_837_500_000_000  # arbitrary fixed millisecond, no real-clock dependency
+    values = [_next_rand_a(ts_ms) for _ in range(50)]
+    # Each call increments (mod 4096) from the previous -- adjacent pairs
+    # strictly increase except at the single possible wraparound point.
+    wraps = sum(1 for a, b in zip(values, values[1:], strict=False) if b <= a)
+    assert wraps <= 1, f"expected at most one wraparound in a monotonic counter, got {wraps}"
 
 
 def test_generate_uuid7_values_are_unique() -> None:
