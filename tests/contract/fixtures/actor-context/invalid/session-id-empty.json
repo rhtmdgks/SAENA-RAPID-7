@@ -1,0 +1,6 @@
+{
+  "actor_id": "actor-system-0005",
+  "actor_type": "system",
+  "session_id": "",
+  "_expected_violation": "session_id requires minLength 1; an empty string violates that constraint."
+}

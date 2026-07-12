@@ -1,0 +1,5 @@
+{
+  "contract_uri": "s3://saena-plans/run-0002/plan.json",
+  "contract_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "_expected_violation": "base_commit is required (k3s §4.2:193); this instance omits it."
+}

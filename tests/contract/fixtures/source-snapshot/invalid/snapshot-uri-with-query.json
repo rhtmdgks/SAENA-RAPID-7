@@ -1,0 +1,12 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0005",
+  "repo_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "snapshot_uri": "https://storage.example.com/snapshot.tar.gz?token=example-not-real",
+  "source_type": "git",
+  "sbom_uri": "s3://saena-sboms/run-0005/sbom.json",
+  "secret_scan_status": "passed",
+  "captured_at": "2026-07-12T11:00:00Z",
+  "_expected_violation": "snapshot_uri (uri_ref $def) forbids query/fragment characters (ruling R9-5, presigned-token smuggling defense); the '?token=' query string is rejected."
+}

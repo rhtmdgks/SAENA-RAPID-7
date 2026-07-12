@@ -1,0 +1,5 @@
+{
+  "project_id": "project-0002",
+  "tenant_id": "Not_A_Slug",
+  "_expected_violation": "tenant_id must match the ADR-0014 slug pattern (common/identifiers $defs.tenant_id); underscores and uppercase are rejected."
+}

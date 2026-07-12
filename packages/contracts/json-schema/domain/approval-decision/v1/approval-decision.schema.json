@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/approval-decision/v1/approval-decision.schema.json",
+  "title": "ApprovalDecision",
+  "description": "B-department signed decision on a ChangePlan (Action Contract). Authority path per ADR-0003: B signed approval -> Policy Gate pre-verification (policy.decision.recorded.v1) -> plan-contract-service signals Temporal directly; plan.contract.approved.v1 is notification-only.",
+  "$comment": "compat_class: closed, signed: true. Authority: approved plan §2 domain row 2 (docs/... virtual-cooking-map.md §2, §5); docs/architecture/contract-catalog.md P0 table 'ApprovalDecision' row (Owner plan-contract, Idempotency key 'contract_hash+approver actor_id', Sensitivity PII+internal); ADR-0003 (docs/decisions/ADR-0003-approval-transition-authority-path.md) authority path. H-7 dual-approval semantics: docs/architecture/security-model.md '승인 원자성 해체 (H-7)' — 'per-patch-unit secret lease ... 고위험 unit 2인 승인'. Each approver submits ONE ApprovalDecision instance; idempotency key = contract_hash + approver_actor_id (contract-catalog.md), so a dual-approval requirement is represented as two separate instances of this contract sharing the same contract_hash, NOT as a multi-approver array inside a single instance. The relational check that both required approver instances exist (a k-anonymity-precedent-style cross-instance aggregate check) is a policy-gate concern, deferred to W2A — not expressible in a single-instance JSON Schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_hash",
+    "tenant_id",
+    "run_id",
+    "approver_actor_id",
+    "decision",
+    "patch_unit_decisions",
+    "signature",
+    "signature_algorithm",
+    "decided_at"
+  ],
+  "properties": {
+    "contract_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list; contract-catalog.md idempotency key component. Points at the ChangePlan instance this decision resolves — ChangePlan itself deliberately omits its own hash (self-reference avoidance, see change-plan.schema.json $comment); this is the primary carrier."
+    },
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list. Single-authority identifier convention (ADR-0011/ADR-0014)."
+    },
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list."
+    },
+    "approver_actor_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/actor_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list; contract-catalog.md idempotency key component 'approver actor_id'. Note: ruling R9 (Security MUST-FIX) removes approver_actor_id from the plan.contract.approved.v1 EVENT payload (event/plan-contract-approved is a separate w1-08 file, contract_hash-reference only) — that removal does NOT apply to this domain contract itself, which is the PII-sensitive system-of-record instance (contract-catalog.md Sensitivity 'PII+internal'); the event is a thin notification projection of it."
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["approved", "rejected"],
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list."
+    },
+    "patch_unit_decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["patch_unit_id", "decision"],
+        "properties": {
+          "patch_unit_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision": {
+            "type": "string",
+            "enum": ["approved", "rejected"]
+          }
+        }
+      },
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list — per-patch-unit granularity, consistent with H-7 per-patch-unit secret lease separation (security-model.md)."
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list. Opaque detached value — W1 explicitly declares signature VERIFICATION is not guaranteed/implemented at this layer ('검증 미보장'); full semantics (key management, verification pipeline) are W2A + ADR-0003 'Open decisions: 서명 체계 (키 관리, 서명 알고리즘) — 별도 설계 문서'. Identity-embedding signature formats (e.g. PGP armored blocks carrying a User ID) are structurally forbidden by using an opaque string rather than a structured/parseable envelope — Security SHOULD-7 (PII minimization: identity must not be embedded inside the signature value itself, only referenced via approver_actor_id)."
+    },
+    "signature_algorithm": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list. Algorithm identifier is open-string in W1 (no fixed enum) pending the ADR-0003 signature-scheme design doc."
+    },
+    "decided_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 2 field list."
+    }
+  }
+}

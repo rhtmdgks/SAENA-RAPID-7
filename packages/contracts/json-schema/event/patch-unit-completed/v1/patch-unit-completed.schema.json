@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/patch-unit-completed/v1/patch-unit-completed.schema.json",
+  "title": "patch.unit.completed.v1 payload",
+  "description": "Payload of the patch.unit.completed.v1 event (TenantContext envelope, ADR-0013 appendix example 1). Thin notification projection of the domain/patch-artifact record — not the artifact itself.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: approved plan §2 event row (docs/... virtual-cooking-map.md §2, §5 'event/ 6종'); docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md §4.2:201-211 PatchUnitCompleted message skeleton (patch_unit_id:205/worktree_commit:206/manifest_uri:207/changed_files:208/quality_gate_ids:209); field shapes copied verbatim from domain/patch-artifact/v1 where present there (patch_unit_id, worktree_commit [7-40 hex short-sha convention], manifest_uri, changed_files, quality_gate_ids). NO additionalProperties:false (open class — forward-compatible gate-specific/service-specific extension fields permitted at payload root, consistent with VerificationResult's open-class precedent). ADR-0024(e)-1 BAN: this payload MUST NOT carry tenant_id or run_id properties — the envelope (packages/contracts/json-schema/envelope/event-envelope/v1) already carries both in its tenant context_type branch. Re-projecting either key into payload is a review-reject condition (ADR-0014 §Constraints duplicate-identifier ban, extended to run_id by ADR-0024(e)-1). REWORK (critic S1, coordinator-relayed): removed quality_gate_status — 'domain 확정 필드만 투영' rule has no authority for a field absent from domain/patch-artifact/v1; ADR-0013 appendix example 1's payload.quality_gate_status is still a valid instance of this open-class schema without the field (verified — extra key on an open schema is always accepted, its removal here only means this schema no longer explicitly types it).",
+  "type": "object",
+  "required": [
+    "patch_unit_id",
+    "worktree_commit"
+  ],
+  "properties": {
+    "patch_unit_id": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "k3s §4.2:205 PatchUnitCompleted.patch_unit_id; mirrors domain/patch-artifact/v1#/properties/patch_unit_id shape (free string, minLength 1)."
+    },
+    "worktree_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "$comment": "k3s §4.2:206 PatchUnitCompleted.worktree_commit; mirrors domain/patch-artifact/v1#/properties/worktree_commit shape (7-40 hex short-sha convention, ADR-0023 worktree execution conventions)."
+    },
+    "manifest_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "k3s §4.2:207 PatchUnitCompleted.manifest_uri; mirrors domain/patch-artifact/v1#/properties/manifest_uri (uri_ref — query/fragment forbidden, ADR-0024(f))."
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "k3s §4.2:208 PatchUnitCompleted.changed_files; mirrors domain/patch-artifact/v1#/properties/changed_files (paths only, never content)."
+    },
+    "quality_gate_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "k3s §4.2:209 PatchUnitCompleted.quality_gate_ids; mirrors domain/patch-artifact/v1#/properties/quality_gate_ids."
+    }
+  }
+}

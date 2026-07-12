@@ -1,0 +1,5 @@
+{
+  "_defs_pointer": "timestamp_utc",
+  "value": "2026-07-12T00:00:00+00:00",
+  "_expected_violation": "timestamp_utc pattern is Z-canonical only (ADR-0013 rev.2 occurred_at Z-canonicalization amendment); numeric +00:00 offset form is rejected."
+}

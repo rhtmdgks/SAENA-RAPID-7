@@ -1,0 +1,7 @@
+{
+  "run_id": "run-0001",
+  "tenant_id": "acme-corp",
+  "state": "INTAKE",
+  "base_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "human_approval_required": true
+}

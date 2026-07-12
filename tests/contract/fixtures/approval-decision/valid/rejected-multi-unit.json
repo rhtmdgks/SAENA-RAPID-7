@@ -1,0 +1,14 @@
+{
+  "contract_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "tenant_id": "acme-corp",
+  "run_id": "run-0002",
+  "approver_actor_id": "actor-approver-0002",
+  "decision": "rejected",
+  "patch_unit_decisions": [
+    {"patch_unit_id": "PU-01", "decision": "approved"},
+    {"patch_unit_id": "PU-02", "decision": "rejected"}
+  ],
+  "signature": "opaque-signature-value-0002",
+  "signature_algorithm": "ed25519",
+  "decided_at": "2026-07-12T11:00:00Z"
+}

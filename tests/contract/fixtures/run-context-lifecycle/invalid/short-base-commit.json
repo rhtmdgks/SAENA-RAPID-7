@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0004",
+  "tenant_id": "acme-corp",
+  "state": "DISCOVERY",
+  "base_commit": "ccc1234",
+  "human_approval_required": true,
+  "_expected_violation": "base_commit must be a full 40-hex git_sha (immutable anchor); a 7-char short-sha is rejected here (unlike worktree_commit's 7-40 hex convention elsewhere)."
+}

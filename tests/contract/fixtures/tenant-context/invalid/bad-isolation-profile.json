@@ -1,0 +1,13 @@
+{
+  "tenant_id": "acme-corp",
+  "display_name": "Acme Corp",
+  "isolation_profile": "public-cloud",
+  "namespace": "saena-tenant-acme-corp",
+  "policy_version": "1.0.0",
+  "engine_scope": ["chatgpt-search"],
+  "status": "active",
+  "retention_policy_ref": "retention-policy-default",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z",
+  "_expected_violation": "isolation_profile enum is exactly ['internal-k3s', 'saas-shared'] (ADR-0014:51); 'public-cloud' is not a member."
+}

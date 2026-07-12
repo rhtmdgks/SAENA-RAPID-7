@@ -1,0 +1,14 @@
+{
+  "contract_hash": "not-a-sha256-hash",
+  "tenant_id": "acme-corp",
+  "run_id": "run-0006",
+  "approver_actor_id": "actor-approver-0007",
+  "decision": "approved",
+  "patch_unit_decisions": [
+    {"patch_unit_id": "PU-01", "decision": "approved"}
+  ],
+  "signature": "opaque-signature-value-0006",
+  "signature_algorithm": "ed25519",
+  "decided_at": "2026-07-12T15:00:00Z",
+  "_expected_violation": "contract_hash must match the sha256_ref pattern ('sha256:' + 64 lowercase hex); this value does not."
+}

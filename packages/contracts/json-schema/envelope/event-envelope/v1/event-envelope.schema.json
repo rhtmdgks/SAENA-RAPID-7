@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.the-saena.ai/envelope/event-envelope/v1/event-envelope.schema.json",
-  "$comment": "DRAFT fixture for harness bootstrap — authoritative schema lands in packages/contracts in W1 via Contracts Steward",
-  "title": "SAENA event envelope v1 (draft)",
-  "description": "Implements ADR-0013 event envelope v1: 9 common fields + context_type discriminator (tenant | system | aggregate). Non-authoritative harness fixture — see $comment.",
+  "$comment": "AUTHORITATIVE. FROZEN class (ADR-0012) — ANY change to this file requires a new ADR (ADR-0012 frozen-class amendment pattern, cf. ADR-0013 rev.2). registry.json frozen_authority_adr = ADR-0013. Implements ADR-0013 (event envelope v1: 9 common fields + context_type discriminator + rev.2 payload as 10th structural member) and ADR-0013 rev.2 amendments (payload required-all-branches; occurred_at Z-canonical only; schema_version prerelease/build excluded; tenant-branch run_id required). Supersedes tests/contract/fixtures/envelope/draft-envelope.schema.json (W0 non-authoritative bootstrap, retired in the same commit that lands this file — no $id double-claim window). UUIDv7 pattern on event_id (version nibble '7', variant nibble in 8/9/a/b) is a structural addition on top of the draft's format:uuid — the RFC 9562 UUID text layout is 8-4-4-4-12 hex groups; the 4th group is 4 hex characters total (1 variant nibble + 3 following hex digits), matching the [89ab][0-9a-f]{3} form used below.",
+  "title": "SAENA event envelope v1",
+  "description": "Implements ADR-0013 event envelope v1 (9 common fields + context_type discriminator: tenant | system | aggregate) and ADR-0013 rev.2 (payload as 10th structural member, required in all branches; occurred_at Z-canonical; schema_version prerelease/build excluded; tenant branch run_id required).",
   "type": "object",
   "oneOf": [
     { "$ref": "#/$defs/tenantContextEnvelope" },
@@ -15,7 +15,8 @@
       "event_id": {
         "type": "string",
         "format": "uuid",
-        "description": "UUIDv7, sortable event identifier."
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "description": "UUIDv7, sortable event identifier. Version nibble fixed to 7, variant nibble in {8,9,a,b} per RFC 9562."
       },
       "context_type": {
         "type": "string",
@@ -24,6 +25,7 @@
       "schema_version": {
         "type": "string",
         "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+        "$comment": "Prerelease/build metadata explicitly excluded (ADR-0013 rev.2 ③) — MAJOR.MINOR.PATCH pure form only, no -rc./+build suffixes.",
         "description": "semver contract version (ADR-0012 compatibility policy target)."
       },
       "producer": {
@@ -32,9 +34,8 @@
         "description": "Publishing service identifier."
       },
       "occurred_at": {
-        "type": "string",
-        "format": "date-time",
-        "description": "RFC3339 UTC timestamp."
+        "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+        "$comment": "Z-canonical only (ADR-0013 rev.2 ②) — +00:00 numeric offset form is rejected. Delegated to common/identifiers so the Z-canonical pattern has one authoritative source."
       },
       "trace_id": {
         "type": "string",
@@ -48,16 +49,17 @@
       },
       "event_type": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,3}\\.v[0-9]+$",
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,3}\\.v[0-9]+$",
         "description": "9th field (ADR-0013 deviation from k3s §4.1 8-field list). Identical to AsyncAPI topic name."
       },
       "payload": {
         "type": "object",
+        "minProperties": 0,
+        "$comment": "10th structural member (ADR-0013 rev.2 ①) — required in ALL context_type branches. Empty object ({}) is a valid minimal value for producers with no domain payload yet at publish time.",
         "description": "Event-specific payload body.",
         "properties": {
           "engine_id": {
-            "type": "string",
-            "enum": ["chatgpt-search"],
+            "$ref": "../../../common/engine-id/v1/engine-id.schema.json",
             "description": "Closed enum, v1 single value (ADR-0013). Required for observation/citation/experiment event families; present here as an optional property so non-engine events remain valid. Any value outside the enum (e.g. Google/Gemini) is rejected at the schema level (CLAUDE.md Engine scope v1)."
           }
         }
@@ -69,12 +71,12 @@
         "event_id": { "$ref": "#/$defs/commonFields/event_id" },
         "context_type": { "const": "tenant" },
         "tenant_id": {
-          "type": "string",
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
           "description": "Required for tenant context (ADR-0013, ADR-0014 slug format)."
         },
         "run_id": {
-          "type": "string",
-          "description": "Required for run-scoped tenant events. Non-run tenant event nullability is OPEN per ADR-0013."
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+          "description": "Required for tenant context (ADR-0013 rev.2 ④ — Open decisions item 1 closed: tenant branch run_id stays required, not nullable)."
         },
         "schema_version": { "$ref": "#/$defs/commonFields/schema_version" },
         "producer": { "$ref": "#/$defs/commonFields/producer" },
@@ -88,6 +90,7 @@
         "event_id",
         "context_type",
         "tenant_id",
+        "run_id",
         "schema_version",
         "producer",
         "occurred_at",
@@ -160,6 +163,7 @@
         "lineage_audit_ref": {
           "type": "string",
           "minLength": 1,
+          "$comment": "Hash format OPEN (ADR-0013:73 open decision carried forward unresolved into v1 — opaque string only, no format constraint imposed here).",
           "description": "Opaque audit-ledger hash reference. Audit-role-only viewing at the application layer; schema cannot enforce access control."
         },
         "payload": { "$ref": "#/$defs/commonFields/payload" }

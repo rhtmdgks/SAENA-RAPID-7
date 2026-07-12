@@ -1,0 +1,8 @@
+{
+  "type": "https://schemas.the-saena.ai/errors/validation/missing_field",
+  "status": 400,
+  "error_code": "saena.validation.missing_field",
+  "retryable": false,
+  "trace_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "_expected_violation": "problem-detail requires 'title' (RFC 9457 standard field, ADR-0015); this instance omits it."
+}

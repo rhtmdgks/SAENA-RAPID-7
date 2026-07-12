@@ -1,0 +1,7 @@
+{
+  "run_id": "run-0002",
+  "tenant_id": "example-tenant",
+  "state": "HANDOFF_READY",
+  "base_commit": "dddddddddddddddddddddddddddddddddddddddd",
+  "human_approval_required": false
+}

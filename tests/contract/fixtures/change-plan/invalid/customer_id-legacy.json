@@ -1,0 +1,34 @@
+{
+  "run_id": "run-0008",
+  "customer_id": "acme-corp",
+  "repo_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "approved_scope": ["apps/web/docs/*"],
+  "engine_scope": ["chatgpt-search"],
+  "hypotheses": [
+    {
+      "id": "H-01",
+      "query_cluster_ids": ["cluster-0001"],
+      "evidence_ids": ["evidence-0001"],
+      "predicted_layers": ["discovery"],
+      "expected_effect_distribution": {"p_7d": 0.42},
+      "risk": "low"
+    }
+  ],
+  "patch_units": [
+    {
+      "id": "PU-01",
+      "files": ["apps/web/docs/new-page.md"],
+      "allowed_transformations": ["create-file"],
+      "tests": ["tests/docs/test_new_page.py"],
+      "rollback": "git-revert:PU-01"
+    }
+  ],
+  "approval_required": true,
+  "no_deploy": true,
+  "no_push": true,
+  "evidence_ledger_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scope_limits": {"max_globs": 5},
+  "diff_budget": {"max_files": 10, "max_lines": 500},
+  "rejected_alternatives": [],
+  "_expected_violation": "Algorithm §5.2's legacy field name 'customer_id' was renamed to 'tenant_id' (Lead ruling R7, ADR-0024 W1 contract deviations); this instance uses the pre-rename legacy name instead of tenant_id and additionally omits the now-required tenant_id property, so it fails both the closed-class extra-property check AND the tenant_id required check."
+}

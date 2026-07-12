@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/site-inventory-completed/v1/site-inventory-completed.schema.json",
+  "title": "site.inventory.completed.v1 payload",
+  "description": "Payload of the site.inventory.completed.v1 event — notification that a site/domain inventory pass has completed. Thin notification projection of context/site-context.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: approved plan §2 event row (docs/... virtual-cooking-map.md §2, §5 'event/ 6종', deliverable 6 — 'site_id from identifiers'); events/catalog/README.md CONFIRMED topic list (site.inventory.completed.v1, producer site-discovery-service); docs/architecture/contract-catalog.md:23 (SiteContext idempotency key 'site_id+inventory_version'). site_id $ref's common/identifiers/v1 $defs.site_id directly (deliverable 6 instruction), the same $def context/site-context/v1#/properties/site_id resolves to. inventory_version mirrors context/site-context/v1#/properties/inventory_version shape (opaque non-empty string, no fixed grammar). NO additionalProperties:false (open class).",
+  "type": "object",
+  "required": [
+    "site_id",
+    "inventory_version"
+  ],
+  "properties": {
+    "site_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/site_id",
+      "$comment": "common/identifiers/v1 $defs.site_id — same $def context/site-context/v1#/properties/site_id resolves to (format OPEN, issuer runtime convention, W1 opaque)."
+    },
+    "inventory_version": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "mirrors context/site-context/v1#/properties/inventory_version shape — opaque version token, composite idempotency key part (contract-catalog.md:23 'site_id+inventory_version')."
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "type": "https://schemas.the-saena.ai/errors/policy_denied/scope_exceeded",
+  "title": "Requested scope exceeds approved Action Contract scope",
+  "status": 403,
+  "detail": "approved_scope does not cover apps/web/docs/new-page.md",
+  "instance": "https://api.the-saena.ai/requests/example-not-real-0001",
+  "error_code": "saena.policy_denied.scope_exceeded",
+  "retryable": false,
+  "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

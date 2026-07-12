@@ -40,6 +40,7 @@ yarn.lock
 Cargo.lock
 poetry.lock
 package-lock.json
+!tools/contract-lint/package-lock.json
 
 # Runtime / local
 .tmp/
@@ -65,3 +66,10 @@ audit/
 # Customer source workspaces (never commit)
 workspaces/
 customer-repos/
+
+# Node toolchain isolation (contract lint only)
+tools/contract-lint/node_modules/
+
+# Coverage artifacts (regenerated every test run)
+.coverage
+coverage.xml

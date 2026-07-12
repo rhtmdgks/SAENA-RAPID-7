@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/audit-event/v1/audit-event.schema.json",
+  "title": "AuditEvent",
+  "description": "Immutable ledger entry recorded from every plane. Closed at the envelope level; payload interior is intentionally open for forward-compatible per-action fields.",
+  "$comment": "compat_class: closed (root additionalProperties:false; payload sub-object additionalProperties intentionally left unset/open — see 'payload' property $comment). Authority: approved plan §2 domain row 6 (docs/... virtual-cooking-map.md §2, §5); docs/architecture/contract-catalog.md P0 table 'AuditEvent' row (Owner audit-ledger, Idempotency key 'event hash (chain)', Sensitivity 'internal+actor PII 최소화', Retention 'contractual, immutable role; payload PII/secret 금지'); ADR-0015 (docs/decisions/ADR-0015-canonical-error-model.md) 'AuditEvent 에러 기록 범위' — error path records error_code + trace_id ONLY, never stack traces or raw content, hence error_code here is a top-level opaque-pattern field rather than an embedded error-detail object. event_hash chain semantics (how prev_event_hash forms a verifiable chain) are explicitly deferred to W2A (docs/... virtual-cooking-map.md §5 'domain/audit-event' row '체인 의미론 W2A').",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_hash",
+    "prev_event_hash",
+    "action",
+    "recorded_at",
+    "scope",
+    "trace_id",
+    "payload"
+  ],
+  "properties": {
+    "event_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list; contract-catalog.md idempotency key 'event hash (chain)'. Opaque value in W1 — chain-linkage semantics (how it is derived from prev_event_hash + payload) are W2A (docs/... virtual-cooking-map.md §5 domain/audit-event row)."
+    },
+    "prev_event_hash": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref"
+        }
+      ],
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list — genesis event uses null (chain head has no predecessor). anyOf[null, sha256_ref] form is chosen deliberately and pre-included NOW (rather than added as a later type-widening major) specifically to avoid a future closed-class breaking change when the chain semantics land in W2A (docs/... virtual-cooking-map.md §2 domain row 6 '$comment top' instruction)."
+    },
+    "action": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,3}\\.v[0-9]+$",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list — 3-4 dot-segment lowercase_snake action identifier ending in a version suffix (e.g. 'plan.contract.approved.v1', 'patch.unit.completed.v1'), matching the event topic naming convention used across k3s §4.2 message names and the events/ catalog."
+    },
+    "recorded_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list."
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["tenant", "system"],
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list — Ruling R9 (Security MUST-FIX #1, docs/... virtual-cooking-map.md §1.1): 'AuditEvent scope discriminator(if/then 3-분기 미러)' — this field is the R9-1 discriminator; see the allOf conditionals below that mirror the envelope's tenant/system split (ADR-0013 rev.2 tenant 분기 run_id required amendment applies the analogous pattern at the envelope layer)."
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list — identical 32-hex W3C trace context format as common/problem-detail/v1 trace_id and the event envelope, the 3-way correlation key per ADR-0015."
+    },
+    "payload": {
+      "type": "object",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list — 'payload interior open' by explicit instruction: additionalProperties intentionally left unset here (unlike every other object in this file) so that per-action payload shapes are NOT constrained by this schema. PII/secret exclusion from payload is a RUNTIME gate + permanent negative-fixture obligation, not schema-enforceable content inspection (ADR-0015:64 — 'AuditEvent 에러 기록 범위: error_code + trace_id만 기록한다'; error path payloads must carry only error_code/trace_id, never raw diagnostic content, mirroring common/error-detail's stack-trace prohibition)."
+    },
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list, optional at the property level — required conditionally per scope via the allOf block below (R9-1)."
+    },
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list, optional at the property level — forbidden for scope=system per the allOf block below (R9-1)."
+    },
+    "actor_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/actor_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list, optional — contract-catalog.md 'actor PII 최소화': ledger carries only actor_id, identity mapping is stored separately."
+    },
+    "error_code": {
+      "type": "string",
+      "pattern": "^saena\\.[a-z_]+\\.[a-z_]+$",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 6 field list, optional — ADR-0015 taxonomy pattern, identical to common/error-detail.error_code and common/problem-detail.error_code. ADR-0015:64 'AuditEvent 에러 기록 범위' — error_code + trace_id is the entire error footprint permitted at this layer; no embedded error-detail/summary object here."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "tenant"
+          }
+        },
+        "required": ["scope"]
+      },
+      "then": {
+        "required": ["tenant_id"]
+      },
+      "$comment": "Ruling R9-1 branch 1: scope=tenant requires tenant_id (mirrors the envelope tenant-scope pattern, ADR-0013 rev.2 amendment)."
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "system"
+          }
+        },
+        "required": ["scope"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": ["tenant_id"]
+            },
+            {
+              "required": ["run_id"]
+            }
+          ]
+        }
+      },
+      "$comment": "Ruling R9-1 branch 2 (envelope mirror, 3-way discriminator completed): scope=system forbids BOTH tenant_id and run_id — a system-scoped event cannot carry tenant- or run-scoped correlation fields, closing the leak path Security MUST-FIX #1 identified."
+    }
+  ]
+}

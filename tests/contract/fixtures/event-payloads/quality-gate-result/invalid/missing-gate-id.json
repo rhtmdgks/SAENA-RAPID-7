@@ -1,0 +1,4 @@
+{
+  "patch_unit_id": "PU-02",
+  "_expected_violation": "gate_id is required (idempotency key component); this instance omits it."
+}

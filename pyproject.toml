@@ -14,6 +14,7 @@ package = false
 members = [
     "packages/shared",
     "packages/testing",
+    "packages/schemas",
 ]
 
 [dependency-groups]
@@ -28,11 +29,17 @@ dev = [
     "check-jsonschema>=0.30,<1",
     "saena-shared",
     "saena-testing",
+    "saena-schemas",
+    "datamodel-code-generator>=0.26,<1",
+    "openapi-spec-validator>=0.7,<1",
+    "pyyaml>=6,<7",
+    "types-jsonschema>=4,<5",
 ]
 
 [tool.uv.sources]
 saena-shared = { workspace = true }
 saena-testing = { workspace = true }
+saena-schemas = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"
@@ -40,6 +47,13 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Generated code carries verbatim JSON Schema description/$comment text as
+# Field(description=...) strings (packages/contracts is the SSOT for that
+# prose, ADR-0011) — reflowing it would diverge from source. Codegen output
+# only, never hand-edited (packages/schemas/README.md).
+"packages/schemas/saena_schemas/**/*.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -54,6 +68,11 @@ testpaths = ["packages", "tests"]
 addopts = "-ra"
 
 [tool.coverage.run]
-source = ["packages"]
+source = ["packages", "tests/contract/harness"]
 # Exclusions must be explicit per ADR-0017 — no implicit patterns.
-omit = []
+# packages/schemas/saena_schemas/* is 100% codegen output (ADR-0011 SSOT
+# split; packages/schemas/README.md) — coverage over generated pydantic
+# models measures datamodel-code-generator's output shape, not this repo's
+# own logic, so it is explicitly omitted here (critic S2, approved plan §2
+# codegen-output-coverage-exclusion obligation).
+omit = ["packages/schemas/saena_schemas/*"]

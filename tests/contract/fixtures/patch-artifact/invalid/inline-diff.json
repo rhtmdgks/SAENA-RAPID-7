@@ -1,0 +1,18 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0002",
+  "patch_unit_id": "PU-02",
+  "worktree_commit": "cccfff1",
+  "base_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "artifact_uri": "s3://saena-artifacts/run-0002/PU-02.diff",
+  "artifact_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest_uri": "s3://saena-artifacts/run-0002/PU-02.manifest.json",
+  "changed_files": ["apps/web/docs/new-page.md"],
+  "quality_gate_ids": ["gate-lint"],
+  "evidence_ids": ["evidence-0002"],
+  "contract_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "rollback_ref": "git-revert:PU-02",
+  "created_at": "2026-07-12T14:30:00Z",
+  "inline_diff": "--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+new",
+  "_expected_violation": "PatchArtifact is closed (additionalProperties:false) and reference-only by design (customer-proprietary 'diff=소스' highest sensitivity); inline_diff is not a declared property and is rejected -- diff content must never ride inline in this contract."
+}

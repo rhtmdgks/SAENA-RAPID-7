@@ -1,0 +1,10 @@
+{
+  "event_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "prev_event_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "action": "system.health.check.v1",
+  "recorded_at": "2026-07-12T16:20:00Z",
+  "scope": "system",
+  "trace_id": "cccccccccccccccccccccccccccccccc",
+  "error_code": "saena.unavailable.dependency_timeout",
+  "payload": {}
+}

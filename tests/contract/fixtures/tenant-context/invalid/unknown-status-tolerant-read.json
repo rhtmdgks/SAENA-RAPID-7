@@ -1,0 +1,13 @@
+{
+  "tenant_id": "acme-corp",
+  "display_name": "Acme Corp",
+  "isolation_profile": "internal-k3s",
+  "namespace": "saena-tenant-acme-corp",
+  "policy_version": "1.0.0",
+  "engine_scope": ["chatgpt-search"],
+  "status": "archived",
+  "retention_policy_ref": "retention-policy-default",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z",
+  "_expected_violation": "status enum is exactly ['active', 'suspended', 'terminating'] (ADR-0014:55); 'archived' is not a current v1 member. This fixture is ALSO the tolerant-read worked example (tests/contract/README.md 'Tolerant-read test obligation') — schema-invalid by design (enum widening = major, ADR-0012), but the accompanying consumer-side resolve_tenant_status() stub in test_tenant_context.py MUST degrade this same 'archived' value safely (Fallback branch, no raise) rather than crash, modeling the old-consumer/new-producer overlap window during a future major-version rollout."
+}
