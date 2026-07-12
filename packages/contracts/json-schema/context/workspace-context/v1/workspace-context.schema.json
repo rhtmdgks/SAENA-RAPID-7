@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/context/workspace-context/v1/workspace-context.schema.json",
+  "title": "WorkspaceContext",
+  "description": "Tenancy-layer workspace record propagated from tenant-control to intake and runner, per docs/architecture/contract-catalog.md:21.",
+  "$comment": "compat_class: open (plan §2 row 'context/workspace-context' — no user closed-class decision applies to this contract; open is the default per plan §5 acceptance matrix 'WorkspaceContext / ProjectContext | open'). Authority: contract-catalog.md:21 (owner tenant-control per ADR-0007, producer tenant-control -> intake/runner, idempotency key workspace_id, sensitivity internal); tenancy-model.md:39 Identifier set ('workspace_id | operator/customer workspace'). Field set is intentionally THIN (workspace_id + tenant_id only) because no authoritative source enumerates further WorkspaceContext fields (lifecycle/status/created_at etc. have no citation in ADR-0014, contract-catalog.md, or tenancy-model.md) — additional fields are deferred as a MINOR (additive, non-breaking under the open compat_class) follow-up once a citation exists, not invented here. IMPORTANT tenancy distinction: this is the tenancy-layer, tenant-control-owned 'WorkspaceContext' object (contract-catalog.md row, tenancy-model.md Identifier set) and is a DIFFERENT concept from the per-run EPHEMERAL execution workspace described in docs/specs/SAENA_AEO_Algorithm_and_Harness_Design_v1.md §6.1 (agent-runner scratch workspace for a single run) — the two share the English word 'workspace' but are not the same entity and must not be conflated when consuming this schema.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["workspace_id", "tenant_id"],
+  "properties": {
+    "workspace_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/workspace_id",
+      "$comment": "tenancy-model.md:39 Identifier set — 'operator/customer workspace'. Format OPEN (issuer runtime convention, W1 opaque) per common/identifiers $defs.workspace_id."
+    },
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Tenant discriminator — every workspace belongs to exactly one tenant (tenancy-model.md hard isolation boundary)."
+    }
+  }
+}

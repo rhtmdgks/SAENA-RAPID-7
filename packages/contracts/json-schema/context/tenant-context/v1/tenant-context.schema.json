@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/context/tenant-context/v1/tenant-context.schema.json",
+  "title": "TenantContext",
+  "description": "Tenant record propagated to every tenant-scoped capability. Field list is fixed verbatim in ADR-0014 (docs/decisions/ADR-0014-tenant-propagation.md, 'TenantContext 계약 객체 — 필드 목록' table) and identified as P0 #1 in docs/architecture/contract-catalog.md:19.",
+  "$comment": "compat_class: closed (user decision 2026-07-12, plan §1.2 item 1 — virtual-cooking-map.md). Authority: approved plan §2 row 'context/tenant-context' + §1.2 item 1; ADR-0014:45-58 (10 fields verbatim); contract-catalog.md:19 (owner tenant-control, idempotency key tenant_id+policy_version, sensitivity internal). This is the tolerant-read 'status' worked example referenced in plan §1.1 R11 / §2 row (first recorded instance — VerificationResult.status and envelope de_identification_status inherit the same obligation): consumers MUST treat unrecognized future values of an enum field as a distinct 'unknown' state rather than failing closed or silently coercing to a known value, so that a minor-version enum addition does not break already-deployed consumers. This obligation is a runtime/consumer contract, not schema-enforceable by JSON Schema itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "display_name",
+    "isolation_profile",
+    "namespace",
+    "policy_version",
+    "engine_scope",
+    "status",
+    "retention_policy_ref",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "ADR-0014:49 — immutable DNS-safe slug, hard isolation boundary (tenancy-model.md Identifier set)."
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "ADR-0014:50 — human-readable, mutable (unlike tenant_id)."
+    },
+    "isolation_profile": {
+      "type": "string",
+      "enum": [
+        "internal-k3s",
+        "saas-shared"
+      ],
+      "$comment": "ADR-0014:51 — isolation profile enum, verbatim two values."
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^saena-tenant-[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])$",
+      "$comment": "ADR-0014:52 — 'saena-tenant-<tenant_id>', derived deterministically from tenant_id, NOT an independent input (ADR-0014 Constraints:65: 'namespace 필드는 tenant_id에서 결정적으로 파생되어야 하며 독립적으로 임의 값을 받아서는 안 된다'). This is a CROSS-FIELD invariant (namespace must equal 'saena-tenant-' + tenant_id) that JSON Schema cannot express structurally in a single-schema form without a value-specific const per instance — the pattern here only enforces the SHAPE (prefix + slug grammar), not that the embedded slug matches this instance's tenant_id value. That equality check is a RUNTIME GATE obligation (plan §2 row tenant-context 'namespace-mismatch' note; cohort precedent — same class of gap as other derived/cross-field checks in this catalog) and is additionally covered by a PERMANENT (non-expiring) gap fixture recording a namespace/tenant_id mismatch instance that this schema alone cannot reject. | SYNC OBLIGATION: the embedded slug sub-regex MUST stay byte-for-byte in sync with common/identifiers/v1 $defs.tenant_id (ADR-0014:28) — composition prevents $ref reuse here."
+    },
+    "policy_version": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/semver",
+      "$comment": "ADR-0014:53 — semver of the applied policy bundle."
+    },
+    "engine_scope": {
+      "type": "array",
+      "items": {
+        "$ref": "../../../common/engine-id/v1/engine-id.schema.json"
+      },
+      "minItems": 1,
+      "$comment": "ADR-0014:54 — v1 = [\"chatgpt-search\"] only, aligned with ADR-0013's closed engine_id enum and CLAUDE.md Engine scope (Google/Gemini disabled). | w1-06 critic SHOULD-FIX 2 + planner OPEN #13 Lead-approved: uniqueItems (duplicate engines meaningless; closed class — post-tag addition would be major).",
+      "uniqueItems": true
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "terminating"
+      ],
+      "$comment": "ADR-0014:55 — lifecycle status enum verbatim. Tolerant-read worked example — see top-level $comment."
+    },
+    "retention_policy_ref": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "ADR-0014:56 — opaque retention policy reference. Concrete format/lookup mechanism is OPEN, carried forward from ADR-0014 Open decisions:71 ('retention_policy_ref의 구체 포맷·조회 메커니즘 — W1 스키마 작성 시 확정') — this schema intentionally only constrains it as a non-empty opaque string pending that follow-up decision."
+    },
+    "created_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "ADR-0014:57 — RFC3339 UTC, Z-canonical per ADR-0013 rev.2."
+    },
+    "updated_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "ADR-0014:58 — RFC3339 UTC, Z-canonical per ADR-0013 rev.2."
+    }
+  }
+}

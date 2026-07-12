@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/context/site-context/v1/site-context.schema.json",
+  "title": "SiteContext",
+  "description": "Site/domain record propagated from site-discovery to demand-graph, intervention-gen, and observer, per docs/architecture/contract-catalog.md:23.",
+  "$comment": "compat_class: open (plan §2 row 'context/site-context'; plan §5 acceptance matrix 'SiteContext | open'). Authority: contract-catalog.md:23 (owner site-discovery, producer site-discovery -> demand-graph/intervention-gen/observer, idempotency key site_id+inventory_version, sensitivity public(domain)+internal); tenancy-model.md:41 Identifier set ('site_id | domain/site under project') is the sole authoritative citation establishing the site-under-project hierarchy link, hence project_id is required alongside site_id/tenant_id.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["site_id", "tenant_id", "project_id", "domain", "inventory_version"],
+  "properties": {
+    "site_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/site_id",
+      "$comment": "tenancy-model.md:41 Identifier set — 'domain/site under project'. Format OPEN (issuer runtime convention, W1 opaque) per common/identifiers $defs.site_id."
+    },
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Tenant discriminator — every site belongs to exactly one tenant (tenancy-model.md hard isolation boundary). Sensitivity note: this tenant LINK is internal even though the domain value itself is public (contract-catalog.md:23 'public(도메인)+internal')."
+    },
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "tenancy-model.md:41 — sites live under a project ('domain/site under project'), the only authoritative citation for this hierarchy link."
+    },
+    "domain": {
+      "type": "string",
+      "format": "hostname",
+      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+      "$comment": "Deliberately a bare HOSTNAME, not a URL (no scheme/path/query) — plan ruling (approved plan §2 row 'context/site-context'). The domain value is public information (contract-catalog.md:23 sensitivity 'public(도메인)'), but the tenant_id/project_id LINK carried alongside it in this object is internal-sensitivity. VERIFIED FINDING (this unit's verification, see commit message): 'format': 'hostname' alone is ANNOTATION-ONLY in this repo's actual tooling invocation — check-jsonschema's documented default format-check list is 'date, date-time, email, ipv4, ipv6, regex, uuid' (from 'check-jsonschema --help'), hostname is NOT in that list and there is no enable-flag to add it (only --disable-formats to remove from the defaults); confirmed empirically with a standalone probe schema+instance (domain=\"https://x.com\") that check-jsonschema reports 'ok -- validation done' despite the value being a URL, not a hostname. The 'jsonschema' Python library's own FORMAT_CHECKER also does not register a 'hostname' checker (only 'idn-hostname' is registered) even when a format_checker is explicitly passed. The 'pattern' fallback added here is therefore the field that provides REAL enforcement: it structurally rejects scheme/path/query characters (':' , '/', '?', '#') and rejects an all-empty or malformed label, giving actual rejection of \"https://x.com\"-shaped values even though it is a coarser check than true RFC 1123 hostname/label-length validation (no per-label 63-char cap, no IDN handling) — those refinements are OPEN, deferred pending a citation."
+    },
+    "inventory_version": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Opaque version token, composite idempotency key part site_id+inventory_version (contract-catalog.md:23). Format is intentionally unconstrained beyond non-empty — no authoritative source specifies a concrete version-string grammar."
+    }
+  }
+}
