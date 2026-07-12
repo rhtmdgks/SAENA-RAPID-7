@@ -68,6 +68,33 @@ class TestCreateRejectsNonEnumEngine:
             flags.get(rogue_engine_id)
 
 
+@pytest.mark.parametrize(
+    "variant_engine_id",
+    [
+        "ChatGPT-Search",
+        "CHATGPT-SEARCH",
+        "chatgpt-search ",
+        " chatgpt-search",
+        "chatgpt-sеarch",  # Cyrillic 'е' (U+0435) homoglyph for Latin 'e'
+    ],
+    ids=[
+        "mixed-case",
+        "upper-case",
+        "trailing-whitespace",
+        "leading-whitespace",
+        "cyrillic-e-homoglyph",
+    ],
+)
+class TestCreateRejectsNearMissVariants:
+    """Locks in the no-normalization guarantee at the flag layer, mirroring
+    `test_engine_gateway_registry.TestRegisterRejectsNearMissVariants`."""
+
+    def test_create_raises_engine_not_permitted(self, variant_engine_id: str) -> None:
+        flags = FlagRegistry()
+        with pytest.raises(EngineNotPermittedError):
+            flags.create(variant_engine_id, enabled=True)
+
+
 class TestIsEnabledFailsClosed:
     def test_no_flag_created_resolves_to_disabled(self) -> None:
         flags = FlagRegistry()

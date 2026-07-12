@@ -20,7 +20,14 @@ Three endpoints:
   entirely (e.g. direct dict manipulation in a misbehaving extension).
 
 Every error response is RFC 9457 `application/problem+json`
-(`saena_engine_gateway.problem_detail`). Tenant reconciliation
+(`saena_engine_gateway.problem_detail`): `EngineGatewayError` subclasses via
+`_engine_gateway_error_handler`, FastAPI/pydantic request-validation
+failures (e.g. a non-string `engine_id` in the request body) via
+`_validation_error_handler`, and any other unhandled `Exception` via
+`_unhandled_exception_handler` — the last two exist specifically so no
+FastAPI-default or bare-exception response ever reaches a caller outside
+this module's problem+json shaping (see their docstrings for the
+value-echo/stack-trace leaks each one closes). Tenant reconciliation
 (`saena_engine_gateway.tenant_middleware`) runs ahead of every non-exempt
 route.
 
@@ -43,6 +50,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from saena_observability.logging import get_logger
@@ -55,7 +63,7 @@ from saena_engine_gateway.errors import (
     PayloadEngineMismatchError,
 )
 from saena_engine_gateway.flags import FlagRegistry
-from saena_engine_gateway.problem_detail import build_problem_detail
+from saena_engine_gateway.problem_detail import build_generic_problem_detail, build_problem_detail
 from saena_engine_gateway.registry import PERMITTED_ENGINE_IDS, AdapterRegistry
 from saena_engine_gateway.tenant_middleware import TenantReconciliationMiddleware
 
@@ -200,6 +208,80 @@ async def _engine_gateway_error_handler(request: Request, exc: Exception) -> JSO
     return JSONResponse(body, status_code=exc.http_status, media_type="application/problem+json")
 
 
+def _sanitize_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]:
+    """Strip every field except `loc`/`type`/`msg` from each pydantic-core
+    error dict.
+
+    `RequestValidationError.errors()` entries can carry an `input` key (the
+    raw, potentially attacker-controlled rejected value verbatim) and a
+    `ctx` key (constraint-derived values that can themselves embed input
+    fragments, e.g. `str_type` pattern context) — FastAPI's own default
+    handler echoes both back to the caller. Neither is safe to return
+    (critic MUST-FIX 1); `loc` (a field-path tuple of static strings/ints)
+    and `type`/`msg` (pydantic's own fixed vocabulary) carry no
+    caller-supplied content and are kept.
+    """
+    sanitized: list[dict[str, Any]] = []
+    for error in exc.errors():
+        entry: dict[str, Any] = {
+            "type": error.get("type"),
+            "loc": list(error.get("loc", ())),
+            "msg": error.get("msg"),
+        }
+        sanitized.append(entry)
+    return sanitized
+
+
+async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """RFC 9457 `422` for FastAPI/pydantic request-validation failures.
+
+    Replaces FastAPI's default `RequestValidationError` handler, which (a)
+    returns bare `{"detail": [...]}` JSON, not `application/problem+json`,
+    and (b) echoes the raw rejected value via each error's `input` key
+    (critic MUST-FIX 1). `detail` here is a fixed, non-request-derived
+    string; per-field specifics are still available to the caller via the
+    sanitized `errors` extension array (`loc`/`type`/`msg` only — see
+    `_sanitize_validation_errors`), never via `detail` itself.
+    """
+    assert isinstance(exc, RequestValidationError)
+    body = build_generic_problem_detail(
+        title="RequestValidationError",
+        status=422,
+        detail="request failed schema validation",
+        error_code="saena.validation.request_validation_failed",
+        instance=str(request.url.path),
+    )
+    body["errors"] = _sanitize_validation_errors(exc)
+    _logger.info(
+        "request_validation_error status=422 error_count=%s",
+        len(body["errors"]),
+    )
+    return JSONResponse(body, status_code=422, media_type="application/problem+json")
+
+
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """RFC 9457 `500` fallback for any exception this module did not
+    anticipate.
+
+    Never includes `str(exc)` or a stack trace in the response body
+    (critic MUST-FIX 1) — `detail` is a fixed string. The exception's type
+    name (not its message, which can embed request-derived content) is
+    logged server-side only, for operator triage.
+    """
+    body = build_generic_problem_detail(
+        title="InternalServerError",
+        status=500,
+        detail="an unexpected error occurred",
+        error_code="saena.internal.unexpected",
+        instance=str(request.url.path),
+    )
+    _logger.info(
+        "unhandled_exception status=500 exception_type=%s",
+        type(exc).__name__,
+    )
+    return JSONResponse(body, status_code=500, media_type="application/problem+json")
+
+
 def create_app(
     *,
     registry: AdapterRegistry | None = None,
@@ -220,6 +302,8 @@ def create_app(
     app.state.flags = resolved_flags
     app.add_middleware(TenantReconciliationMiddleware)
     app.add_exception_handler(EngineGatewayError, _engine_gateway_error_handler)
+    app.add_exception_handler(RequestValidationError, _validation_error_handler)
+    app.add_exception_handler(Exception, _unhandled_exception_handler)
 
     app.get("/v1/engines")(list_engines)
     app.post("/v1/engines/{engine_id}/requests", status_code=202)(submit_engine_request)

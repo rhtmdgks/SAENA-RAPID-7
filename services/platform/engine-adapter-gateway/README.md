@@ -42,7 +42,11 @@ separate from observer business logic) and the CLAUDE.md v1 engine scope
   (`X-Saena-Tenant-Id` vs `SAENA_TENANT_ID`), tenant-safe structured logging
   via `saena_observability`.
 - `errors.py` / `problem_detail.py` — ADR-0015 RFC 9457
-  `application/problem+json` error model.
+  `application/problem+json` error model, covering every response path this
+  app can return: `EngineGatewayError` subclasses, FastAPI/pydantic request
+  validation failures (no `input`/`ctx` value echo — sanitized to
+  `loc`/`type`/`msg` only), and any other unhandled exception (fixed
+  `detail`, no stack trace).
 
 Not yet implemented (out of this patch unit's scope): real ChatGPT Search
 observation calls, citation normalization, rate limiting beyond flag

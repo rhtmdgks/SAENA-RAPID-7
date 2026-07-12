@@ -79,6 +79,41 @@ class TestRegisterRejectsNonEnumEngine:
             registry.get(rogue_engine_id)
 
 
+@pytest.mark.parametrize(
+    "variant_engine_id",
+    [
+        "ChatGPT-Search",  # mixed case
+        "CHATGPT-SEARCH",  # upper case
+        "chatgpt-search ",  # trailing whitespace
+        " chatgpt-search",  # leading whitespace
+        "chatgpt-sеarch",  # Cyrillic 'е' (U+0435) homoglyph for Latin 'e'
+    ],
+    ids=[
+        "mixed-case",
+        "upper-case",
+        "trailing-whitespace",
+        "leading-whitespace",
+        "cyrillic-e-homoglyph",
+    ],
+)
+class TestRegisterRejectsNearMissVariants:
+    """Locks in the no-normalization guarantee: `AdapterRegistry.register`
+    does exact, byte-for-byte membership testing against
+    `PERMITTED_ENGINE_IDS` -- it must never case-fold, strip, or Unicode-
+    normalize a candidate `engine_id` before comparing it. A future
+    refactor that adds normalization would silently widen the v1 closed
+    enum (CLAUDE.md Engine scope / ADR-0013) to accept lookalike values."""
+
+    def test_register_raises_engine_not_permitted(self, variant_engine_id: str) -> None:
+        registry = AdapterRegistry()
+        with pytest.raises(EngineNotPermittedError) as exc_info:
+            registry.register(FakeAdapter(variant_engine_id))
+        assert exc_info.value.engine_id == variant_engine_id
+
+    def test_variant_is_not_in_permitted_engine_ids(self, variant_engine_id: str) -> None:
+        assert variant_engine_id not in PERMITTED_ENGINE_IDS
+
+
 class TestGetOnEmptyRegistry:
     def test_valid_engine_id_not_registered_raises_not_found(self) -> None:
         registry = AdapterRegistry()

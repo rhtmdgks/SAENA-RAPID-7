@@ -68,6 +68,44 @@ class TestClosedEnumBoundaryCheckedFirst:
         assert response.status_code == 202
 
 
+class TestClosedEnumRejectsNearMissVariants:
+    """Locks in the no-normalization guarantee at the HTTP boundary,
+    mirroring `test_engine_gateway_registry.TestRegisterRejectsNearMissVariants`
+    -- a caller cannot bypass the closed enum via case-folding, incidental
+    whitespace, or a Unicode homoglyph. Requests are made with the raw
+    path segment; `httpx`/starlette's `TestClient` percent-encodes
+    whitespace/non-ASCII automatically, so this exercises the exact same
+    server-side decoding a real client's request would."""
+
+    @pytest.mark.parametrize(
+        "variant_engine_id",
+        [
+            "ChatGPT-Search",
+            "CHATGPT-SEARCH",
+            "chatgpt-search ",
+            " chatgpt-search",
+            "chatgpt-sеarch",  # Cyrillic 'е' (U+0435) homoglyph for Latin 'e'
+        ],
+        ids=[
+            "mixed-case",
+            "upper-case",
+            "trailing-whitespace",
+            "leading-whitespace",
+            "cyrillic-e-homoglyph",
+        ],
+    )
+    def test_variant_rejected_with_403_policy_denied(
+        self, client: TestClient, variant_engine_id: str
+    ) -> None:
+        response = client.post(
+            f"/v1/engines/{variant_engine_id}/requests",
+            json={},
+            headers=TENANT_HEADERS,
+        )
+        assert response.status_code == 403
+        assert response.json()["error_code"] == "saena.policy_denied.engine_not_permitted"
+
+
 class TestEmptyEngineIdPathSegment:
     """An empty `{engine_id}` path segment (`POST /v1/engines//requests`)
     never reaches `submit_engine_request` at all -- Starlette's router does
