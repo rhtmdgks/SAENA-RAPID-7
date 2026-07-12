@@ -173,6 +173,12 @@ class _PlanFacts:
         high_risk: bool,
         patch_unit_ids: tuple[str, ...],
         run_id: str,
+        evidence_ledger_hash: str,
+        approved_scope: tuple[str, ...],
+        scope_max_globs: int,
+        diff_max_files: int,
+        diff_max_lines: int,
+        hypothesis_risks: tuple[str, ...],
     ) -> None:
         with self._lock:
             self._facts[(tenant_id.value, contract_hash)] = {
@@ -180,6 +186,20 @@ class _PlanFacts:
                 "high_risk": high_risk,
                 "patch_unit_ids": patch_unit_ids,
                 "run_id": run_id,
+                # w2-21: the H-3 evidence/scope/diff-budget facts
+                # HttpPolicyGateClient.plan_check needs to build a complete,
+                # schema-valid PlanCheckRequestBody at decision time — only
+                # available here (propose_plan sees the validated
+                # ChangeplanActionContract), not at submit_decision, which
+                # only ever sees `contract_hash`/`PlanRepository`'s narrow
+                # PlanSnapshot. See gate_client.GateCheckRequest's docstring
+                # for the caller-gap this closes.
+                "evidence_ledger_hash": evidence_ledger_hash,
+                "approved_scope": approved_scope,
+                "scope_max_globs": scope_max_globs,
+                "diff_max_files": diff_max_files,
+                "diff_max_lines": diff_max_lines,
+                "hypothesis_risks": hypothesis_risks,
             }
 
     def get(self, tenant_id: TenantId, contract_hash: str) -> dict[str, Any]:
@@ -387,6 +407,12 @@ def create_app(
             high_risk=high_risk,
             patch_unit_ids=tuple(pu.id for pu in plan.patch_units),
             run_id=plan.run_id.root,
+            evidence_ledger_hash=plan.evidence_ledger_hash.root,
+            approved_scope=tuple(plan.approved_scope),
+            scope_max_globs=plan.scope_limits.max_globs,
+            diff_max_files=plan.diff_budget.max_files,
+            diff_max_lines=plan.diff_budget.max_lines,
+            hypothesis_risks=tuple(h.risk.value for h in plan.hypotheses),
         )
 
         envelope = EnvelopeFactory.build_tenant_envelope(
@@ -516,10 +542,27 @@ def create_app(
         # Deny => 403 policy_denied + audit record, no transition attempted.
         # Gate down => 503 gate_unavailable FAIL CLOSED, no transition
         # attempted — this branch is the ADR-0003/W2A exit-demo path.
+        #
+        # w2-21: populate the H-3 evidence/scope/diff-budget fields
+        # policy-gate's real PlanCheckRequestBody requires (gate_client.py's
+        # HttpPolicyGateClient fails closed via its own pre-flight guard if
+        # any of these were still None — see GateCheckRequest's docstring)
+        # from the facts propose_plan recorded off the validated
+        # ChangeplanActionContract, plus approver_actor_id, already in scope
+        # from the submitted ApprovalDecision.
         gate_request = GateCheckRequest(
             contract_hash=contract_hash,
             tenant_id=tenant_id.value,
             high_risk=high_risk,
+            approved_scope=tuple(plan_facts["approved_scope"]),
+            patch_unit_ids=tuple(plan_facts["patch_unit_ids"]),
+            proposer_actor_id=proposer_actor_id,
+            approver_actor_id=decision_body.approver_actor_id.root,
+            evidence_ledger_hash=plan_facts["evidence_ledger_hash"],
+            scope_max_globs=plan_facts["scope_max_globs"],
+            diff_max_files=plan_facts["diff_max_files"],
+            diff_max_lines=plan_facts["diff_max_lines"],
+            hypothesis_risks=tuple(plan_facts["hypothesis_risks"]),
         )
         # gate.plan_check raises PolicyGateUnavailableError on any transport
         # failure/timeout/non-200 (fail-closed) — propagates unmodified, the
