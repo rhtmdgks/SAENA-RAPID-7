@@ -15,6 +15,16 @@ members = [
     "packages/shared",
     "packages/testing",
     "packages/schemas",
+    "packages/domain",
+    "packages/observability",
+    "services/foundation/tenant-control-service",
+    "services/foundation/policy-gate-service",
+    "services/foundation/audit-ledger-service",
+    "services/foundation/plan-contract-service",
+    "services/platform/forge-console-api",
+    "services/platform/agent-orchestrator-service",
+    "services/platform/artifact-registry-service",
+    "services/platform/engine-adapter-gateway",
 ]
 
 [dependency-groups]
@@ -30,16 +40,38 @@ dev = [
     "saena-shared",
     "saena-testing",
     "saena-schemas",
+    "saena-domain",
+    "saena-observability",
+    "saena-tenant-control",
+    "saena-policy-gate",
+    "saena-audit-ledger",
+    "saena-plan-contract",
+    "saena-forge-console",
+    "saena-orchestrator",
+    "saena-artifact-registry",
+    "saena-engine-gateway",
     "datamodel-code-generator>=0.26,<1",
     "openapi-spec-validator>=0.7,<1",
     "pyyaml>=6,<7",
     "types-jsonschema>=4,<5",
+    "types-pyyaml>=6,<7",
+    "testcontainers>=4.9,<5",
 ]
 
 [tool.uv.sources]
 saena-shared = { workspace = true }
 saena-testing = { workspace = true }
 saena-schemas = { workspace = true }
+saena-domain = { workspace = true }
+saena-observability = { workspace = true }
+saena-tenant-control = { workspace = true }
+saena-policy-gate = { workspace = true }
+saena-audit-ledger = { workspace = true }
+saena-plan-contract = { workspace = true }
+saena-forge-console = { workspace = true }
+saena-orchestrator = { workspace = true }
+saena-artifact-registry = { workspace = true }
+saena-engine-gateway = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"
@@ -61,14 +93,14 @@ strict = false
 warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = true
-files = ["packages"]
+files = ["packages", "services"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "tests"]
 addopts = "-ra"
 
 [tool.coverage.run]
-source = ["packages", "tests/contract/harness"]
+source = ["packages", "services", "tests/contract/harness"]
 # Exclusions must be explicit per ADR-0017 — no implicit patterns.
 # packages/schemas/saena_schemas/* is 100% codegen output (ADR-0011 SSOT
 # split; packages/schemas/README.md) — coverage over generated pydantic
