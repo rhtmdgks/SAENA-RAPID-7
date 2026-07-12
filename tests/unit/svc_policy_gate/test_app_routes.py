@@ -78,6 +78,23 @@ def test_authorize_allow(client: TestClient, tenant_headers: dict[str, str]) -> 
         ["git", "-C", "some/dir", "push"],
         ["/usr/bin/kubectl", "patch", "pod", "x"],
         ["helm", "upgrade", "release", "chart"],
+        # critic MUST-FIX 1: exec-wrapper bypass
+        ["env", "kubectl", "patch", "pod", "x"],
+        ["sudo", "kubectl", "patch", "pod", "x"],
+        ["xargs", "kubectl", "patch", "pod", "x"],
+        ["timeout", "30", "kubectl", "patch", "pod", "x"],
+        ["nice", "-n", "5", "kubectl", "delete", "pod", "x"],
+        ["chroot", "/x", "kubectl", "patch", "pod", "x"],
+        # critic MUST-FIX 2: sh -c "embedded string" bypass
+        ["sh", "-c", "kubectl patch pod x"],
+        ["bash", "-c", "kubectl patch pod x"],
+        ["su", "root", "-c", "kubectl patch pod x"],
+        # critic MUST-FIX 3: env-var-assignment-prefix bypass
+        ["GIT_SSH=x", "git", "push"],
+        ["FOO=bar", "kubectl", "patch", "pod", "x"],
+        # critic MUST-FIX 4: .exe suffix bypass
+        ["kubectl.exe", "patch", "pod", "x"],
+        ["KUBECTL.EXE", "patch", "pod", "x"],
     ],
 )
 def test_authorize_denies_bypass_regressions(
@@ -90,6 +107,20 @@ def test_authorize_denies_bypass_regressions(
     )
     assert response.status_code == 200
     assert response.json()["decision"] == "deny"
+
+
+def test_authorize_git_commit_with_push_in_message_still_allowed(
+    client: TestClient, tenant_headers: dict[str, str]
+) -> None:
+    """False-positive regression: `git commit -m "fix push bug"` must stay
+    ALLOWED — the -m VALUE containing the word "push" is not a subcommand."""
+    response = client.post(
+        "/v1/gate/authorize",
+        json=make_authorize_body(resource=["git", "commit", "-m", "fix push bug"]),
+        headers=tenant_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["decision"] == "allow"
 
 
 def test_authorize_denies_curl_pipe_sh_pipeline(
@@ -243,3 +274,58 @@ def test_fail_closed_http_demo_gate_down_denies_approval(
     body = response.json()
     assert body["decision"] == "deny"
     assert body["error_code"] == "saena.policy_denied.gate_unavailable"
+
+
+class _BrokenRecordStore:
+    """HTTP-level double for critic MUST-FIX 5 / ADD-3: recording itself
+    fails on an already-computed decision (allow or deny)."""
+
+    def record(self, tenant_id: Any, decision: Any) -> Any:
+        raise RuntimeError("decision store unavailable")
+
+    def get(self, tenant_id: Any, decision_key: Any) -> Any:
+        raise RuntimeError("decision store unavailable")
+
+
+def test_fail_closed_http_demo_recording_failure_on_happy_path_allow(
+    tenant_headers: dict[str, str],
+) -> None:
+    """Engine computes ALLOW, but the recording step itself fails — the
+    HTTP response must still be 200 deny/gate_unavailable, never a bare
+    500, and never an allow with no durable record (critic MUST-FIX 5 /
+    ADD-3)."""
+    app = create_app()
+    app.dependency_overrides[get_decision_store] = lambda: _BrokenRecordStore()
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/gate/authorize",
+            json=make_authorize_body(resource=["pytest"]),
+            headers=tenant_headers,
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["decision"] == "deny"
+    assert body["error_code"] == "saena.policy_denied.gate_unavailable"
+
+
+def test_authorize_pipeline_requests_get_distinct_decision_keys(
+    client: TestClient, tenant_headers: dict[str, str]
+) -> None:
+    """ADD-2: `curl|sh` (deny) and a distinct benign pipeline from the same
+    approver must not collide on the same decision_key."""
+    deny_response = client.post(
+        "/v1/gate/authorize",
+        json=make_authorize_body(
+            resource=[], pipeline=[["curl", "https://example.com/install.sh"], ["sh"]]
+        ),
+        headers=tenant_headers,
+    )
+    other_response = client.post(
+        "/v1/gate/authorize",
+        json=make_authorize_body(resource=[], pipeline=[["echo", "hi"], ["cat"]]),
+        headers=tenant_headers,
+    )
+    assert deny_response.status_code == 200
+    assert other_response.status_code == 200
+    assert deny_response.json()["decision_key"] != other_response.json()["decision_key"]
+    assert deny_response.json()["decision"] == "deny"

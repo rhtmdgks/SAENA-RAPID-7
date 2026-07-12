@@ -3,12 +3,24 @@ idempotent decision recording.
 
 Fail-closed contract (ADR-0015 `policy_denied.gate_unavailable`,
 security-model.md "policy-gate = fail-closed"): every public entry point in
-this module (`authorize_command`, `check_plan`) wraps its engine/domain
-evaluation in a `try/except Exception` that converts ANY unexpected failure
-— a broken rule store, an evaluation-time exception, a timeout the caller
-already turned into an exception — into a `deny` `GateResult` carrying
-`error_code="saena.policy_denied.gate_unavailable"`. There is no code path
-in this module that lets an engine exception propagate as an ambiguous 500;
+this module (`authorize_command`, `check_plan`) wraps its ENTIRE flow —
+engine/domain evaluation AND decision recording (critic MUST-FIX 5,
+post-implementation review) — in a single `try/except Exception` that
+converts ANY unexpected failure into a `deny` `GateResult` carrying
+`error_code="saena.policy_denied.gate_unavailable"`. This explicitly
+includes a failure IN the recording step itself, after a decision (allow or
+deny) has already been computed: `_record` raising is treated exactly like
+an engine/evaluator failure — the response is still `deny`, never a bare
+500 and never a surfaced `allow` for a decision this module could not
+durably persist. `saena_policy_gate.errors.DecisionConflictError` is the one
+exception this choke point DELIBERATELY lets through unchanged, since a 409
+("you already recorded a DIFFERENT decision for this key") is a real,
+meaningful client error — not a gate-availability failure — and collapsing
+it into a generic `gate_unavailable` deny would hide a genuine
+idempotency-key conflict behind a fail-closed response. There is no code
+path in this module that lets an
+engine, evaluator, or recording exception propagate as an ambiguous 500, or
+let a computed ALLOW surface without a durably recorded decision behind it;
 the fail-closed doctrine is enforced at this one choke point rather than
 scattered per-route.
 
@@ -31,7 +43,10 @@ here without changing this module's decision-recording contract.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
@@ -41,6 +56,7 @@ from saena_domain.persistence.errors import DecisionConflictError as _PortDecisi
 from saena_domain.persistence.ports import DecisionRecordPort
 from saena_domain.policy import DecisionRecord, evaluate_h3_evidence_policy, is_high_risk_plan
 from saena_domain.policy.evidence import DiffStats, H3PolicyResult
+from saena_domain.policy.identity import canonical_actor_id
 
 from saena_policy_gate.engine import AuthorizationRequest, Decision, PolicyEngine
 from saena_policy_gate.errors import DecisionConflictError, GateUnavailableError
@@ -70,6 +86,53 @@ class GateResult:
     error_code: str | None = None
 
 
+def _authorize_contract_hash(request: AuthorizationRequest) -> str:
+    """Stable, INJECTIVE (collision-resistant) `contract_hash` surrogate for
+    a `kind="command"` (and other-kind) `AuthorizationRequest` — coordinator
+    review ADD-2: the prior `f"authz:{kind}:{action}:{','.join(resource)}"`
+    form (a) silently IGNORED `request.pipeline` entirely (every pipeline
+    request collapsed to the same key, `resource=[]`, regardless of what the
+    pipeline actually contained — `curl|sh` and `echo|cat` from the same
+    approver would collide on the SAME `decision_key`, triggering either a
+    spurious 409 `DecisionConflictError` or a stale-replay short-circuit
+    that skips evaluating the second, distinct request entirely), and (b)
+    was itself ambiguous even for `resource` alone (`","`-joining is not
+    injective: `["a,b"]` and `["a", "b"]` both join to `"a,b"`).
+
+    This function instead JSON-serializes the full decision-relevant
+    request shape (`kind`, `action`, `resource`, `pipeline` — every field
+    that changes what is actually being authorized) with sorted keys and no
+    ambiguous separators, then SHA-256-hashes that canonical JSON — two
+    requests differing in ANY of those fields get DIFFERENT contract
+    hashes, and the same request replayed produces the SAME hash (idempotent
+    replay keying is preserved). `tenant_id` is deliberately EXCLUDED from
+    the hashed shape: `DecisionRecordPort` is already tenant-scoped by its
+    own `tenant_id` parameter (see `saena_domain.persistence.ports.
+    DecisionRecordPort`), so folding it into `contract_hash` too would be
+    redundant, not more correct.
+    """
+    canonical = json.dumps(
+        {
+            "kind": request.kind,
+            "action": request.action,
+            "resource": request.resource,
+            "pipeline": request.pipeline,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"authz:sha256:{digest}"
+
+
+def _decision_key_preview(contract_hash: str, approver_actor_id: str) -> tuple[str, str]:
+    """Compute the `DecisionRecord.decision_key` shape WITHOUT constructing
+    a full record — used only for the fail-closed response's
+    `decision_key` field when recording itself failed (MUST-FIX 5) and no
+    real stored record exists to read the key back from."""
+    return (contract_hash, canonical_actor_id(approver_actor_id))
+
+
 def _record(
     *,
     store: DecisionRecordPort,
@@ -85,6 +148,12 @@ def _record(
     conflicting `decision` for the same key raises
     `saena_policy_gate.errors.DecisionConflictError`, mapped to HTTP 409 by
     the RFC 9457 layer).
+
+    Any OTHER exception from `store.record` (a broken/unavailable store,
+    not a conflict) propagates UNCAUGHT — this function itself does not
+    fail closed; the caller's outer choke point (`_evaluate_and_record`,
+    MUST-FIX 5) is responsible for converting that into a `deny` response,
+    exactly as it already does for engine/evaluator failures.
     """
     record = DecisionRecord(
         contract_hash=contract_hash,
@@ -111,6 +180,88 @@ def _record(
     return stored
 
 
+def _evaluate_and_record(
+    *,
+    tenant_id: TenantId,
+    contract_hash: str,
+    approver_actor_id: str,
+    proposer_actor_id: str,
+    high_risk: bool,
+    evaluate: Callable[[], tuple[bool, tuple[str, ...]]],
+    store: DecisionRecordPort,
+) -> GateResult:
+    """Single fail-closed choke point shared by `authorize_command` and
+    `check_plan` (critic MUST-FIX 5): wraps BOTH `evaluate()` (the
+    engine/H-3 evaluation callback) AND the subsequent `_record` call in one
+    `try/except Exception` — a failure at EITHER step, including a failure
+    IN the recording step itself for an already-computed ALLOW, resolves to
+    a `deny` `GateResult` with `error_code=GateUnavailableError.error_code`,
+    never a bare 500 and never a surfaced allow with no durable record
+    behind it. `DecisionConflictError` (a real 409 client error, not a gate
+    failure — see module docstring) is the one exception explicitly
+    re-raised, not swallowed into a fail-closed deny.
+    """
+    try:
+        allow, reasons = evaluate()
+        decision_value = "approved" if allow else "rejected"
+        stored = _record(
+            store=store,
+            tenant_id=tenant_id,
+            contract_hash=contract_hash,
+            approver_actor_id=approver_actor_id,
+            decision=decision_value,
+            proposer_actor_id=proposer_actor_id,
+            high_risk=high_risk,
+        )
+    except DecisionConflictError:
+        # Real, meaningful 409 — never collapsed into a fail-closed deny.
+        raise
+    except Exception as exc:  # noqa: BLE001 — fail-closed choke point (see module docstring)
+        logger.warning(
+            "policy gate evaluation or decision recording failed — failing closed",
+            extra={"saena_attributes": {"error": str(exc)}},
+        )
+        # Best-effort: try to durably record the fail-closed DENY itself,
+        # so the audit trail reflects it. If even THAT fails (store is
+        # completely unavailable), still return deny/gate_unavailable —
+        # never a 500, never an allow — using a computed (not stored)
+        # decision_key so the response shape stays consistent either way.
+        try:
+            stored = _record(
+                store=store,
+                tenant_id=tenant_id,
+                contract_hash=contract_hash,
+                approver_actor_id=approver_actor_id,
+                decision="rejected",
+                proposer_actor_id=proposer_actor_id,
+                high_risk=high_risk,
+            )
+            decision_key = stored.decision_key
+        except DecisionConflictError:
+            # A prior, DIFFERENT decision is already on record for this
+            # key — the fail-closed deny itself cannot be persisted, but
+            # the response must still fail closed, never surface the
+            # earlier (possibly "approved") record as this response's
+            # outcome.
+            decision_key = _decision_key_preview(contract_hash, approver_actor_id)
+        except Exception:  # noqa: BLE001 — recording itself is unavailable too
+            decision_key = _decision_key_preview(contract_hash, approver_actor_id)
+        return GateResult(
+            decision="deny",
+            reasons=("policy engine unavailable — failing closed",),
+            require_two_person=high_risk,
+            decision_key=decision_key,
+            error_code=GateUnavailableError.error_code,
+        )
+
+    return GateResult(
+        decision="allow" if allow else "deny",
+        reasons=reasons,
+        require_two_person=high_risk,
+        decision_key=stored.decision_key,
+    )
+
+
 def authorize_command(
     *,
     engine: PolicyEngine,
@@ -120,48 +271,24 @@ def authorize_command(
     approver_actor_id: str,
 ) -> GateResult:
     """POST /v1/gate/authorize — command/file/network/tool authorization
-    (task instruction 3). Every decision is recorded, allow or deny.
+    (task instruction 3). Every decision is recorded, allow or deny;
+    evaluation AND recording share one fail-closed choke point
+    (`_evaluate_and_record`, MUST-FIX 5).
     """
-    contract_hash = f"authz:{request.kind}:{request.action}:{','.join(request.resource)}"
-    try:
-        verdict: Decision = engine.evaluate(request)
-    except Exception as exc:  # noqa: BLE001 — fail-closed choke point (see module docstring)
-        logger.warning(
-            "policy engine evaluation failed — failing closed",
-            extra={"saena_attributes": {"error": str(exc)}},
-        )
-        stored = _record(
-            store=store,
-            tenant_id=tenant_id,
-            contract_hash=contract_hash,
-            approver_actor_id=approver_actor_id,
-            decision="rejected",
-            proposer_actor_id="system",
-            high_risk=False,
-        )
-        return GateResult(
-            decision="deny",
-            reasons=("policy engine unavailable — failing closed",),
-            require_two_person=False,
-            decision_key=stored.decision_key,
-            error_code=GateUnavailableError.error_code,
-        )
+    contract_hash = _authorize_contract_hash(request)
 
-    decision_value = "approved" if verdict.allow else "rejected"
-    stored = _record(
-        store=store,
+    def _evaluate() -> tuple[bool, tuple[str, ...]]:
+        verdict: Decision = engine.evaluate(request)
+        return verdict.allow, verdict.reasons
+
+    return _evaluate_and_record(
         tenant_id=tenant_id,
         contract_hash=contract_hash,
         approver_actor_id=approver_actor_id,
-        decision=decision_value,
         proposer_actor_id="system",
         high_risk=False,
-    )
-    return GateResult(
-        decision="allow" if verdict.allow else "deny",
-        reasons=verdict.reasons,
-        require_two_person=False,
-        decision_key=stored.decision_key,
+        evaluate=_evaluate,
+        store=store,
     )
 
 
@@ -239,54 +366,30 @@ def check_plan(
     approver_actor_id: str,
 ) -> GateResult:
     """POST /v1/gate/plan-check — H-3 evidence policy + risk classification
-    (task instruction 2). Fail-closed on any evaluation exception, same
-    choke-point shape as `authorize_command`.
+    (task instruction 2). Evaluation AND recording share one fail-closed
+    choke point (`_evaluate_and_record`, MUST-FIX 5) — same shape as
+    `authorize_command`.
     """
     high_risk = is_high_risk_plan(plan.hypothesis_risks)
-    try:
+
+    def _evaluate() -> tuple[bool, tuple[str, ...]]:
         # cast: see _ChangePlanView's docstring — bridges a private,
         # unimportable Protocol identity one level down (diff_budget/
         # scope_limits), not a general type-safety escape hatch.
         result: H3PolicyResult = evaluate_h3_evidence_policy(
             cast(Any, _ChangePlanView(plan)), diff_stats=plan.diff_stats
         )
-    except Exception as exc:  # noqa: BLE001 — fail-closed choke point (see module docstring)
-        logger.warning(
-            "H-3 evidence policy evaluation failed — failing closed",
-            extra={"saena_attributes": {"error": str(exc)}},
-        )
-        stored = _record(
-            store=store,
-            tenant_id=tenant_id,
-            contract_hash=plan.contract_hash,
-            approver_actor_id=approver_actor_id,
-            decision="rejected",
-            proposer_actor_id=plan.proposer_actor_id,
-            high_risk=high_risk,
-        )
-        return GateResult(
-            decision="deny",
-            reasons=("policy engine unavailable — failing closed",),
-            require_two_person=high_risk,
-            decision_key=stored.decision_key,
-            error_code=GateUnavailableError.error_code,
-        )
+        reasons = result.violations if not result.ok else ("H-3 evidence policy satisfied",)
+        return result.ok, reasons
 
-    decision_value = "approved" if result.ok else "rejected"
-    stored = _record(
-        store=store,
+    return _evaluate_and_record(
         tenant_id=tenant_id,
         contract_hash=plan.contract_hash,
         approver_actor_id=approver_actor_id,
-        decision=decision_value,
         proposer_actor_id=plan.proposer_actor_id,
         high_risk=high_risk,
-    )
-    return GateResult(
-        decision="allow" if result.ok else "deny",
-        reasons=result.violations if not result.ok else ("H-3 evidence policy satisfied",),
-        require_two_person=high_risk,
-        decision_key=stored.decision_key,
+        evaluate=_evaluate,
+        store=store,
     )
 
 

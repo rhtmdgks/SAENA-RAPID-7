@@ -31,18 +31,38 @@
 
 - `saena_policy_gate.engine` — default-deny `PolicyEngine` over a data-driven
   `AllowRule` allowlist; argv-level command classification (`classify_command`,
-  `classify_pipeline`) closes the named deny-bypass regressions (`kubectl
-  patch`/`edit`/`delete`/`replace`, `git push` incl. `git -c a=b push` / `git
-  -C dir push` / flag-injected forms, `helm upgrade`/`install`/`uninstall`/
-  `delete`, `curl|sh`-shaped pipelines, absolute-path `argv[0]`, tab/multi-space
-  whitespace tricks).
-- `saena_policy_gate.service` — fail-closed orchestration (`GateUnavailableError`
-  / `saena.policy_denied.gate_unavailable` on ANY engine/H-3-evaluator
-  exception), H-3 evidence-policy plan-check (`saena_domain.policy.
+  `classify_pipeline`) RECURSIVELY unwraps every layer an attacker can use to
+  hide a denied command before applying the `(binary, subcommand)` deny table
+  (post-implementation critic review, MUST-FIX 1-4 + follow-up regressions):
+  exec-wrapper prefixes (`env`/`sudo`/`xargs`/`nohup`/`timeout`/`nice`/
+  `ionice`/`stdbuf`/`time`/`doas`/`setsid`/`chroot`/`su -c`, incl. nested
+  chains like `env sudo kubectl patch` and wrapper-specific leading
+  positionals like `timeout 30 ...`/`nice 5 ...`), `shell -c "..."` embedded
+  command strings (`sh`/`bash`/`zsh`/`dash`/`ksh`/`ash`/`su`, fail-closed on
+  unparseable quoting), leading `NAME=VALUE` env-assignment prefixes
+  (`GIT_SSH=x git push`), `.exe`-suffixed/case-varied binaries
+  (`kubectl.exe`/`KUBECTL.EXE`), Windows-style backslash paths, absolute-path
+  `argv[0]`, tab/multi-space whitespace tricks, `git push` incl. `git -c a=b
+  push`/`git -C dir push`/flag-injected forms, `helm
+  upgrade`/`install`/`uninstall`/`delete`, and `curl|sh`-shaped pipelines.
+  False-positive regression maintained throughout: `git commit -m "fix push
+  bug"` stays ALLOWED.
+- `saena_policy_gate.service` — fail-closed orchestration
+  (`_evaluate_and_record`, `GateUnavailableError` /
+  `saena.policy_denied.gate_unavailable` on ANY engine/H-3-evaluator
+  exception, OR a failure in the decision-RECORDING step itself for an
+  already-computed allow — critic MUST-FIX 5: recording is inside the same
+  choke point as evaluation, never a separate unguarded call, so a store
+  outage can never surface a bare 500 or a computed-but-unrecorded allow),
+  H-3 evidence-policy plan-check (`saena_domain.policy.
   evaluate_h3_evidence_policy`), risk classification
   (`is_high_risk_plan` → `require_two_person`), idempotent decision recording
   via `saena_domain.persistence.DecisionRecordPort` (in-memory reference
-  adapter only — SQL lands in w2-13).
+  adapter only — SQL lands in w2-13). `authorize_command`'s `contract_hash`
+  is a SHA-256 over the full decision-relevant request shape (`kind`,
+  `action`, `resource`, `pipeline`) — critic ADD-2: the prior
+  `','.join(resource)` form silently ignored `request.pipeline` entirely,
+  collapsing every pipeline request onto the same `decision_key`.
 - `saena_policy_gate.app` — FastAPI surface: `POST /v1/gate/plan-check`,
   `POST /v1/gate/authorize`, `GET /v1/health` (exempt from tenant-header
   reconciliation, for fail-closed client-side liveness probing); RFC 9457

@@ -221,3 +221,203 @@ def test_engine_rules_property_is_a_copy() -> None:
     # Mutating the caller's original list must not affect the engine's own
     # stored rule set (constructor takes a defensive copy via list(rules)).
     assert len(engine.rules) == 1
+
+
+# --- critic MUST-FIX 1: exec-wrapper bypass (env/sudo/xargs/...) ------------
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["env", "kubectl", "patch", "pod", "x"],
+        ["sudo", "kubectl", "patch", "pod", "x"],
+        ["xargs", "kubectl", "patch", "pod", "x"],
+        ["nohup", "kubectl", "patch", "pod", "x"],
+        ["doas", "kubectl", "patch", "pod", "x"],
+        ["setsid", "kubectl", "patch", "pod", "x"],
+        ["stdbuf", "-oL", "kubectl", "patch", "pod", "x"],
+        ["time", "kubectl", "patch", "pod", "x"],
+        ["env", "sudo", "kubectl", "patch", "pod", "x"],  # nested wrappers
+        ["sudo", "-u", "root", "kubectl", "patch", "pod", "x"],
+        ["env", "-i", "kubectl", "patch", "pod", "x"],
+        ["env", "-u", "PATH", "kubectl", "patch", "pod", "x"],
+        ["env", "FOO=bar", "kubectl", "patch", "pod", "x"],
+    ],
+)
+def test_classify_command_denies_exec_wrapper_bypass(argv: list[str]) -> None:
+    result = classify_command(argv)
+    assert result.denied is True
+    assert result.binary == "kubectl"
+    assert result.subcommand == "patch"
+
+
+def test_classify_command_denies_wrapped_git_push() -> None:
+    result = classify_command(["sudo", "git", "push"])
+    assert result.denied is True
+
+
+def test_classify_command_bare_wrapper_no_command_not_denied() -> None:
+    # A wrapper invoked with no trailing command at all carries no
+    # inspectable underlying command to deny — falls through to ordinary
+    # (empty-subcommand) classification, not a false positive.
+    result = classify_command(["sudo"])
+    assert result.denied is False
+
+
+# --- critic MUST-FIX 1 addendum: timeout/chroot/nice leading-positional ----
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["timeout", "30", "kubectl", "patch", "pod", "x"],
+        ["timeout", "30s", "kubectl", "patch", "pod", "x"],
+        ["chroot", "/newroot", "kubectl", "patch", "pod", "x"],
+        ["nice", "-n", "5", "kubectl", "delete", "pod", "x"],
+        ["nice", "5", "kubectl", "patch", "pod", "x"],
+        ["nice", "-5", "kubectl", "patch", "pod", "x"],
+    ],
+)
+def test_classify_command_denies_wrapper_with_leading_positional(argv: list[str]) -> None:
+    result = classify_command(argv)
+    assert result.denied is True
+    assert result.binary == "kubectl"
+
+
+# --- critic MUST-FIX 2: sh -c "embedded string" bypass ----------------------
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected_binary"),
+    [
+        (["sh", "-c", "kubectl patch pod x"], "kubectl"),
+        (["bash", "-c", "kubectl patch pod x"], "kubectl"),
+        (["zsh", "-c", "kubectl patch pod x"], "kubectl"),
+        (["dash", "-c", "git push"], "git"),
+        (["sh", "-c", "kubectl   patch   pod   x"], "kubectl"),  # whitespace inside -c
+        (["su", "root", "-c", "kubectl patch pod x"], "kubectl"),
+        (["su", "-c", "kubectl patch pod x", "root"], "kubectl"),
+    ],
+)
+def test_classify_command_denies_shell_dash_c_embedded_string(
+    argv: list[str], expected_binary: str
+) -> None:
+    result = classify_command(argv)
+    assert result.denied is True
+    assert result.binary == expected_binary
+
+
+def test_classify_command_shell_dash_c_malformed_quoting_fails_closed() -> None:
+    # An unparseable -c string is DENIED, not silently skipped — an
+    # uninspectable embedded command must never be treated as benign.
+    result = classify_command(["sh", "-c", 'echo "unterminated'])
+    assert result.denied is True
+    assert "unparseable" in (result.reason or "")
+
+
+def test_classify_command_shell_without_dash_c_falls_through() -> None:
+    # A shell invoked WITHOUT -c (e.g. reading a script file) carries no
+    # inspectable embedded string — falls through to ordinary
+    # classification (sh itself is not in the deny table).
+    result = classify_command(["sh", "script.sh"])
+    assert result.denied is False
+
+
+# --- critic MUST-FIX 3: env-var-assignment-prefix argv bypass ---------------
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["GIT_SSH=x", "git", "push"],
+        ["FOO=bar", "kubectl", "patch", "pod", "x"],
+        ["A=1", "B=2", "kubectl", "patch", "pod", "x"],  # multiple assignments
+    ],
+)
+def test_classify_command_denies_env_assignment_prefix_bypass(argv: list[str]) -> None:
+    result = classify_command(argv)
+    assert result.denied is True
+
+
+def test_classify_command_argv_entirely_env_assignments_not_denied() -> None:
+    # An argv consisting ONLY of NAME=VALUE tokens (no actual command at
+    # all) is not a runnable command shape — nothing to deny.
+    result = classify_command(["FOO=bar", "BAZ=qux"])
+    assert result.denied is False
+    assert result.binary == ""
+
+
+def test_classify_command_env_assignment_after_command_start_not_stripped() -> None:
+    # An assignment-shaped token appearing AFTER the real command has
+    # already started is just a plain argument (e.g. a commit message),
+    # not an env-prefix — must not be treated as a wrapper token.
+    result = classify_command(["git", "commit", "-m", "FOO=bar"])
+    assert result.denied is False
+
+
+# --- critic MUST-FIX 4: .exe suffix bypass ----------------------------------
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["kubectl.exe", "patch", "pod", "x"],
+        ["KUBECTL.EXE", "patch", "pod", "x"],
+        ["Kubectl.Exe", "patch", "pod", "x"],
+        ["/usr/bin/kubectl.exe", "patch", "pod", "x"],
+        ["C:\\tools\\kubectl.exe", "patch", "pod", "x"],
+    ],
+)
+def test_classify_command_denies_exe_suffix_bypass(argv: list[str]) -> None:
+    result = classify_command(argv)
+    assert result.denied is True
+    assert result.binary == "kubectl"
+
+
+def test_classify_command_exe_binary_case_fold_does_not_lowercase_subcommand() -> None:
+    # Binary-name comparison is case-folded, but subcommand tokens are
+    # NEVER lowercased — this is a regression guard for that distinction.
+    result = classify_command(["KUBECTL.EXE", "PATCH", "pod", "x"])
+    # "PATCH" (uppercase) is not in the (kubectl, patch) deny table entry
+    # since subcommands are case-sensitive — this specific argv is NOT
+    # denied by the deny table (documenting the boundary, not a gap: the
+    # binary-name fold is deliberately narrow in scope).
+    assert result.binary == "kubectl"
+    assert result.denied is False
+
+
+# --- combined / nested bypass chains ----------------------------------------
+
+
+def test_classify_command_denies_env_wrapper_shell_combo_chain() -> None:
+    # env -> sudo -> sh -c "kubectl.exe PATCH ..." chained through every
+    # unwrap layer at once.
+    result = classify_command(
+        ["env", "sudo", "sh", "-c", "kubectl.exe patch pod x"],
+    )
+    assert result.denied is True
+
+
+def test_classify_command_recursion_depth_cap_fails_closed() -> None:
+    chain = ["env"] * 20 + ["kubectl", "patch", "pod", "x"]
+    result = classify_command(chain)
+    assert result.denied is True
+    assert "recursion depth" in (result.reason or "")
+
+
+# --- false-positive regression: benign commands stay allowed ----------------
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["git", "commit", "-m", "fix push bug"],
+        ["git", "status"],
+        ["git", "diff"],
+        ["pytest", "-x"],
+        ["timeout", "30", "pytest", "-x"],
+    ],
+)
+def test_classify_command_benign_commands_not_denied(argv: list[str]) -> None:
+    result = classify_command(argv)
+    assert result.denied is False
