@@ -132,6 +132,93 @@ class TestReprAndEquality:
         assert ctx.model.tenant_id.root == "acme-corp"
 
 
+class TestModelPropertyIsADefensiveCopy:
+    """MUST-FIX (critic, w2-01 review): the generated pydantic model has
+    `extra="forbid"` but is NOT frozen. `.model` must never hand out the
+    live internal instance -- mutating the returned value must never affect
+    the wrapper's own enforced state, and must never let a caller bypass a
+    construction-time gate by mutating a field after the fact.
+    """
+
+    def test_returned_model_is_not_the_same_object_as_internal_state(
+        self, tenant_context_payload: dict
+    ) -> None:
+        ctx = TenantContext.from_payload(tenant_context_payload)
+        returned = ctx.model
+        assert returned is not ctx._model  # noqa: SLF001 - explicit internal-state check
+
+    def test_two_calls_to_model_return_independent_copies(
+        self, tenant_context_payload: dict
+    ) -> None:
+        ctx = TenantContext.from_payload(tenant_context_payload)
+        first = ctx.model
+        second = ctx.model
+        assert first is not second
+        assert first == second  # still value-equal, just not the same object
+
+    def test_mutating_returned_status_does_not_flip_the_wrapper(
+        self, tenant_context_payload: dict
+    ) -> None:
+        ctx = TenantContext.from_payload(tenant_context_payload)
+        assert ctx.status == "active"
+
+        leaked = ctx.model
+        leaked.status = tenant_module._SchemaStatus.suspended  # type: ignore[attr-defined]
+
+        # The wrapper's own status property (backed by self._model, not the
+        # leaked copy) must be unaffected.
+        assert ctx.status == "active"
+        # A fresh wrapper constructed from the ORIGINAL payload must still
+        # enforce the original (active) status -- the mutation on the leaked
+        # copy never touched the source payload either.
+        fresh = TenantContext.from_payload(tenant_context_payload)
+        assert fresh.status == "active"
+
+    def test_mutating_returned_namespace_does_not_affect_wrapper_namespace(
+        self, tenant_context_payload: dict
+    ) -> None:
+        ctx = TenantContext.from_payload(tenant_context_payload)
+        original_namespace = ctx.namespace
+
+        leaked = ctx.model
+        leaked.namespace = "saena-tenant-attacker-controlled"
+
+        assert ctx.namespace == original_namespace
+        assert ctx.namespace != "saena-tenant-attacker-controlled"
+
+    def test_mutating_returned_model_cannot_resurrect_a_suspended_tenant_gate(
+        self, tenant_context_payload: dict
+    ) -> None:
+        # Construct successfully as active, obtain the (now leaked) copy,
+        # mutate it to suspended -- confirms mutation of the RETURNED copy
+        # can never retroactively be fed back through the construction-time
+        # gate (there is no setter path from the copy back into the
+        # wrapper), and a fresh wrapper built from a genuinely-suspended
+        # payload is still correctly rejected (the gate itself is untouched
+        # by this whole exercise).
+        ctx = TenantContext.from_payload(tenant_context_payload)
+        leaked = ctx.model
+        leaked.status = tenant_module._SchemaStatus.suspended  # type: ignore[attr-defined]
+        assert ctx.status == "active"
+
+        suspended_payload = make_tenant_context_payload(status="suspended")
+        with pytest.raises(TenantSuspendedError):
+            TenantContext.from_payload(suspended_payload)
+
+    def test_deep_copy_extends_to_nested_engine_scope_list(
+        self, tenant_context_payload: dict
+    ) -> None:
+        ctx = TenantContext.from_payload(tenant_context_payload)
+        leaked = ctx.model
+        leaked.engine_scope.clear()
+
+        # engine_scope is a list nested inside the model -- deep=True must
+        # copy it too, or clearing the leaked list would corrupt the
+        # wrapper's own engine_scope as an aliasing side effect.
+        assert ctx.engine_scope == ("chatgpt-search",)
+        ctx.require_engine("chatgpt-search")  # still no raise
+
+
 # --- Tolerant-read worked example -------------------------------------------
 #
 # Mirrors tests/contract/fixtures/tenant-context/invalid/

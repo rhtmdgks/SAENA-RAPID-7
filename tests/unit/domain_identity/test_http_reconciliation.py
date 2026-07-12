@@ -48,6 +48,18 @@ class TestReconcileTenantMismatch:
         with pytest.raises(TenantMismatchError):
             reconcile_tenant("a", "b")
 
+    def test_case_sensitive_comparison(self) -> None:
+        # SHOULD-FIX 2 (critic, w2-01 review): reconciliation must be
+        # case-SENSITIVE -- tenant_id itself is lowercase-only by ADR-0014's
+        # own pattern, so a header/env pair differing only by case is not a
+        # "same tenant, different casing" situation, it is a genuine
+        # mismatch (and potentially a spoofing attempt) that must raise, not
+        # be silently normalized/accepted.
+        with pytest.raises(TenantMismatchError) as exc_info:
+            reconcile_tenant("TENANT-A", "tenant-a")
+        assert exc_info.value.context["header_value"] == "TENANT-A"
+        assert exc_info.value.context["env_value"] == "tenant-a"
+
 
 class TestReconcileTenantMissingValues:
     def test_missing_header_raises(self) -> None:

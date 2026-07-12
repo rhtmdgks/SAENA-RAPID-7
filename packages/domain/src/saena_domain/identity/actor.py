@@ -68,8 +68,21 @@ class ActorContext:
 
     @property
     def model(self) -> _ActorContextModel:
-        """The underlying generated pydantic model (read-only access)."""
-        return self._model
+        """A deep-copied snapshot of the underlying generated pydantic model.
+
+        The generated model has `extra="forbid"` but is NOT frozen (pydantic
+        v2 models are mutable by default unless `model_config` sets
+        `frozen=True`, which this codegen artifact does not). Handing out
+        `self._model` directly would let a caller mutate it after this
+        wrapper's construction-time gate already ran — e.g. flip
+        `actor_type` from `system` to `human` post-construction, bypassing
+        `ActorTenantRequiredError` entirely for an instance that already
+        exists. Returning `model_copy(deep=True)` means every caller gets an
+        independent snapshot: mutating it can never affect `self._model` or
+        the gate this wrapper already enforced. All internal reads in this
+        class go through `self._model` directly, not through this property.
+        """
+        return self._model.model_copy(deep=True)
 
     @property
     def actor_id(self) -> str:

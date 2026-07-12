@@ -43,6 +43,24 @@ _MAX_NAMESPACE_LENGTH: Final[int] = 63
 # v1 closed engine scope (CLAUDE.md Engine scope; ADR-0013:58).
 _ALLOWED_ENGINE_SCOPE: Final[frozenset[str]] = frozenset({"chatgpt-search"})
 
+# Bound on how much of a rejected raw value ever gets echoed back into an
+# error message/context. A schema-valid tenant_id is <=32 chars, so anything
+# longer is already known-invalid input — but the invalid value can be
+# arbitrarily long (attacker-controlled or accidental), and interpolating it
+# unbounded into log/audit sinks is its own hazard (log flooding, structured
+# log field size limits, accidental secret-shaped-value echoing). 64 chars is
+# double the valid max, generous enough for a human to recognize what was
+# wrong while capping the blast radius.
+_ECHO_TRUNCATE_LENGTH: Final[int] = 64
+
+
+def _truncate_for_echo(value: str, *, limit: int = _ECHO_TRUNCATE_LENGTH) -> str:
+    """Cap `value` at `limit` chars, appending an ellipsis marker when
+    truncated, for safe interpolation into error messages/context."""
+    if len(value) <= limit:
+        return value
+    return f"{value[:limit]}...<truncated, {len(value)} chars total>"
+
 
 @dataclass(frozen=True, slots=True)
 class TenantId:
@@ -58,10 +76,11 @@ class TenantId:
 
     def __post_init__(self) -> None:
         if not TENANT_ID_PATTERN.fullmatch(self.value):
+            echoed = _truncate_for_echo(self.value)
             raise InvalidTenantIdError(
-                f"tenant_id {self.value!r} does not match ADR-0014 pattern "
+                f"tenant_id {echoed!r} does not match ADR-0014 pattern "
                 f"{TENANT_ID_PATTERN.pattern!r}",
-                context={"tenant_id": self.value, "pattern": TENANT_ID_PATTERN.pattern},
+                context={"tenant_id": echoed, "pattern": TENANT_ID_PATTERN.pattern},
             )
 
     def __str__(self) -> str:
@@ -157,8 +176,24 @@ class TenantContext:
 
     @property
     def model(self) -> _TenantContextModel:
-        """The underlying generated pydantic model (read-only access)."""
-        return self._model
+        """A deep-copied snapshot of the underlying generated pydantic model.
+
+        The generated model has `extra="forbid"` but is NOT frozen — pydantic
+        v2 models are mutable by default unless `model_config` sets
+        `frozen=True` (it does not here, since the model is a straight
+        codegen artifact per ADR-0011, not hand-tuned for immutability).
+        Handing out `self._model` directly would let a caller mutate it in
+        place (e.g. flip `status` back to `active` after this wrapper's
+        construction-time gate already rejected `suspended`, or rewrite
+        `namespace` after `validate_namespace` already passed) and silently
+        desynchronize the wrapper's own gates from the data they were
+        computed against. Returning `model_copy(deep=True)` means every
+        caller gets an independent snapshot: mutating it can never affect
+        `self._model` or any gate this wrapper already enforced. All
+        internal reads in this class go through `self._model` directly, not
+        through this property.
+        """
+        return self._model.model_copy(deep=True)
 
     @property
     def tenant_id(self) -> TenantId:

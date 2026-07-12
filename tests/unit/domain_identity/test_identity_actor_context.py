@@ -5,6 +5,7 @@ idempotency identity, PII-safe repr.
 from __future__ import annotations
 
 import pytest
+import saena_domain.identity.actor as actor_module
 from conftest import make_actor_context_payload
 from saena_domain.identity.actor import ActorContext, ActorTenantRequiredError
 
@@ -116,3 +117,75 @@ class TestPiiBoundary:
         )
         with pytest.raises(pydantic.ValidationError):
             ActorContext.from_payload(payload)
+
+
+class TestModelPropertyIsADefensiveCopy:
+    """MUST-FIX (critic, w2-01 review): the generated pydantic model has
+    `extra="forbid"` but is NOT frozen. `.model` must never hand out the
+    live internal instance -- mutating the returned value must never affect
+    the wrapper's own enforced state, and must never let a caller bypass the
+    human/system tenant_id conditional by mutating a field after the fact.
+    """
+
+    def test_returned_model_is_not_the_same_object_as_internal_state(
+        self, actor_context_payload: dict
+    ) -> None:
+        actor = ActorContext.from_payload(actor_context_payload)
+        returned = actor.model
+        assert returned is not actor._model  # noqa: SLF001 - explicit internal-state check
+
+    def test_two_calls_to_model_return_independent_copies(
+        self, actor_context_payload: dict
+    ) -> None:
+        actor = ActorContext.from_payload(actor_context_payload)
+        first = actor.model
+        second = actor.model
+        assert first is not second
+        assert first == second
+
+    def test_mutating_returned_actor_type_does_not_flip_the_wrapper(
+        self, actor_context_payload: dict
+    ) -> None:
+        actor = ActorContext.from_payload(actor_context_payload)
+        assert actor.actor_type == "system"
+        assert not actor.is_human()
+
+        leaked = actor.model
+        leaked.actor_type = actor_module._SchemaActorType.human
+
+        # The wrapper's own actor_type property (backed by self._model, not
+        # the leaked copy) must be unaffected -- this is exactly the
+        # "flip actor_type from system to human post-construction, bypassing
+        # ActorTenantRequiredError" scenario the critic flagged.
+        assert actor.actor_type == "system"
+        assert not actor.is_human()
+
+    def test_mutating_returned_model_cannot_bypass_human_tenant_gate_for_a_fresh_wrapper(
+        self, actor_context_payload: dict
+    ) -> None:
+        actor = ActorContext.from_payload(actor_context_payload)
+        leaked = actor.model
+        leaked.actor_type = actor_module._SchemaActorType.human
+        leaked.tenant_id = None
+
+        # Mutating the leaked copy has no path back into the wrapper's own
+        # gate. A genuinely fresh human-without-tenant payload is still
+        # correctly rejected -- confirming the gate itself was never
+        # touched by mutating the returned snapshot.
+        human_without_tenant = make_actor_context_payload(
+            actor_id="actor-human-fresh", actor_type="human", session_id="session-fresh"
+        )
+        with pytest.raises(ActorTenantRequiredError):
+            ActorContext.from_payload(human_without_tenant)
+
+    def test_mutating_returned_session_id_does_not_affect_idempotency_key(
+        self, actor_context_payload: dict
+    ) -> None:
+        actor = ActorContext.from_payload(actor_context_payload)
+        original_key = actor.idempotency_key()
+
+        leaked = actor.model
+        leaked.session_id = "attacker-controlled-session"
+
+        assert actor.idempotency_key() == original_key
+        assert actor.session_id != "attacker-controlled-session"

@@ -91,6 +91,38 @@ class TestInvalidTenantId:
         assert exc_info.value.context["tenant_id"] == "BAD"
         assert exc_info.value.error_code == "saena.identity.invalid_tenant_id"
 
+    def test_pathologically_long_value_is_truncated_in_context_and_message(self) -> None:
+        # SHOULD-FIX 1 (critic, w2-01 review): the raw rejected value must
+        # never be echoed back unbounded -- a caller can pass an arbitrarily
+        # long (attacker-controlled or accidental) string, and interpolating
+        # it verbatim into an error/log/audit sink is its own hazard.
+        pathological = "A" * 10_000
+        with pytest.raises(InvalidTenantIdError) as exc_info:
+            TenantId(pathological)
+        echoed = exc_info.value.context["tenant_id"]
+        assert len(echoed) < len(pathological)
+        assert echoed.startswith("A" * 64)
+        assert "10000 chars total" in echoed
+        # The formatted exception message must not carry the full 10k chars
+        # either -- only the truncated form.
+        assert pathological not in str(exc_info.value)
+
+    def test_short_invalid_value_is_echoed_verbatim_not_truncated(self) -> None:
+        # Truncation must only kick in above the cap -- short invalid values
+        # (the overwhelmingly common case) keep full diagnostic fidelity.
+        with pytest.raises(InvalidTenantIdError) as exc_info:
+            TenantId("BAD-Value-123")
+        assert exc_info.value.context["tenant_id"] == "BAD-Value-123"
+
+    def test_value_exactly_at_truncation_boundary_is_not_marked_truncated(self) -> None:
+        # 64 chars is the cap itself -- values at or below it pass through
+        # unmodified (only values STRICTLY longer than the cap are marked).
+        boundary_value = "A" * 64
+        with pytest.raises(InvalidTenantIdError) as exc_info:
+            TenantId(boundary_value)
+        assert exc_info.value.context["tenant_id"] == boundary_value
+        assert "truncated" not in exc_info.value.context["tenant_id"]
+
 
 class TestTenantIdImmutability:
     def test_is_frozen_dataclass(self) -> None:
