@@ -17,6 +17,18 @@ test) asserts this by inspecting the FastAPI route table rather than merely
 probing a few methods, so a future edit cannot silently reintroduce a
 mutation route without the test catching it.
 
+Value-echo hardening (critic MUST-FIX 1/2, w2-10 review): two global
+exception handlers replace FastAPI's defaults — `RequestValidationError`
+(malformed/wrong-type request bodies) and a catch-all `Exception` (500) — so
+that EVERY error response this service returns is `application/problem+json`
+and NEVER echoes a raw caller-supplied value or a stack trace (see
+`problem.py`'s "Value-echo hardening" docstring). `AppendEntryRequest.
+error_code` is guarded via `saena_domain.audit.guard_payload` BEFORE
+`build_entry` is called (`build_entry` itself only guards `payload`/`actor`,
+never `error_code`) — a caller-supplied `error_code` containing
+guard-detectable content (e.g. a stack-trace fragment) is rejected exactly
+like a forbidden `payload` key, value never echoed.
+
 `audit.event.appended.v1` is a PROPOSED topic (README "Published events" row)
 — no outbox publish happens here (W2A scope note, `saena_domain.persistence.
 ports` module docstring: "이벤트는 transactional outbox 기록까지 — bus 배선은
@@ -40,8 +52,10 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from saena_domain.audit import ForbiddenAuditDataError, make_lineage_ref
+from pydantic import ValidationError
+from saena_domain.audit import ForbiddenAuditDataError, guard_payload, make_lineage_ref
 
 # `build_entry`/`is_lineage_ref` are not re-exported from `saena_domain.audit`'s
 # `__all__` (see that package's `__init__.py`) — imported from their owning
@@ -62,8 +76,10 @@ from saena_audit_ledger.problem import (
     domain_error_problem,
     forbidden_audit_data_problem,
     forbidden_rbac_problem,
+    internal_error_problem,
     not_found_problem,
     problem_response,
+    validation_error_problem,
 )
 from saena_audit_ledger.schemas import (
     AppendEntryRequest,
@@ -120,6 +136,22 @@ def create_app(ledger: AuditLedgerPort) -> FastAPI:
         if not has_permission(request, Permission.APPEND_AUDIT):
             return forbidden_rbac_problem(permission=Permission.APPEND_AUDIT.value, request=request)
 
+        # error_code boundary guard (critic MUST-FIX 2, w2-10 review):
+        # build_entry only runs guard_payload over `payload` and
+        # guard_actor_fields over `actor` — it never inspects `error_code`,
+        # so a caller-supplied error_code carrying guard-detectable content
+        # (stack-trace fragments etc.) would otherwise be hashed into the
+        # chain and echoed back forever on every future read. Run the same
+        # guard over error_code BEFORE build_entry is called, wrapping it in
+        # a dict (guard_payload's own signature, `saena_domain.audit.guard`)
+        # so the existing key-path-only-in-message contract applies
+        # identically to this field as to every `payload` key.
+        if body.error_code is not None:
+            try:
+                guard_payload({"error_code": body.error_code})
+            except ForbiddenAuditDataError as exc:
+                return forbidden_audit_data_problem(exc, request=request)
+
         tenant_id = _resolve_scope_tenant(body.scope, body.tenant_id)
         actor = {"actor_id": body.actor_id} if body.actor_id is not None else None
 
@@ -144,10 +176,13 @@ def create_app(ledger: AuditLedgerPort) -> FastAPI:
             )
         except ForbiddenAuditDataError as exc:
             return forbidden_audit_data_problem(exc, request=request)
-        except ValueError as exc:
-            return bad_request_problem(
-                error_code="saena.audit_ledger.invalid_entry", detail=str(exc), request=request
-            )
+        except ValidationError as exc:
+            # AuditEntry's own field-pattern re-validation inside build_entry
+            # (e.g. action/trace_id/recorded_at/error_code pattern mismatch)
+            # — routed through the same value-safe path as a top-level
+            # RequestValidationError (critic MUST-FIX 1): never str(exc),
+            # which embeds input_value=<raw value> verbatim.
+            return validation_error_problem(exc, request=request)
 
         try:
             appended = ledger.append(entry)
@@ -277,6 +312,35 @@ def create_app(ledger: AuditLedgerPort) -> FastAPI:
     @app.exception_handler(PersistenceError)
     async def _persistence_error_handler(request: Request, exc: PersistenceError) -> JSONResponse:
         return domain_error_problem(exc, status=409, request=request)
+
+    # --- value-echo hardening: replace FastAPI's default handlers (critic MUST-FIX 1) --
+    #
+    # FastAPI installs a DEFAULT `RequestValidationError` handler
+    # (`fastapi.exception_handlers.request_validation_exception_handler`)
+    # that returns `application/json` (not this service's problem+json
+    # convention) with each error dict's raw `input` field intact — a
+    # wrong-type request body's value is echoed straight back. Overriding it
+    # here replaces that default for every route in this app. There is no
+    # narrower "only override the leaky field" option: FastAPI does not
+    # expose a hook to edit the default handler's output, only to replace it
+    # wholesale — replacing it with `validation_error_problem` (value-safe by
+    # construction, see `problem.py`) is the only way to close this channel.
+    @app.exception_handler(RequestValidationError)
+    async def _request_validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        return validation_error_problem(exc, request=request)
+
+    # Catch-all: anything NOT already handled by a more specific handler
+    # above (IdentityError/PersistenceError/RequestValidationError) — an
+    # unexpected/unhandled exception must still never leak a stack trace or
+    # exception message to the caller. Starlette dispatches to the handler
+    # registered for the most specific matching type in the exception's MRO,
+    # so this broad `Exception` handler only ever fires for genuinely
+    # unanticipated errors, never shadowing the handlers above.
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        return internal_error_problem(request=request)
 
     return app
 

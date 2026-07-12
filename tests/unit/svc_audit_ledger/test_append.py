@@ -27,13 +27,24 @@ def test_append_returns_201_with_computed_hash(client: TestClient) -> None:
 def test_append_does_not_accept_caller_supplied_hash(client: TestClient) -> None:
     """`event_hash`/`prev_event_hash` are not fields of the request model —
     a caller attempting to supply either is rejected by pydantic's
-    `extra="forbid"` (422), never silently ignored or trusted."""
+    `extra="forbid"` (422), never silently ignored or trusted.
+
+    Hardened (critic SHOULD-FIX, w2-10 review): also asserts problem+json
+    content-type and that the injected (fake but still caller-supplied)
+    hash value never appears anywhere in the raw response text — the
+    `RequestValidationError` handler must not echo the rejected `extra`
+    field's value back."""
+    injected_hash = "sha256:" + "0" * 64
     payload = make_append_body()
-    payload["event_hash"] = "sha256:" + "0" * 64
+    payload["event_hash"] = injected_hash
 
     resp = client.post("/v1/audit/entries", json=payload, headers=roles_header("service"))
 
     assert resp.status_code == 422
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert injected_hash not in resp.text
+    body = resp.json()
+    assert body["error_code"] == "saena.audit_ledger.validation_failed"
 
 
 def test_second_append_links_to_first_via_computed_prev_hash(client: TestClient) -> None:
@@ -87,17 +98,33 @@ def test_system_scope_append_omits_tenant_id(client: TestClient) -> None:
     assert resp.json()["tenant_id"] is None
 
 
-def test_malformed_action_pattern_is_bad_request_not_forbidden_data(client: TestClient) -> None:
-    """`build_entry` raises a plain `ValueError` (pydantic validation error,
-    not `ForbiddenAuditDataError`) for a structurally invalid field — the
-    handler's second `except ValueError` branch, distinct from the
-    forbidden-data guard path."""
-    body = make_append_body(action="not-a-valid-action")
+def test_malformed_action_pattern_is_validation_error_not_forbidden_data(
+    client: TestClient,
+) -> None:
+    """`build_entry` raises a `pydantic.ValidationError` (via `AuditEntry`
+    re-validation) for a structurally invalid field, not
+    `ForbiddenAuditDataError` — routed through `validation_error_problem`
+    (critic MUST-FIX 1), never `str(exc)`, so the rejected value never
+    appears in the response."""
+    injected_action = "not-a-valid-action"
+    body = make_append_body(action=injected_action)
 
     resp = client.post("/v1/audit/entries", json=body, headers=roles_header("service"))
 
-    assert resp.status_code == 400
-    assert resp.json()["error_code"] == "saena.audit_ledger.invalid_entry"
+    assert resp.status_code == 422
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert injected_action not in resp.text
+    problem = resp.json()
+    assert problem["error_code"] == "saena.audit_ledger.validation_failed"
+    assert problem["errors"] == [
+        {
+            "type": "string_pattern_mismatch",
+            "loc": ["action"],
+            "msg": (
+                "String should match pattern '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,3}\\.v[0-9]+$'"
+            ),
+        }
+    ]
 
 
 def test_tenant_scope_with_malformed_tenant_id_is_identity_error_400(client: TestClient) -> None:

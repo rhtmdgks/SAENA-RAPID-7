@@ -15,14 +15,33 @@ the whole point of that guard is it never carries the offending value), but
 this module still never interpolates a raw request body or any other
 caller-supplied value into a `detail` string beyond what the domain-layer
 exception itself already decided was safe to expose.
+
+Value-echo hardening (critic MUST-FIX 1, w2-10 review): FastAPI's DEFAULT
+`RequestValidationError` handler (and any bare pydantic `ValidationError`
+this service's own code re-raises as a plain `str(exc)`, e.g. `AuditEntry`
+re-validation inside `build_entry`) embeds the RAW caller-supplied value
+verbatim in each error dict's `input` field / in `ValidationError.__str__`'s
+`input_value=...` fragment — a wrong-type or malformed field value (which
+could itself be a secret/PII/stack-trace fragment the caller mistakenly
+pasted into the wrong field) is echoed straight back in the 422 body, and at
+`application/json` content-type rather than this service's
+`application/problem+json` convention. `safe_validation_errors` below is the
+single choke point every validation-error-to-response path in this module
+must go through: it keeps only `type`/`loc`/`msg` from each pydantic error
+dict, dropping `input`/`url`/`ctx` (`ctx` can itself embed the rejected value
+inside a nested `error`/`pattern` sub-field depending on the validator, so it
+is dropped wholesale rather than allow-listed further).
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from saena_domain.audit import ForbiddenAuditDataError
 from saena_domain.identity.errors import IdentityError
 from saena_domain.persistence.errors import PersistenceError
@@ -30,6 +49,11 @@ from saena_observability import current_trace_id, generate_trace_id
 
 PROBLEM_TYPE_BASE = "https://schemas.the-saena.ai/errors"
 _MEDIA_TYPE = "application/problem+json"
+
+#: The only pydantic per-error dict keys ever surfaced to a caller — see
+#: module docstring "Value-echo hardening". `input`/`url`/`ctx` are always
+#: stripped, regardless of validator kind.
+_SAFE_ERROR_KEYS = ("type", "loc", "msg")
 
 
 def _trace_id() -> str:
@@ -51,13 +75,18 @@ def problem_response(
     detail: str | None = None,
     retryable: bool = False,
     request: Request | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> JSONResponse:
     """Build a `JSONResponse` carrying a `ProblemDetail`-shaped body.
 
     `instance` is set from `request.url.path` when a `Request` is supplied
     (the concrete instance the error occurred on) — never a query string or
     body content, to avoid echoing caller-supplied values into the error
-    body beyond the path itself.
+    body beyond the path itself. `extra` merges additional SAENA-extension
+    fields beyond the `ProblemDetail` contract's own set (e.g.
+    `validation_error_problem`'s `errors` list) — callers passing `extra`
+    are responsible for ensuring its values are already value-safe (this
+    function does not itself redact `extra`'s contents).
     """
     body: dict[str, Any] = {
         "type": f"{PROBLEM_TYPE_BASE}/{error_code.replace('.', '/')}",
@@ -71,6 +100,8 @@ def problem_response(
         body["detail"] = detail
     if request is not None:
         body["instance"] = request.url.path
+    if extra:
+        body.update(extra)
     return JSONResponse(status_code=status, content=body, media_type=_MEDIA_TYPE)
 
 
@@ -132,6 +163,76 @@ def bad_request_problem(
         error_code=error_code,
         detail=detail,
         retryable=False,
+        request=request,
+    )
+
+
+def safe_validation_errors(raw_errors: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Strip every pydantic per-error dict down to `type`/`loc`/`msg`.
+
+    `loc` is a tuple of path segments (field names / indices) — never the
+    VALUE at that path — so it is always safe to echo; `type`/`msg` name the
+    validator and a fixed, value-free message template. See module docstring
+    "Value-echo hardening" for why `input`/`url`/`ctx` must never reach a
+    caller. `loc` tuples are converted to lists for JSON-serialization
+    (`jsonable_encoder` would do this too, but this module's own
+    `problem_response` uses plain `JSONResponse`, which does not run
+    `jsonable_encoder`).
+    """
+    return [
+        {
+            key: (list(value) if key == "loc" else value)
+            for key, value in error.items()
+            if key in _SAFE_ERROR_KEYS
+        }
+        for error in raw_errors
+    ]
+
+
+def validation_error_problem(
+    error: RequestValidationError | ValidationError, *, request: Request | None = None
+) -> JSONResponse:
+    """Map a pydantic/FastAPI validation error to a 422 problem+json response.
+
+    Never includes the raw caller-supplied value: `detail` carries only the
+    value-free `safe_validation_errors` summary (critic MUST-FIX 1). Handles
+    both `fastapi.exceptions.RequestValidationError` (raised by FastAPI's own
+    request-body parsing, `.errors()` takes no filtering kwargs) and a bare
+    `pydantic.ValidationError` (raised by e.g. `AuditEntry` re-validation
+    inside `saena_domain.audit.build_entry`, whose `.errors()` DOES accept
+    `include_input=False`/`include_url=False`/`include_context=False` — but
+    this function calls `safe_validation_errors` uniformly on the raw dicts
+    from either type rather than relying on that kwarg-level difference, so
+    both paths get identical stripping behavior and neither can regress
+    independently of the other).
+    """
+    errors = safe_validation_errors(error.errors())
+    return problem_response(
+        status=422,
+        title="Validation error",
+        error_code="saena.audit_ledger.validation_failed",
+        detail="request failed validation; see 'errors' for field paths (values omitted)",
+        retryable=False,
+        request=request,
+        extra={"errors": errors},
+    )
+
+
+def internal_error_problem(*, request: Request | None = None) -> JSONResponse:
+    """Map an unexpected/unhandled exception to a 500 problem+json response.
+
+    Never includes the exception's message, type, or a stack trace — an
+    unhandled exception is, by definition, one this module has no structured,
+    already-vetted-safe information about (contrast `domain_error_problem`,
+    which only ever runs against `saena_domain` exceptions whose `.context`
+    the domain layer itself already decided was log-safe).
+    """
+    return problem_response(
+        status=500,
+        title="Internal server error",
+        error_code="saena.audit_ledger.internal_error",
+        detail="an unexpected error occurred",
+        retryable=True,
         request=request,
     )
 
