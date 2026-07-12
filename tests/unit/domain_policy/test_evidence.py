@@ -67,6 +67,8 @@ def test_none_evidence_ledger_hash_rejected() -> None:
         "/etc/passwd",
         "file:///etc/passwd",
         " apps/web/docs/*",
+        "apps\\..\\..\\etc\\passwd",
+        "apps\\web\\..\\..\\..\\etc",
     ],
 )
 def test_scope_glob_escape_rejected(glob: str) -> None:

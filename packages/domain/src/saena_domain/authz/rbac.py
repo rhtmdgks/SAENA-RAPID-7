@@ -38,6 +38,7 @@ least-privilege meaning, flagged as an OPEN ITEM):
 from __future__ import annotations
 
 from enum import StrEnum
+from types import MappingProxyType
 
 
 class Role(StrEnum):
@@ -63,15 +64,20 @@ class Permission(StrEnum):
 # Explicit allow matrix: Role -> frozenset[Permission]. Absence of a role, or
 # absence of a permission from a role's set, means DENY (default-deny is
 # enforced structurally by authorize() never falling through to an implicit
-# allow — see authorize() below).
-ALLOW_MATRIX: dict[Role, frozenset[Permission]] = {
-    Role.PROPOSER: frozenset({Permission.PROPOSE_PLAN}),
-    Role.APPROVER: frozenset({Permission.APPROVE_PLAN}),
-    Role.OPERATOR: frozenset({Permission.EXECUTE_PLAN}),
-    Role.AUDITOR: frozenset({Permission.VIEW_LINEAGE, Permission.READ_AUDIT}),
-    Role.CONTRACTS_STEWARD: frozenset({Permission.MANAGE_TENANT, Permission.PUBLISH_AGGREGATE}),
-    Role.SERVICE: frozenset({Permission.APPEND_AUDIT}),
-}
+# allow — see authorize() below). Wrapped in MappingProxyType (SHOULD-FIX 2)
+# so the matrix itself is read-only at the mapping level, matching the
+# already-frozenset() values — the whole structure, not just its leaves, is
+# immutable.
+ALLOW_MATRIX: MappingProxyType[Role, frozenset[Permission]] = MappingProxyType(
+    {
+        Role.PROPOSER: frozenset({Permission.PROPOSE_PLAN}),
+        Role.APPROVER: frozenset({Permission.APPROVE_PLAN}),
+        Role.OPERATOR: frozenset({Permission.EXECUTE_PLAN}),
+        Role.AUDITOR: frozenset({Permission.VIEW_LINEAGE, Permission.READ_AUDIT}),
+        Role.CONTRACTS_STEWARD: frozenset({Permission.MANAGE_TENANT, Permission.PUBLISH_AGGREGATE}),
+        Role.SERVICE: frozenset({Permission.APPEND_AUDIT}),
+    }
+)
 
 
 def authorize(

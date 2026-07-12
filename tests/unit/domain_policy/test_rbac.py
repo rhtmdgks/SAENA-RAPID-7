@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 import pytest
 from saena_domain.authz.rbac import ALLOW_MATRIX, Permission, Role, authorize
 
@@ -96,3 +98,11 @@ def test_no_role_holds_every_permission() -> None:
     all_permissions = set(Permission)
     for role, permissions in ALLOW_MATRIX.items():
         assert permissions != all_permissions, f"{role} must not hold all permissions"
+
+
+def test_allow_matrix_is_mapping_proxy() -> None:
+    # SHOULD-FIX 2: the matrix itself (not just its frozenset values) is
+    # read-only.
+    assert isinstance(ALLOW_MATRIX, MappingProxyType)
+    with pytest.raises(TypeError):
+        ALLOW_MATRIX[Role.OPERATOR] = frozenset()  # type: ignore[index]

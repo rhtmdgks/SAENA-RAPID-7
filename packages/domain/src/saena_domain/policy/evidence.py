@@ -69,7 +69,13 @@ def _is_glob_escape(glob: str) -> bool:
         return True
     if "://" in glob:
         return True
-    segments = glob.split("/")
+    # Backslash-as-separator escape (SHOULD-FIX 1): a glob using '\' path
+    # separators (e.g. Windows-style or a deliberate '..\\..\\' escape
+    # attempt) must be checked for '..' segments the same way '/'-separated
+    # globs are — normalize '\' to '/' before segment-splitting so
+    # 'apps\\..\\..\\etc' is caught exactly like 'apps/../../etc'.
+    normalized = glob.replace("\\", "/")
+    segments = normalized.split("/")
     return any(segment == ".." for segment in segments)
 
 

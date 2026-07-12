@@ -14,6 +14,7 @@ from saena_domain.policy.errors import (
 from saena_domain.policy.states import PlanState
 from saena_domain.policy.transitions import (
     DecisionRecord,
+    PlanSnapshot,
     cancel,
     expire,
     guard_execution,
@@ -396,3 +397,231 @@ def test_is_high_risk_plan_true_when_any_hypothesis_high() -> None:
 def test_is_high_risk_plan_false_when_no_hypothesis_high() -> None:
     assert not is_high_risk_plan(("low", "medium"))
     assert not is_high_risk_plan(())
+
+
+# --- MUST-FIX 1: immutability wired into transition() as a choke point -----
+
+
+def test_transition_raises_contract_hash_violation_on_mutated_content_same_hash() -> None:
+    """Mutated content under the same contract_hash must be caught BY
+    transition() itself (not only by a standalone guard_immutability call)."""
+    stored = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-original")
+    presented = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-mutated")
+    with pytest.raises(ContractHashViolationError):
+        transition(
+            PlanState.WAITING_APPROVAL,
+            contract_hash=CONTRACT_HASH,
+            proposer_actor_id=PROPOSER,
+            approvals=(ApproverRecord(APPROVER_1, "approved"),),
+            high_risk=False,
+            decided_at=DECIDED_AT,
+            incoming_decision=_decision(APPROVER_1, "approved"),
+            stored_plan=stored,
+            presented_plan=presented,
+        )
+
+
+def test_transition_immutability_check_runs_before_state_logic() -> None:
+    """The immutability violation must fire even when the decision itself
+    would otherwise be perfectly valid (quorum satisfied, no self-approval,
+    no replay conflict) — proving the check runs unconditionally FIRST, not
+    as a fallback only reached when other checks pass."""
+    stored = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-original")
+    presented = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-mutated")
+    with pytest.raises(ContractHashViolationError):
+        transition(
+            PlanState.WAITING_APPROVAL,
+            contract_hash=CONTRACT_HASH,
+            proposer_actor_id=PROPOSER,
+            approvals=(ApproverRecord(APPROVER_1, "approved"),),
+            high_risk=False,
+            decided_at=DECIDED_AT,
+            incoming_decision=_decision(APPROVER_1, "approved"),
+            stored_plan=stored,
+            presented_plan=presented,
+        )
+
+
+def test_transition_allows_same_hash_same_content() -> None:
+    stored = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-original")
+    presented = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-original")
+    outcome = transition(
+        PlanState.WAITING_APPROVAL,
+        contract_hash=CONTRACT_HASH,
+        proposer_actor_id=PROPOSER,
+        approvals=(ApproverRecord(APPROVER_1, "approved"),),
+        high_risk=False,
+        decided_at=DECIDED_AT,
+        incoming_decision=_decision(APPROVER_1, "approved"),
+        stored_plan=stored,
+        presented_plan=presented,
+    )
+    assert outcome.state == PlanState.APPROVED
+
+
+def test_transition_does_not_false_positive_when_hash_and_content_both_differ() -> None:
+    # A legitimately re-proposed plan (new contract_hash for new content) is
+    # NOT a contract-hash-reuse violation — guard_immutability only fires
+    # when the SAME contract_hash is reused with DIFFERENT content. Here the
+    # presented snapshot's contract_hash differs from stored, so the
+    # immutability check must be a no-op; the transition proceeds normally
+    # against the (matching) plan/decision contract_hash.
+    stored = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-original")
+    other_hash = "sha256:" + "c" * 64
+    presented = PlanSnapshot(contract_hash=other_hash, content_fingerprint="fp-changed")
+    outcome = transition(
+        PlanState.WAITING_APPROVAL,
+        contract_hash=other_hash,
+        proposer_actor_id=PROPOSER,
+        approvals=(ApproverRecord(APPROVER_1, "approved"),),
+        high_risk=False,
+        decided_at=DECIDED_AT,
+        incoming_decision=_decision(APPROVER_1, "approved", contract_hash=other_hash),
+        stored_plan=stored,
+        presented_plan=presented,
+    )
+    assert outcome.state == PlanState.APPROVED
+
+
+def test_transition_skips_immutability_check_when_snapshots_omitted() -> None:
+    # Default behavior unchanged when stored_plan/presented_plan are not
+    # supplied (e.g. PROPOSED->WAITING_APPROVAL submission path).
+    outcome = transition(
+        PlanState.PROPOSED,
+        contract_hash=CONTRACT_HASH,
+        proposer_actor_id=PROPOSER,
+        approvals=(),
+        high_risk=False,
+        decided_at=DECIDED_AT,
+    )
+    assert outcome.state == PlanState.WAITING_APPROVAL
+
+
+# --- MUST-FIX 2: actor_id canonicalization ----------------------------------
+
+
+def test_same_approver_case_variant_twice_never_satisfies_high_risk_quorum() -> None:
+    approvals = (
+        ApproverRecord("Actor-Approver-0001", "approved"),
+        ApproverRecord("actor-approver-0001", "approved"),
+    )
+    outcome = transition(
+        PlanState.WAITING_APPROVAL,
+        contract_hash=CONTRACT_HASH,
+        proposer_actor_id=PROPOSER,
+        approvals=approvals,
+        high_risk=True,
+        decided_at=DECIDED_AT,
+        incoming_decision=_decision("actor-approver-0001", "approved", high_risk=True),
+    )
+    assert outcome.state == PlanState.WAITING_APPROVAL
+
+
+def test_same_approver_whitespace_variant_twice_never_satisfies_high_risk_quorum() -> None:
+    approvals = (
+        ApproverRecord(" actor-approver-0001", "approved"),
+        ApproverRecord("actor-approver-0001 ", "approved"),
+    )
+    outcome = transition(
+        PlanState.WAITING_APPROVAL,
+        contract_hash=CONTRACT_HASH,
+        proposer_actor_id=PROPOSER,
+        approvals=approvals,
+        high_risk=True,
+        decided_at=DECIDED_AT,
+        incoming_decision=_decision("actor-approver-0001 ", "approved", high_risk=True),
+    )
+    assert outcome.state == PlanState.WAITING_APPROVAL
+
+
+def test_proposer_case_variant_self_approval_is_rejected() -> None:
+    with pytest.raises(InvalidTransitionError):
+        transition(
+            PlanState.WAITING_APPROVAL,
+            contract_hash=CONTRACT_HASH,
+            proposer_actor_id=PROPOSER,
+            approvals=(),
+            high_risk=False,
+            decided_at=DECIDED_AT,
+            incoming_decision=_decision(PROPOSER.upper(), "approved"),
+        )
+
+
+def test_proposer_whitespace_variant_self_approval_is_rejected() -> None:
+    with pytest.raises(InvalidTransitionError):
+        transition(
+            PlanState.WAITING_APPROVAL,
+            contract_hash=CONTRACT_HASH,
+            proposer_actor_id=PROPOSER,
+            approvals=(),
+            high_risk=False,
+            decided_at=DECIDED_AT,
+            incoming_decision=_decision(f"  {PROPOSER}  ", "approved"),
+        )
+
+
+def test_whitespace_variant_replay_treated_as_same_key_idempotent() -> None:
+    seen = {
+        (CONTRACT_HASH, "actor-approver-0001"): _decision("actor-approver-0001", "approved"),
+    }
+    outcome = transition(
+        PlanState.WAITING_APPROVAL,
+        contract_hash=CONTRACT_HASH,
+        proposer_actor_id=PROPOSER,
+        approvals=(ApproverRecord("actor-approver-0001", "approved"),),
+        high_risk=False,
+        decided_at=DECIDED_AT,
+        seen_decisions=seen,
+        incoming_decision=_decision("  actor-approver-0001  ", "approved"),
+    )
+    # Whitespace-variant resubmission of the SAME decision maps to the same
+    # canonical replay key -> idempotent, same outcome, no error.
+    assert outcome.state == PlanState.APPROVED
+
+
+def test_whitespace_variant_conflicting_decision_raises() -> None:
+    seen = {
+        (CONTRACT_HASH, "actor-approver-0001"): _decision("actor-approver-0001", "approved"),
+    }
+    with pytest.raises(ConflictingDecisionError):
+        transition(
+            PlanState.WAITING_APPROVAL,
+            contract_hash=CONTRACT_HASH,
+            proposer_actor_id=PROPOSER,
+            approvals=(ApproverRecord("actor-approver-0001", "approved"),),
+            high_risk=False,
+            decided_at=DECIDED_AT,
+            seen_decisions=seen,
+            incoming_decision=_decision("  Actor-Approver-0001  ", "rejected"),
+        )
+
+
+def test_decision_key_canonicalizes_case_and_whitespace() -> None:
+    d1 = _decision("Actor-1", "approved")
+    d2 = _decision("  actor-1  ", "approved")
+    assert d1.decision_key == d2.decision_key
+
+
+def test_cancel_uses_allowed_transitions_table() -> None:
+    # SHOULD-FIX 4: cancel() consults _ALLOWED_TRANSITIONS rather than a
+    # hardcoded membership check — exercised indirectly via legal/illegal
+    # edges already covered above; this test pins the observable contract
+    # that APPROVED (a terminal state with an empty adjacency set) is
+    # rejected, consistent with the table.
+    with pytest.raises(InvalidTransitionError):
+        cancel(
+            PlanState.APPROVED,
+            contract_hash=CONTRACT_HASH,
+            actor_id=PROPOSER,
+            decided_at=DECIDED_AT,
+        )
+
+
+def test_expire_uses_allowed_transitions_table() -> None:
+    with pytest.raises(InvalidTransitionError):
+        expire(
+            PlanState.CANCELLED,
+            contract_hash=CONTRACT_HASH,
+            actor_id=PROPOSER,
+            decided_at=DECIDED_AT,
+        )

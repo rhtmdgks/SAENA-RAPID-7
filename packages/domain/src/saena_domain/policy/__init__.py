@@ -22,10 +22,15 @@ from saena_domain.policy.errors import (
     PolicyViolationError,
 )
 from saena_domain.policy.evidence import evaluate_h3_evidence_policy
+from saena_domain.policy.identity import canonical_actor_id
 from saena_domain.policy.lease import PatchUnitLease, issue_lease
 from saena_domain.policy.states import PlanState
 from saena_domain.policy.transitions import (
+    DecisionRecord,
+    PlanSnapshot,
+    TransitionOutcome,
     guard_execution,
+    guard_immutability,
     is_high_risk_plan,
     transition,
 )
@@ -36,14 +41,19 @@ __all__ = [
     "AuditTrailRecord",
     "ConflictingDecisionError",
     "ContractHashViolationError",
+    "DecisionRecord",
     "ExecutionBlockedError",
     "InvalidTransitionError",
     "PatchUnitLease",
+    "PlanSnapshot",
     "PlanState",
     "PolicyViolationError",
+    "TransitionOutcome",
+    "canonical_actor_id",
     "evaluate_h3_evidence_policy",
     "evaluate_h7_two_person_approval",
     "guard_execution",
+    "guard_immutability",
     "is_high_risk_plan",
     "issue_lease",
     "transition",

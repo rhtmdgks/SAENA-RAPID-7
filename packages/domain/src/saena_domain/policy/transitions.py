@@ -24,6 +24,7 @@ from saena_domain.policy.errors import (
     ExecutionBlockedError,
     InvalidTransitionError,
 )
+from saena_domain.policy.identity import canonical_actor_id
 from saena_domain.policy.states import PlanState
 from saena_domain.policy.two_person import ApproverRecord, evaluate_h7_two_person_approval
 
@@ -58,6 +59,11 @@ class DecisionRecord:
     (contract_hash, approver_actor_id) via `decision_key`. OPEN ITEM: if a
     future schema revision adds an explicit decision_id, this derivation
     should be replaced with the schema field.
+
+    `decision_key` canonicalizes approver_actor_id (identity.canonical_actor_id)
+    before keying — actor_id format is OPEN per identifiers.schema.json, so a
+    whitespace/case variant of the same approver_actor_id MUST map to the same
+    replay key (critic MUST-FIX 2), not a distinct one.
     """
 
     contract_hash: str
@@ -69,7 +75,7 @@ class DecisionRecord:
 
     @property
     def decision_key(self) -> tuple[str, str]:
-        return (self.contract_hash, self.approver_actor_id)
+        return (self.contract_hash, canonical_actor_id(self.approver_actor_id))
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +84,23 @@ class TransitionOutcome:
 
     state: PlanState
     audit_record: AuditTrailRecord
+
+
+@dataclass(frozen=True, slots=True)
+class PlanSnapshot:
+    """contract_hash + an opaque content fingerprint for immutability checks.
+
+    `content_fingerprint` is caller-supplied (e.g. a hash of the canonical
+    ChangePlan document) — this module does not compute it; it only compares
+    two snapshots under guard_immutability. Used by transition() to make the
+    post-approval immutability check (H-3/H-7: "after approval, contract_hash
+    frozen") a structural choke point on the WAITING_APPROVAL decision path
+    rather than a separately-callable, easy-to-skip function (critic
+    MUST-FIX 1).
+    """
+
+    contract_hash: str
+    content_fingerprint: str
 
 
 def is_high_risk_plan(hypothesis_risks: tuple[str, ...]) -> bool:
@@ -102,8 +125,31 @@ def transition(
     decided_at: str,
     seen_decisions: dict[tuple[str, str], DecisionRecord] | None = None,
     incoming_decision: DecisionRecord | None = None,
+    stored_plan: PlanSnapshot | None = None,
+    presented_plan: PlanSnapshot | None = None,
 ) -> TransitionOutcome:
     """Compute the next PlanState given the current state and an approval set.
+
+    `stored_plan`/`presented_plan` (critic MUST-FIX 1): when both are
+    supplied, guard_immutability() runs FIRST, before any other state logic —
+    a caller cannot reach APPROVED (or any other outcome) through this
+    function while bypassing the post-approval immutability check.
+    `stored_plan` is the plan content as already persisted/previously
+    approved; `presented_plan` is the plan content presented alongside this
+    decision. Both are optional (default None, check skipped) because the
+    PROPOSED->WAITING_APPROVAL submission path has no "stored" plan to
+    compare against yet — callers on the WAITING_APPROVAL decision path
+    (where post-approval immutability actually matters) MUST pass both.
+
+    Idempotency note (SHOULD-FIX 5): transition() is a pure, stateless
+    function — "idempotent replay" means that calling it again with the same
+    arguments (including the same `seen_decisions`/`approvals` snapshot)
+    yields the same TransitionOutcome; this module does NOT persist or cache
+    any prior outcome itself. Callers are responsible for supplying a
+    consistent `seen_decisions`/`approvals` view (e.g. reloaded from a
+    decision store) on each call — replay safety is a property of calling
+    this function with consistent inputs, not a guarantee this module
+    enforces via hidden state.
 
     Semantics:
     - PROPOSED -> WAITING_APPROVAL / CANCELLED: not decision-driven (no
@@ -113,16 +159,21 @@ def transition(
       advances to WAITING_APPROVAL in this function — proposer-initiated
       CANCELLED from PROPOSED is a distinct explicit caller action, not
       modeled as an inferred outcome of this function (see cancel() below).
-    - WAITING_APPROVAL: evaluated against `approvals` (H-7
-      evaluate_h7_two_person_approval) plus `incoming_decision` idempotency
-      checks:
+    - WAITING_APPROVAL: guard_immutability() runs first (see above), then
+      evaluated against `approvals` (H-7 evaluate_h7_two_person_approval)
+      plus `incoming_decision` idempotency checks:
         * incoming_decision replays (identical contract_hash+approver+decision
-          already in seen_decisions) => no-op, returns the SAME outcome as
-          before (idempotent replay, no duplicate state change).
+          already in seen_decisions, approver_actor_id compared via
+          canonical_actor_id) => no-op, returns the SAME outcome as calling
+          this function again with the same consistent inputs (idempotent
+          replay, no duplicate state change).
         * incoming_decision conflicts (same decision_key, different decision
           value) => ConflictingDecisionError.
-        * incoming_decision.approver_actor_id == proposer_actor_id =>
-          InvalidTransitionError (self-approval forbidden for ALL plans).
+        * incoming_decision.approver_actor_id == proposer_actor_id, compared
+          via canonical_actor_id (NFKC + strip + casefold — actor_id format
+          is OPEN per identifiers.schema.json) => InvalidTransitionError
+          (self-approval forbidden for ALL plans, including case/whitespace
+          variants of the same identity).
         * otherwise: if quorum satisfied (H-7-aware) => APPROVED; if the
           incoming decision itself is "rejected" => REJECTED; else plan stays
           WAITING_APPROVAL (insufficient quorum yet — not an error, just no
@@ -152,6 +203,18 @@ def transition(
     if plan_state != PlanState.WAITING_APPROVAL:
         raise InvalidTransitionError(plan_state, incoming_decision)
 
+    # Immutability choke point (critic MUST-FIX 1): runs BEFORE any other
+    # state logic on the approval path. A caller cannot reach APPROVED (or
+    # any other WAITING_APPROVAL outcome) through this function while
+    # bypassing this check.
+    if stored_plan is not None and presented_plan is not None:
+        guard_immutability(
+            contract_hash=presented_plan.contract_hash,
+            prior_contract_hash=stored_plan.contract_hash,
+            prior_content_fingerprint=stored_plan.content_fingerprint,
+            new_content_fingerprint=presented_plan.content_fingerprint,
+        )
+
     if incoming_decision is None:
         raise InvalidTransitionError(plan_state, incoming_decision)
 
@@ -165,10 +228,11 @@ def transition(
     prior = seen.get(key)
     if prior is not None:
         if prior.decision == incoming_decision.decision:
-            # Idempotent replay: identical decision resubmitted. No duplicate
-            # state change — recompute the CURRENT outcome from `approvals`
-            # (which already reflects the first application) and return it
-            # unchanged.
+            # Idempotent replay: identical decision resubmitted (approver
+            # identity compared via the canonicalized decision_key). No
+            # duplicate state change — recompute the CURRENT outcome from
+            # `approvals` (which already reflects the first application) and
+            # return it unchanged.
             pass
         else:
             raise ConflictingDecisionError(
@@ -177,7 +241,9 @@ def transition(
                 f"{prior.decision!r} then {incoming_decision.decision!r}"
             )
 
-    if incoming_decision.approver_actor_id == proposer_actor_id:
+    if canonical_actor_id(incoming_decision.approver_actor_id) == canonical_actor_id(
+        proposer_actor_id
+    ):
         raise InvalidTransitionError(plan_state, incoming_decision)
 
     if incoming_decision.decision == "rejected":
@@ -239,9 +305,10 @@ def cancel(
     Valid from PROPOSED or WAITING_APPROVAL only (k3s §4.3: CANCELLED is
     reachable from WAITING_APPROVAL on rejection; PROPOSED->CANCELLED models
     proposer withdrawal before submission — this module's own extension,
-    consistent with _ALLOWED_TRANSITIONS).
+    consistent with _ALLOWED_TRANSITIONS, which is this function's single
+    source of truth for validity, SHOULD-FIX 4).
     """
-    if plan_state not in (PlanState.PROPOSED, PlanState.WAITING_APPROVAL):
+    if PlanState.CANCELLED not in _ALLOWED_TRANSITIONS.get(plan_state, frozenset()):
         raise InvalidTransitionError(plan_state, "cancel")
     reason = (
         AuditReasonCode.CANCELLED_BY_OPERATOR
@@ -270,8 +337,11 @@ def expire(
 ) -> TransitionOutcome:
     """Expiry path — lease/approval window lapsed. Valid only from
     WAITING_APPROVAL (see states.py OPEN ITEM re: k3s §4.3 silence on expiry).
+    Validity is checked against _ALLOWED_TRANSITIONS (SHOULD-FIX 4), the
+    single source of truth for this module's adjacency, rather than a
+    hardcoded state comparison.
     """
-    if plan_state != PlanState.WAITING_APPROVAL:
+    if PlanState.EXPIRED not in _ALLOWED_TRANSITIONS.get(plan_state, frozenset()):
         raise InvalidTransitionError(plan_state, "expire")
     return TransitionOutcome(
         state=PlanState.EXPIRED,
@@ -330,6 +400,7 @@ def guard_immutability(
 
 __all__ = [
     "DecisionRecord",
+    "PlanSnapshot",
     "TransitionOutcome",
     "cancel",
     "expire",

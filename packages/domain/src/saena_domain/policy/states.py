@@ -37,9 +37,25 @@ Mapping to k3s §4.3 vocabulary:
                         transition; this module treats EXPIRED as reachable
                         only from WAITING_APPROVAL, mirroring CANCELLED.
 
-OPEN ITEM: whether EXPIRED/CANCELLED are truly distinct from REJECTED at the
-audit-ledger level is not specified by the read specs; this module keeps them
-distinct because they have different actors/reason codes (see audit.py).
+OPEN ITEM (SHOULD-FIX 6, strengthened per critic review): k3s §4.3's
+state-diagram literally has exactly TWO terminal outcomes reachable from
+WAITING_APPROVAL — EXECUTING (via `approved`) and CANCELLED (via
+`rejected`). This module's PlanState deliberately WIDENS that second,
+single k3s-level CANCELLED outcome into three distinct states — REJECTED,
+EXPIRED, CANCELLED — because they have different actors, triggers, and audit
+reason codes (see audit.py AuditReasonCode) that a policy/audit consumer
+needs to distinguish. This is an intentional implementation choice, not a
+literal 1:1 rendering of the k3s diagram: at the k3s event/state-diagram
+level, REJECTED, EXPIRED, and CANCELLED here all COLLAPSE onto the single
+k3s `CANCELLED` node. Any component that maps this module's PlanState back
+onto the k3s §4.3 vocabulary (e.g. run-level status reporting, Temporal
+workflow state) must perform that many-to-one collapse explicitly. This
+widening is NOT itself a change to k3s §4.3 or any ADR — docs/specs and
+docs/decisions were not edited to accommodate it — and is flagged here for
+human follow-up (should k3s §4.3 itself be revised to name these three
+outcomes explicitly, or should this module's three states instead be
+represented as CANCELLED + a separate reason-code-only distinction?). Do not
+resolve this by editing docs/specs/** or docs/decisions/ADR-*.md status.
 """
 
 from __future__ import annotations
