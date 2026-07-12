@@ -48,6 +48,8 @@ def test_audit_trail_record_is_immutable() -> None:
 def test_reason_code_is_closed_enum_not_free_text() -> None:
     values = {code.value for code in AuditReasonCode}
     assert "approved_sufficient_quorum" in values
+    assert "quorum_pending" in values
+    assert "gate_denied" in values
     assert "rejected_by_approver" in values
     assert "rejected_self_approval" in values
     assert "rejected_duplicate_approver" in values
@@ -59,3 +61,13 @@ def test_reason_code_is_closed_enum_not_free_text() -> None:
     assert "cancelled_by_operator" in values
     assert "contract_hash_violation" in values
     assert "conflicting_decision" in values
+
+
+def test_gate_denied_is_distinct_from_quorum_pending() -> None:
+    # w2-24 (Wave 2 critic follow-up, audit-truthfulness bug): GATE_DENIED
+    # ("the policy gate denied this decision outright") must be a member
+    # distinct from QUORUM_PENDING ("not enough approvers have signed off
+    # yet") — a service that conflates the two would misreport a gate
+    # rejection as a still-pending approval in the audit trail.
+    assert AuditReasonCode.GATE_DENIED != AuditReasonCode.QUORUM_PENDING
+    assert AuditReasonCode.GATE_DENIED.value == "gate_denied"

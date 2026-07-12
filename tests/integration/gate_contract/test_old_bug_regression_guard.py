@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from gate_contract_factories import make_request
+from gate_contract_factories import make_partial_request, make_request
 from saena_plan_contract.gate_client import HttpPolicyGateClient
 
 
@@ -121,7 +121,7 @@ def test_a_still_mismatched_body_422_fails_closed_not_silent_allow(
 
     with pytest.raises(PolicyGateUnavailableError):
         real_gate_client.plan_check(
-            make_request(
+            make_partial_request(  # type: ignore[arg-type]
                 contract_hash="sha256:" + "7" * 64,
                 evidence_ledger_hash=None,  # caller-gap: forces the pre-flight guard
             )

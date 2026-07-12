@@ -82,8 +82,11 @@ def test_approved_lease_scope_matches_plan_approved_scope(
     assert calls[0]["scope"] != ()
 
 
-def test_gate_denied_before_any_transition(client, headers, change_plan, gate, plans) -> None:
+def test_gate_denied_before_any_transition(
+    client, headers, change_plan, gate, plans, audit_trail
+) -> None:
     from saena_domain.identity import TenantId
+    from saena_domain.policy import AuditReasonCode
 
     contract_hash = _propose(client, headers, change_plan)
     gate.mode = "deny"
@@ -98,6 +101,15 @@ def test_gate_denied_before_any_transition(client, headers, change_plan, gate, p
     # NO transition: plan is still WAITING_APPROVAL, no decision recorded.
     assert plans.get_state(TenantId("acme-corp"), contract_hash).value == "waiting_approval"
     assert plans.get_decisions(TenantId("acme-corp"), contract_hash) == ()
+
+    # w2-24 (Wave 2 critic follow-up, audit-truthfulness bug): a policy-gate
+    # DENIAL must produce an audit descriptor with reason GATE_DENIED, never
+    # QUORUM_PENDING (which is reserved for a genuine insufficient-quorum
+    # outcome — see test_two_person_first_approval_still_waiting_is_quorum_pending
+    # below for that still-correct, unbroken path).
+    records = audit_trail.list_for_plan(TenantId("acme-corp"), contract_hash)
+    assert any(r.reason_code == AuditReasonCode.GATE_DENIED for r in records)
+    assert not any(r.reason_code == AuditReasonCode.QUORUM_PENDING for r in records)
 
 
 def test_gate_unavailable_before_any_transition_fail_closed(
@@ -125,7 +137,12 @@ def test_gate_unavailable_before_any_transition_fail_closed(
     assert approved_events == []
 
 
-def test_two_person_first_approval_still_waiting(client, headers) -> None:
+def test_two_person_first_approval_still_waiting_is_quorum_pending(
+    client, headers, audit_trail
+) -> None:
+    from saena_domain.identity import TenantId
+    from saena_domain.policy import AuditReasonCode
+
     plan = high_risk_change_plan()
     contract_hash = _propose(client, headers, plan)
     response = client.post(
@@ -135,6 +152,14 @@ def test_two_person_first_approval_still_waiting(client, headers) -> None:
     )
     assert response.status_code == 200
     assert response.json()["state"] == "waiting_approval"
+
+    # w2-24 regression guard: a genuine insufficient-quorum outcome (the gate
+    # ALLOWED this decision — FakeGateClient defaults to mode="allow" — but
+    # H-7 two-person quorum is not yet satisfied) must still map to
+    # QUORUM_PENDING, proving the GATE_DENIED fix above did not also divert
+    # this legitimate, unrelated QUORUM_PENDING path.
+    records = audit_trail.list_for_plan(TenantId("acme-corp"), contract_hash)
+    assert any(r.reason_code == AuditReasonCode.QUORUM_PENDING for r in records)
 
 
 def test_two_person_second_distinct_approver_reaches_approved(client, headers) -> None:
