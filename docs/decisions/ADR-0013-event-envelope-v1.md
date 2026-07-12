@@ -183,3 +183,19 @@ accepted (2026-07-12, 사용자)
 - Wave 1 계획 승인 문답 §1.2 항목 2 (`/Users/edmond104/.claude/plans/virtual-cooking-map.md`) — 4건 일괄 승인 근거.
 - 본 ADR 원 본문 §Current decision, §부록(예시 인스턴스 3종) — ①②의 명문화·정준화가 기존 예시와 정합함을 대조.
 - `docs/decisions/ADR-0012-contract-compatibility-policy.md` §Current decision (envelope = frozen, canonical 비교) — ②③의 근거.
+
+## rev.3 개정 (2026-07-12, 사용자 승인 — w1-08 critic MUST-1 해소)
+
+`event_type` 패턴의 반복 하한을 `{2,3}` → `{1,3}`으로 완화한다 (허용 토큰 수 4~5 → 3~5).
+
+근거: CONFIRMED 토픽 목록(api-event-contracts.md :47-57) 중 3건(`repo.intaken.v1`,
+`observation.captured.v1`, `citation.normalized.v1`)이 3토큰 형태로, 기존 패턴과
+교집합 공집합 — AsyncAPI allOf 조합에서 해당 채널의 어떤 인스턴스도 valid 불가
+(w1-08 pre-merge critic 발견). 본 패턴은 W0 draft 유래이며 개정 시점 기준 계약
+소비자·발급 태그 0 — 무비용 개정 창. §명명 규칙의 `<domain>.<entity>.<action>.v<major>`
+는 canonical 형태로 유지하되 `<domain>.<action>.v<major>` 2-segment 형태를 CONFIRMED
+토픽 한정으로 추인한다. 신규 토픽은 canonical 3-segment 권장.
+
+frozen-class 변경 절차 준수: 본 개정이 ADR 경로(ADR-0012 §envelope)다. 스키마 파일
+`packages/contracts/json-schema/envelope/event-envelope/v1/` 및 파생 모델
+`saena_schemas/envelope/`이 본 개정과 동일 patch unit(w1-16)에서 원자 반영됨.

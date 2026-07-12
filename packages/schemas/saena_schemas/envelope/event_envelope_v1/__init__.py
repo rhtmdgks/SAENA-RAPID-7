@@ -82,7 +82,7 @@ class EventType(RootModel[str]):
         str,
         Field(
             description="9th field (ADR-0013 deviation from k3s §4.1 8-field list). Identical to AsyncAPI topic name.",
-            pattern="^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){2,3}\\.v[0-9]+$",
+            pattern="^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,3}\\.v[0-9]+$",
         ),
     ]
 
