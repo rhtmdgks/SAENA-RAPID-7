@@ -503,3 +503,81 @@ def test_classify_command_env_split_string_does_not_break_plain_env_wrapper() ->
     assert result.denied is True
     assert result.binary == "kubectl"
     assert result.subcommand == "patch"
+
+
+# --- w2-24 critic MUST-FIX: env --split-string SPACE-SEPARATED long form ---
+#
+# GNU getopt_long accepts a long option's value either glued with `=`
+# (`--split-string=X`, already covered above) OR as the following token
+# (`--split-string X`) — the original patch only recognized the glued form,
+# leaving `--split-string X` to fall through to `_unwrap_exec_wrapper`'s
+# generic option-skip loop, which treated `--split-string` as an ordinary
+# skippable flag and misread the STRING value itself as the wrapped
+# command's own argv[0] (never shlex-split, never classified) — a live
+# bypass a critic follow-up found. This section is that regression guard.
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["env", "--split-string", "kubectl patch pod x"],
+        ["env", "--split-string", "git push"],
+    ],
+)
+def test_classify_command_denies_env_split_string_space_separated_long_form(
+    argv: list[str],
+) -> None:
+    result = classify_command(argv)
+    assert result.denied is True
+    assert result.binary in {"kubectl", "git"}
+
+
+def test_classify_command_env_split_string_space_separated_kubectl_patch_denies() -> None:
+    result = classify_command(["env", "--split-string", "kubectl patch pod x"])
+    assert result.denied is True
+    assert result.binary == "kubectl"
+    assert result.subcommand == "patch"
+
+
+def test_classify_command_env_split_string_space_separated_git_push_denies() -> None:
+    result = classify_command(["env", "--split-string", "git push"])
+    assert result.denied is True
+    assert result.binary == "git"
+    assert result.subcommand == "push"
+
+
+def test_classify_command_env_split_string_space_separated_malformed_quoting_fails_closed() -> None:
+    # Same fail-closed doctrine as every other shell/split-string unwrap
+    # path — an unparseable embedded string is denied, never silently
+    # skipped.
+    result = classify_command(["env", "--split-string", 'echo "unterminated'])
+    assert result.denied is True
+    assert "unparseable" in (result.reason or "")
+    assert "env" in (result.reason or "")
+
+
+def test_classify_command_env_split_string_space_separated_benign_not_denied() -> None:
+    # Only the deny corpus triggers a denial — a benign command reached via
+    # the space-separated long form must not be falsely denied.
+    result = classify_command(["env", "--split-string", "pytest -x"])
+    assert result.denied is False
+    assert result.binary == "pytest"
+
+
+def test_classify_command_env_split_string_space_separated_nested_wrapper_denies() -> None:
+    # Composition: env --split-string unwraps to a further wrapper (sudo),
+    # which itself unwraps to kubectl patch — proves the recursion actually
+    # re-enters _classify_argv for this form too, not just -S/--split-string=.
+    result = classify_command(["env", "--split-string", "sudo kubectl patch pod x"])
+    assert result.denied is True
+    assert result.binary == "kubectl"
+
+
+def test_classify_command_env_split_string_bare_flag_no_value_falls_through() -> None:
+    # A bare `--split-string` with NO following token at all (malformed/
+    # incomplete invocation) carries no inspectable embedded command —
+    # must fall through harmlessly to ordinary classification (env itself
+    # is not in the deny table), never crash and never open a new bypass.
+    result = classify_command(["env", "--split-string"])
+    assert result.denied is False
+    assert result.binary == "env"

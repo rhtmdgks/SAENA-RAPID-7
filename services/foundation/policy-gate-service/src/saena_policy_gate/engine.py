@@ -32,15 +32,19 @@ attacker can use to hide the real command from a naive argv[0] check
      NEVER lowercased, since `git -c a=b push` semantics do not extend to
      case-insensitive subcommands).
   2. If that basename is `env` AND carries an `-S`/`-S<glued>`/
-     `--split-string=<glued>` STRING argument (w2-24, Wave 2 critic
-     follow-up — `env`'s split-string form parses its STRING argument
-     shell-style, functionally identical to `sh -c "..."`, e.g. `env -S
-     "kubectl patch ..."`, `env --split-string=kubectl patch`), `shlex.split`
-     that string and RECURSE on the result as a fresh command — checked
-     BEFORE step 2 below so the generic wrapper-option skip never treats
-     `-S`'s OWN value as a harmless option-then-argv[0]. `shlex.split` raising
-     (malformed quoting) is FAIL-CLOSED, same doctrine as step 3's `-c`
-     handling below.
+     `--split-string=<glued>`/`--split-string <space-separated>` STRING
+     argument (w2-24, Wave 2 critic follow-up — `env`'s split-string form
+     parses its STRING argument shell-style, functionally identical to
+     `sh -c "..."`, e.g. `env -S "kubectl patch ..."`, `env
+     --split-string=kubectl patch`, `env --split-string "kubectl patch
+     ..."` — GNU getopt_long accepts a long option's value either glued
+     with `=` or as the following token, and a critic follow-up found the
+     space-separated form was initially missed), `shlex.split` that string
+     and RECURSE on the result as a fresh command — checked BEFORE step 2
+     below so the generic wrapper-option skip never treats `-S`/
+     `--split-string`'s OWN value as a harmless option-then-argv[0].
+     `shlex.split` raising (malformed quoting) is FAIL-CLOSED, same
+     doctrine as step 3's `-c` handling below.
   3. If that basename is a recognized EXEC WRAPPER (`env`, `sudo`, `xargs`,
      `nohup`, `timeout`, `nice`, `ionice`, `stdbuf`, `time`, `doas`,
      `setsid`, ... — MUST-FIX 1), skip the wrapper's own leading
@@ -214,24 +218,35 @@ def _is_env_assignment(token: str) -> bool:
 # past it, leaving the STRING argument to be misread as the wrapped
 # command's own argv[0] (one opaque token, e.g. `"kubectl patch pod x"` as a
 # literal binary name) — never unwrapped, never classified against the deny
-# table. This function recognizes all three of `env`'s accepted spellings —
-# `-S STRING` (separate token), `-SSTRING` (glued short form), and
-# `--split-string=STRING` (glued long form) — and returns the STRING
-# argument for `shlex.split`-based recursive classification, exactly like
-# `_unwrap_shell_dash_c` already does for `sh -c`.
+# table. This function recognizes all FOUR of `env`'s accepted spellings —
+# `-S STRING` (separate token), `-SSTRING` (glued short form),
+# `--split-string=STRING` (glued long form), and `--split-string STRING`
+# (space-separated long form — GNU getopt_long accepts a long option's value
+# either glued with `=` or as the following token; a critic follow-up found
+# this fourth spelling was NOT recognized in the original patch, falling
+# through to `_unwrap_exec_wrapper`'s generic skip-and-misread-argv[0] path,
+# a live bypass for e.g. `env --split-string "kubectl patch pod x"`) — and
+# returns the STRING argument for `shlex.split`-based recursive
+# classification, exactly like `_unwrap_shell_dash_c` already does for `sh
+# -c`.
 _ENV_SPLIT_STRING_LONG_PREFIX = "--split-string="
+_ENV_SPLIT_STRING_LONG_FLAG = "--split-string"
 
 
 def _find_env_split_string_arg(argv: list[str]) -> str | None:
-    """Return `env -S`/`-S<glued>`/`--split-string=<glued>`'s STRING
-    argument from `argv[1:]` (the tokens after `env` itself), or `None` if
-    no such option is present. Scans the ENTIRE tail (not just the first
-    token) — same defense-in-depth rationale as `iter_candidate_subcommands`
-    (an unrelated leading option before `-S` must not hide it)."""
+    """Return `env -S`/`-S<glued>`/`--split-string=<glued>`/
+    `--split-string <space-separated>`'s STRING argument from `argv[1:]`
+    (the tokens after `env` itself), or `None` if no such option is present
+    (including a bare `-S`/`--split-string` with no following token at all
+    — nothing to unwrap, falls through to ordinary classification, same as
+    `env -S` alone documented in `_classify_argv`). Scans the ENTIRE tail
+    (not just the first token) — same defense-in-depth rationale as
+    `iter_candidate_subcommands` (an unrelated leading option before `-S`/
+    `--split-string` must not hide it)."""
     i = 1
     while i < len(argv):
         token = argv[i]
-        if token == "-S":
+        if token == "-S" or token == _ENV_SPLIT_STRING_LONG_FLAG:
             if i + 1 < len(argv):
                 return argv[i + 1]
             return None
@@ -462,12 +477,15 @@ def _classify_argv(argv: list[str], *, depth: int = 0) -> CommandClassification:
     if binary == "env":
         split_string = _find_env_split_string_arg(unwrapped)
         if split_string is not None:
-            # w2-24: `env -S`/`-S<glued>`/`--split-string=<glued>` parses its
-            # STRING argument shell-style, exactly like `sh -c "..."` — must
-            # be unwrapped and recursively classified BEFORE the generic
-            # exec-wrapper option-skip loop below ever sees `-S` (which it
-            # would otherwise treat as a harmless, skippable option token and
-            # misread the STRING itself as the wrapped command's argv[0]).
+            # w2-24: `env -S`/`-S<glued>`/`--split-string=<glued>`/
+            # `--split-string <space-separated>` parses its STRING argument
+            # shell-style, exactly like `sh -c "..."` — must be unwrapped and
+            # recursively classified BEFORE the generic exec-wrapper
+            # option-skip loop below ever sees `-S`/`--split-string` (which
+            # it would otherwise treat as a harmless, skippable option token
+            # and misread the STRING itself as the wrapped command's argv[0]
+            # — the exact space-separated-long-form bypass a critic
+            # follow-up found in the original patch).
             try:
                 split_argv = shlex.split(split_string)
             except ValueError:
