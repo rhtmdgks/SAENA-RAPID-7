@@ -2,6 +2,7 @@
 root_packages =
     saena_shared
     saena_testing
+    saena_schemas
 
 ; dependency-policy Allowed directions, W0 minimal form.
 ; Grows one contract per new workspace member (ADR-0002 module isolation
@@ -13,4 +14,14 @@ type = forbidden
 source_modules =
     saena_shared
 forbidden_modules =
+    saena_testing
+    saena_schemas
+
+[importlinter:contract:schemas-is-a-leaf]
+name = saena_schemas must not import other saena packages
+type = forbidden
+source_modules =
+    saena_schemas
+forbidden_modules =
+    saena_shared
     saena_testing

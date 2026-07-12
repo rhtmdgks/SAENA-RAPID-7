@@ -20,7 +20,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import jsonschema  # type: ignore[import-untyped]
+import jsonschema
 import pytest
 
 REGISTRY_DIR = Path(__file__).resolve().parent.parent / "registry"
@@ -146,7 +146,7 @@ class TestPlantedViolationDetection:
         validator_cls = jsonschema.validators.validator_for(schema)
         validator = validator_cls(schema)
 
-        planted_bad_entry = {
+        planted_bad_entry: dict[str, Any] = {
             "name": "saena.tenant_id",
             "type": "string",
             "cardinality": "high",
