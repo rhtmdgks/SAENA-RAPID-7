@@ -195,7 +195,7 @@ time for any of the three.
 | Artifact | W0 (this patch unit) | W1 |
 |---|---|---|
 | `fixtures/envelope/{valid,invalid}/*.json` | shipped (3 valid, 4 invalid) | additional per-contract fixtures |
-| `fixtures/envelope/draft-envelope.schema.json` | shipped, explicitly **non-authoritative** (see its `$comment`) | superseded by `packages/contracts/json-schema/envelope/v1/event-envelope.schema.json`, authored by Contracts Steward |
+| `fixtures/envelope/draft-envelope.schema.json` | RETIRED (w1-05) | superseded by `packages/contracts/json-schema/envelope/event-envelope/v1/event-envelope.schema.json` (authoritative, Contracts Steward) |
 | `test_envelope_fixtures.py` | shipped | extended or retargeted once the authoritative schema lands |
 | `test_compat_selfdiff.py` (`structural_diff()`) | shipped, self-diff only | wired to real N-1 git-tag pairs in `compat/` |
 | `validate/`, `compat/` directories | **not created** — no content to validate yet beyond the envelope draft | created, populated per contract |

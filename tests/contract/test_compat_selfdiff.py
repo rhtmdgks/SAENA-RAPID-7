@@ -29,16 +29,19 @@ from pathlib import Path
 
 from harness.diff import structural_diff
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures" / "envelope"
-SCHEMA_PATH = FIXTURES_DIR / "draft-envelope.schema.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCHEMA_PATH = (
+    REPO_ROOT
+    / "packages/contracts/json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+)
 
 
 # --------------------------------------------------------------------------
-# Self-diff bootstrap test: draft schema against itself must be clean.
+# Self-diff bootstrap test: authoritative envelope against itself must be clean.
 # --------------------------------------------------------------------------
 
 
-def test_draft_schema_selfdiff_is_clean() -> None:
+def test_envelope_schema_selfdiff_is_clean() -> None:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     violations = structural_diff(schema, schema)
     assert violations == [], f"self-diff must be empty but found: {violations}"
