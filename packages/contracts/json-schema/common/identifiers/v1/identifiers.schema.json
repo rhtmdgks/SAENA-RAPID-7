@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/common/identifiers/v1/identifiers.schema.json",
+  "title": "Common identifiers",
+  "description": "Shared identifier and primitive value $defs consumed by other contracts via $ref. This file defines no root type — $defs only.",
+  "$comment": "compat_class: closed ($defs-only reuse surface, no additionalProperties root to seal since there is no root object). Authority: approved plan §2 row 1 (docs/decisions ADR references below); ruling R1 (docs/... virtual-cooking-map.md §1.1) — engine_id is intentionally NOT defined here, it lives in common/engine-id/v1 as a standalone file so it is not duplicated across two contracts. tenant_id pattern is verbatim from ADR-0014 (docs/decisions/ADR-0014-tenant-propagation.md, 'tenant_id 형식' section) — do not reinvent. timestamp_utc uses a Z-canonical pattern per ADR-0013 rev.2 (occurred_at Z-정준화 amendment, docs/decisions/ADR-0013-event-envelope-v1.md). sha256_ref/git_sha/uri_ref support cross-contract hash and reference fields (ChangePlan H-3/H-7, SourceSnapshot, PatchArtifact — W1 P0 domain contracts, not yet authored in this unit).",
+  "$defs": {
+    "tenant_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])$",
+      "$comment": "Verbatim from ADR-0014 (docs/decisions/ADR-0014-tenant-propagation.md) — immutable DNS-safe slug, max 32 chars, sized to fit under the 'saena-tenant-<id>' <=63-char namespace convention. Do not alter this pattern without an ADR-0014 revision."
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "format OPEN — issuer runtime convention; W1 opaque"
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "format OPEN — issuer runtime convention; W1 opaque"
+    },
+    "site_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "format OPEN — issuer runtime convention; W1 opaque"
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "format OPEN — issuer runtime convention; W1 opaque"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "format OPEN — issuer runtime convention; W1 opaque"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "$comment": "Full semver core (major.minor.patch), no prerelease/build metadata — consistent with ADR-0012 compatibility policy and ADR-0013 rev.2 prerelease exclusion amendment."
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+      "$comment": "Z-canonical only (no numeric UTC offset, e.g. +00:00, accepted) per ADR-0013 rev.2 occurred_at Z-canonicalization amendment."
+    },
+    "sha256_ref": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "$comment": "Lowercase hex, 'sha256:' prefix required. Example form per ADR-0013:148."
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "$comment": "Full 40-hex git commit SHA-1, lowercase."
+    },
+    "uri_ref": {
+      "type": "string",
+      "pattern": "^[a-z0-9+.-]+://[^?#]+$",
+      "$comment": "query/fragment forbidden — presigned-token smuggling defense (ADR-0024, ruling R9-5 in docs/... virtual-cooking-map.md §1.1)."
+    }
+  }
+}
