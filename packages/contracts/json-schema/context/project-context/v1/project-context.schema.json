@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/context/project-context/v1/project-context.schema.json",
+  "title": "ProjectContext",
+  "description": "Engagement/project record propagated from tenant-control to demand-graph and experiment-attribution, per docs/architecture/contract-catalog.md:22.",
+  "$comment": "compat_class: open (plan §2 row 'context/project-context'; plan §5 acceptance matrix 'WorkspaceContext / ProjectContext | open'). Authority: contract-catalog.md:22 (owner tenant-control per ADR-0007, producer tenant-control -> demand-graph/experiment-attr, idempotency key project_id, sensitivity internal/customer-proprietary); tenancy-model.md:40 Identifier set ('project_id | engagement/project'). Field set is intentionally THIN (project_id + tenant_id only): engagement metadata (client name, contract terms, scope description, etc.) is EXCLUDED from v1 because no authoritative source maps out those fields — there is no citation for an engagement-metadata field list anywhere in ADR-0014, contract-catalog.md, or tenancy-model.md, so it remains OPEN and is deferred to a later minor/major revision once a citation exists, rather than being invented here.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["project_id", "tenant_id"],
+  "properties": {
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "tenancy-model.md:40 Identifier set — 'engagement/project'. Format OPEN (issuer runtime convention, W1 opaque) per common/identifiers $defs.project_id."
+    },
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Tenant discriminator — every project belongs to exactly one tenant (tenancy-model.md hard isolation boundary)."
+    }
+  }
+}

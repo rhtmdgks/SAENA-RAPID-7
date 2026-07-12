@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/context/actor-context/v1/actor-context.schema.json",
+  "title": "ActorContext",
+  "description": "Identity/authorization context for the human or system actor initiating a request, consumed by policy-gate, audit, and plan-contract per docs/architecture/contract-catalog.md:20.",
+  "$comment": "compat_class: closed (user decision 2026-07-12, plan §1.2 item 4 'closed 승격 5건 일괄' — virtual-cooking-map.md). Authority: approved plan §2 row 'context/actor-context'; contract-catalog.md:20 (owner forge-console-api, producer console(RBAC) -> policy-gate/audit/plan-contract, idempotency key actor_id+session, sensitivity PII); Security MUST-FIX 2 (plan §1.1 R9, user-approved) mandates the human=>tenant_id if/then below. PII minimization: identity fields (display_name/email/role) are STRUCTURALLY ABSENT from this schema by design, not merely omitted by oversight — the audit ledger stores actor_id only and identity mapping is kept in a separate store (contract-catalog.md:20 '부인방지 장기 <-> PII 최소화: ledger에는 actor_id만, 신원 매핑 분리 보관'). Do not add display_name/email/role to this schema without a fresh ADR and a compat_class/PII-classification re-review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actor_id", "actor_type", "session_id"],
+  "properties": {
+    "actor_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/actor_id",
+      "$comment": "tenancy-model.md:43 Identifier set — 'human or system actor'. Format OPEN (issuer runtime convention, W1 opaque) per common/identifiers $defs.actor_id."
+    },
+    "actor_type": {
+      "type": "string",
+      "enum": ["human", "system"],
+      "$comment": "Discriminator driving the allOf/if/then below (Security MUST-FIX 2 / plan §1.1 R9)."
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "$comment": "Composite idempotency key part actor_id+session (contract-catalog.md:20 'Idempotency key: actor_id+session'). Concrete SEMANTICS (session lifetime, issuance, renewal) are OPEN, deferred to W2A console design (plan §7 'session_id 의미(W2A)'). Security SHOULD-1: this field MUST be an opaque session identifier, NEVER a raw session token/credential — carrying bearer tokens or other secret-shaped values here is forbidden regardless of schema-level unenforceability of that semantic constraint."
+    },
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Optional at the base object level, but conditionally required for human actors — see allOf/if/then below (Security MUST-FIX 2, plan §1.1 R9, user-approved)."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "actor_type": { "const": "human" }
+        },
+        "required": ["actor_type"]
+      },
+      "then": {
+        "required": ["tenant_id"]
+      },
+      "$comment": "Security MUST-FIX 2 (plan §1.1 R9, user-approved 2026-07-12): a human actor MUST carry an explicit tenant_id in ActorContext — system actors (e.g. internal service accounts, cross-tenant workers) may omit it. This does not relax ADR-0014's rule that the event envelope tenant_id remains the sole authority on the event path; it constrains this context object's own shape for human-originated requests."
+    }
+  ]
+}
