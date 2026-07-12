@@ -40,9 +40,14 @@ from saena_forgectl.models import CheckResult
 
 CHECK_NAME = "external_secrets"
 
-#: `valueFrom` backends that are NOT a plaintext ConfigMap — anything else
-#: (including an absent/unrecognized `valueFrom`) fails closed.
-_PERMITTED_BACKENDS = frozenset({"SecretStore", "ClusterSecretStore", "VaultSecret"})
+#: `valueFrom` maps to the external-secrets.io CRD's `secretStoreRef.kind`,
+#: whose ONLY two valid values are `SecretStore` and `ClusterSecretStore` —
+#: a backend such as Vault is configured inside one of those store objects
+#: (`spec.provider.vault: {...}`), never as a kind itself. Anything else
+#: (including an absent/unrecognized `valueFrom`) fails closed. Kept in
+#: lockstep with the closed enum in
+#: deploy/charts/saena-forge/values.schema.json.
+_PERMITTED_BACKENDS = frozenset({"SecretStore", "ClusterSecretStore"})
 
 #: The literal fail condition k3s spec §8.1 names — kept as an explicit
 #: constant (rather than "anything not in `_PERMITTED_BACKENDS`") so the

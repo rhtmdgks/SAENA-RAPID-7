@@ -111,9 +111,11 @@ eventBus:
     - redpanda-2.saena-data.svc.cluster.local:9092
   credentialsSecretRef: saena-redpanda-credentials
 
-# externalSecrets — every entry MUST resolve via a real secret backend
-# (SecretStore/ClusterSecretStore/VaultSecret), never a plaintext ConfigMap
-# (forgectl external_secrets check; k3s spec §8.1 condition 3).
+# externalSecrets — every entry's `valueFrom` MUST be a real external-secrets.io
+# `secretStoreRef.kind` (SecretStore or ClusterSecretStore — a provider such
+# as Vault is configured INSIDE one of those two objects, never a `kind`
+# value itself), never a plaintext ConfigMap (forgectl external_secrets
+# check; k3s spec §8.1 condition 3).
 externalSecrets:
   - name: saena-postgres-credentials
     source: external-secrets-operator
@@ -127,6 +129,13 @@ externalSecrets:
   - name: saena-temporal-credentials
     source: external-secrets-operator
     valueFrom: ClusterSecretStore
+
+# egressProxy — the k3s spec §6.1/§6.2 egress allowlist proxy is an
+# out-of-band dependency NOT rendered by this chart. Default off so the
+# NetworkPolicy allow rules targeting it are only emitted when the proxy
+# workload actually exists in the namespace.
+egressProxy:
+  enabled: false
 
 observability:
   openTelemetry: true

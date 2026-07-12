@@ -100,12 +100,23 @@
           "source": { "type": "string" },
           "valueFrom": {
             "type": "string",
-            "enum": ["SecretStore", "ClusterSecretStore", "VaultSecret"],
-            "description": "MUST NOT be 'ConfigMap' — plaintext ConfigMap-backed secret refs are the exact k3s spec §8.1 condition-3 fail case."
+            "enum": ["SecretStore", "ClusterSecretStore"],
+            "description": "The external-secrets.io CRD's `secretStoreRef.kind` field — its ONLY two valid values are `SecretStore` (namespaced) and `ClusterSecretStore` (cluster-scoped). A backend/provider such as Vault, AWS Secrets Manager, etc. is configured INSIDE a SecretStore/ClusterSecretStore object (the `spec.provider` field of that separate resource) — it is never itself a `kind` value here. `VaultSecret` was a critic-flagged MUST-FIX: it is not a real ESO kind and would render an ExternalSecret the actual external-secrets.io controller rejects. MUST NOT be 'ConfigMap' either — plaintext ConfigMap-backed secret refs are the exact k3s spec §8.1 condition-3 fail case."
           }
         },
         "additionalProperties": true
       }
+    },
+
+    "egressProxy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the k3s spec §6.1/§6.2 egress allowlist proxy workload exists in the namespace. The proxy is provisioned out-of-band (not rendered by this chart); NetworkPolicy allow rules targeting it are emitted only when true so the chart never ships an allow rule for a nonexistent workload."
+        }
+      },
+      "additionalProperties": true
     },
 
     "observability": {

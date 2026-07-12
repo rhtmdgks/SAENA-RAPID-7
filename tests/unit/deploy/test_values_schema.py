@@ -192,15 +192,30 @@ class TestExternalSecretsValueFromClosedEnum:
             {"name": "x", "source": "external-secrets-operator", "valueFrom": "ConfigMap"}
         )
 
-    @pytest.mark.parametrize("backend", ["SecretStore", "ClusterSecretStore", "VaultSecret"])
-    def test_permitted_backends_accepted(self, values_schema: dict[str, Any], backend: str) -> None:
+    @pytest.mark.parametrize("kind", ["SecretStore", "ClusterSecretStore"])
+    def test_permitted_secret_store_kinds_accepted(
+        self, values_schema: dict[str, Any], kind: str
+    ) -> None:
         item_schema = values_schema["properties"]["externalSecrets"]["items"]
         validator = _validator(item_schema)
-        assert validator.is_valid({"name": "x", "source": "esops", "valueFrom": backend})
+        assert validator.is_valid({"name": "x", "source": "esops", "valueFrom": kind})
 
-    def test_every_external_secret_in_values_yaml_uses_a_permitted_backend(
+    @pytest.mark.parametrize(
+        "invalid_kind", ["VaultSecret", "ConfigMap", "Secret", "AWSSecret", ""]
+    )
+    def test_non_secret_store_kinds_rejected(
+        self, values_schema: dict[str, Any], invalid_kind: str
+    ) -> None:
+        # secretStoreRef.kind's only real ESO values are SecretStore /
+        # ClusterSecretStore. VaultSecret (a provider, not a kind) was the
+        # critic MUST-FIX; ConfigMap is the k3s §8.1 condition-3 plaintext fail.
+        item_schema = values_schema["properties"]["externalSecrets"]["items"]
+        validator = _validator(item_schema)
+        assert not validator.is_valid({"name": "x", "source": "esops", "valueFrom": invalid_kind})
+
+    def test_every_external_secret_in_values_yaml_uses_a_valid_store_kind(
         self, values_data: dict[str, Any]
     ) -> None:
-        permitted = {"SecretStore", "ClusterSecretStore", "VaultSecret"}
+        valid_kinds = {"SecretStore", "ClusterSecretStore"}
         for entry in values_data["externalSecrets"]:
-            assert entry["valueFrom"] in permitted, entry
+            assert entry["valueFrom"] in valid_kinds, entry
