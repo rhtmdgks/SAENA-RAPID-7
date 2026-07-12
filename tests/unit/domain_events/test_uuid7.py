@@ -40,13 +40,37 @@ def test_generate_uuid7_many_values_all_valid() -> None:
     assert all(is_valid_uuid7(v) for v in values)
 
 
-def test_generate_uuid7_ordering_is_monotonic_within_process() -> None:
-    """Sequential generation in the same process yields a non-decreasing
-    sequence of UUIDv7 string values (lexical == chronological for this
-    layout: fixed-width, big-endian-hex-encoded timestamp+counter prefix).
+def _ts_ms_prefix(value: str) -> int:
+    """First 48 bits (12 hex chars, first two groups) -- the millisecond
+    Unix timestamp field (RFC 9562 §5.7).
+    """
+    hex_digits = value.replace("-", "")
+    return int(hex_digits[:12], 16)
+
+
+def test_generate_uuid7_timestamp_prefix_is_non_decreasing_across_process() -> None:
+    """The 48-bit millisecond timestamp field itself is always non-decreasing
+    across sequential generation, regardless of the best-effort `rand_a`
+    counter's per-millisecond reseed (module docstring: "reseeds... so
+    ordering is not observable across the [millisecond] boundary" -- that
+    reseed intentionally makes full-value lexical ordering NOT guaranteed
+    across a millisecond boundary, so this test checks the guarantee that
+    IS made: the timestamp field is chronological).
     """
     values = [generate_uuid7() for _ in range(200)]
-    assert values == sorted(values)
+    timestamps = [_ts_ms_prefix(v) for v in values]
+    assert timestamps == sorted(timestamps)
+
+
+def test_generate_uuid7_ordering_is_monotonic_within_same_millisecond() -> None:
+    """Values generated back-to-back within the same millisecond (rand_a
+    increments deterministically, no reseed) are strictly lexically ordered
+    -- the guarantee `_next_rand_a` actually provides.
+    """
+    values = [generate_uuid7() for _ in range(50)]
+    same_ms = [v for v in values if _ts_ms_prefix(v) == _ts_ms_prefix(values[0])]
+    assert len(same_ms) >= 2, "expected at least 2 values in the same millisecond to compare"
+    assert same_ms == sorted(same_ms)
 
 
 def test_generate_uuid7_values_are_unique() -> None:

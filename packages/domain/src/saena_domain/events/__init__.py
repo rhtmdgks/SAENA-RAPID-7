@@ -10,6 +10,9 @@ Public API:
     TopicMismatchError      — event_type not a declared AsyncAPI channel
     ProducerMismatchError   — producer != expected producer for event_type
     EngineNotPermittedError — payload.engine_id outside the v1 closed enum
+    EngineIdRequiredError   — payload.engine_id missing on a channel that
+                              requires it (x-saena-engine-id-required, ADR-0013
+                              observation/citation/experiment families)
     PayloadDuplicatesEnvelopeFieldError — payload re-projects tenant_id/run_id
 
 Out of scope for this module (task spec, ADR-0013 §Current decision
@@ -23,6 +26,7 @@ from __future__ import annotations
 
 from saena_domain.events._uuid7 import generate_uuid7, is_valid_uuid7
 from saena_domain.events.errors import (
+    EngineIdRequiredError,
     EngineNotPermittedError,
     EnvelopeError,
     EnvelopeValidationError,
@@ -33,6 +37,7 @@ from saena_domain.events.errors import (
 from saena_domain.events.factory import EnvelopeFactory
 
 __all__ = [
+    "EngineIdRequiredError",
     "EngineNotPermittedError",
     "EnvelopeError",
     "EnvelopeFactory",

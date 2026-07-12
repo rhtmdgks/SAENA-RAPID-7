@@ -25,7 +25,14 @@ Every builder performs, in order:
   3. Topic/producer discipline (ADR-0013 event_type == topic name 1:1):
      `event_type` must be a declared AsyncAPI channel address, and
      `producer` must match that channel's expected producer.
-  4. `engine_id` guard (ADR-0013 closed enum: `chatgpt-search` only).
+  4. `engine_id` guards: (a) presence — channels flagged
+     `x-saena-engine-id-required: true` in the AsyncAPI catalog
+     (`observation.captured.v1`, `citation.normalized.v1`,
+     `experiment.outcome.observed.v1` — ADR-0013 "observation·citation·
+     experiment 계열 이벤트 payload에 필수") reject a missing
+     `payload.engine_id` (`EngineIdRequiredError`); (b) value — any present
+     `engine_id` outside the v1 closed enum (`chatgpt-search` only) is
+     rejected (`EngineNotPermittedError`).
   5. Known-event-type payload binding: if `event_type` is one of the 6
      CONFIRMED payload-bearing events, `payload` is parsed with that event's
      generated pydantic model (no duplicate DTOs) in addition to the generic
@@ -41,10 +48,30 @@ contains zero `context_type: system` channels as of this patch unit — only
 ADR-0013's own appendix example 2 (`adapter.config.updated.v1`) document the
 SystemContext shape illustratively, but that topic has not landed in the
 catalog a producer/topic check can consult. Every builder therefore accepts
-an optional `asyncapi_path` override (test-only escape hatch, defaults to the
-real catalog) so `build_system_envelope`'s happy-path behavior can be proven
-against a small fixture catalog without asserting a not-yet-CONFIRMED topic
-into the production AsyncAPI file. See `tests/unit/domain_events/fixtures/`.
+a private, keyword-only `_asyncapi_path` override
+(`tests/unit/domain_events/fixtures/`) so `build_system_envelope`'s
+happy-path behavior can be proven against a small fixture catalog without
+asserting a not-yet-CONFIRMED topic into the production AsyncAPI file.
+**`_asyncapi_path` is test-only** — it is not part of the public builder
+contract (underscore-prefixed by convention, never documented as a normal
+call parameter, and passing a non-`None` value in production code bypasses
+the real AsyncAPI catalog's topic/producer/engine_id-required discipline
+entirely). Production callers must never pass it.
+
+Deferred-scope note (`quality.gate.passed.v1` / `quality.gate.failed.v1`):
+both event_types share one payload contract
+(`packages/contracts/json-schema/event/quality-gate-result/v1/quality-gate-result.schema.json`,
+bound via `EVENT_PAYLOAD_MODELS` to `QualityGatePassedFailedV1Payload`) that
+alone does not encode the `failures`-presence split — the AsyncAPI catalog's
+channel-layer `allOf` overlay is the sole enforcement point (R4: `passed.v1`
+forbids a `failures` key via `not: required: [failures]`, `failed.v1`
+requires `failures` with `>=1` item). This factory's
+`_check_known_payload_model` validates only the shared payload schema/model,
+not the per-channel overlay — a `quality.gate.passed.v1` envelope built here
+with a non-empty `payload.failures` list passes this factory's checks even
+though the AsyncAPI channel-layer contract would reject it. Enforcing the
+overlay split is out of scope for this patch unit (w2-02-envelope) and is
+not implemented here.
 """
 
 from __future__ import annotations
@@ -63,10 +90,11 @@ from saena_schemas.event.quality_gate_result_v1 import QualityGatePassedFailedV1
 from saena_schemas.event.repo_intaken_v1 import RepoIntakenV1Payload
 from saena_schemas.event.site_inventory_completed_v1 import SiteInventoryCompletedV1Payload
 
-from saena_domain.events._topics import load_topic_catalog
+from saena_domain.events._topics import TopicInfo, load_topic_catalog
 from saena_domain.events._uuid7 import generate_uuid7
 from saena_domain.events._validation import jsonschema_errors
 from saena_domain.events.errors import (
+    EngineIdRequiredError,
     EngineNotPermittedError,
     EnvelopeValidationError,
     PayloadDuplicatesEnvelopeFieldError,
@@ -137,20 +165,34 @@ def _check_occurred_at(occurred_at: str) -> None:
         raise ValueError(msg)
 
 
-def _check_topic_and_producer(
-    event_type: str, producer: str, *, asyncapi_path: Path | None = None
-) -> None:
-    catalog = load_topic_catalog() if asyncapi_path is None else load_topic_catalog(asyncapi_path)
+def _resolve_topic(
+    event_type: str, producer: str, *, _asyncapi_path: Path | None = None
+) -> TopicInfo:
+    """Look up `event_type` in the AsyncAPI catalog and check `producer`.
+
+    `_asyncapi_path` is a private, test-only override (see factory.py module
+    docstring "Catalog gap note") — production callers must never pass it;
+    `None` (the default) always resolves against the real, authoritative
+    catalog.
+    """
+    catalog = load_topic_catalog() if _asyncapi_path is None else load_topic_catalog(_asyncapi_path)
     info = catalog.get(event_type)
     if info is None:
         raise TopicMismatchError(event_type)
     if info.expected_producer != producer:
         raise ProducerMismatchError(event_type, producer, info.expected_producer)
+    return info
 
 
-def _check_engine_id(payload: dict[str, Any]) -> None:
+def _check_engine_id(payload: dict[str, Any], topic: TopicInfo) -> None:
+    """(a) presence — `topic.engine_id_required` channels must carry
+    `payload.engine_id`; (b) value — any present `engine_id` must be in the
+    v1 closed enum.
+    """
     engine_id = payload.get("engine_id")
     if engine_id is None:
+        if topic.engine_id_required:
+            raise EngineIdRequiredError(topic.event_type)
         return
     if engine_id not in _PERMITTED_ENGINE_IDS:
         raise EngineNotPermittedError(str(engine_id))
@@ -188,8 +230,13 @@ def _base_fields(
     trace_id: str | None,
     idempotency_key: str,
     schema_version: str,
-    asyncapi_path: Path | None = None,
 ) -> dict[str, Any]:
+    """Synthesize/validate the 7 remaining common fields. Does NOT perform
+    topic/producer resolution — callers must call `_resolve_topic` first
+    (before payload checks, so `_check_engine_id` can consult
+    `TopicInfo.engine_id_required`) and pass the already-validated
+    `event_type`/`producer` through here unchanged.
+    """
     if occurred_at is None:
         # UTC millisecond-precision Z-suffixed timestamp, matching the
         # contract's timestamp_utc pattern (fractional seconds optional).
@@ -201,7 +248,6 @@ def _base_fields(
     _check_occurred_at(occurred_at)
     _check_schema_version(schema_version)
     resolved_trace_id = _check_or_generate_trace_id(trace_id)
-    _check_topic_and_producer(event_type, producer, asyncapi_path=asyncapi_path)
 
     return {
         "event_id": generate_uuid7(),
@@ -225,6 +271,12 @@ class EnvelopeFactory:
     specific event (e.g. `patch.unit.completed.v1` fixtures in ADR-0013's
     appendix use `f"{tenant_id}:{run_id}:{patch_unit_id}"`); the factory only
     enforces that a non-empty string is present.
+
+    Every builder also accepts `_asyncapi_path` (leading underscore —
+    private, test-only; NOT part of the supported public call surface). See
+    this module's docstring "Catalog gap note": passing a non-`None` value
+    bypasses the real, authoritative AsyncAPI catalog's topic/producer/
+    engine_id-required discipline. Production callers must never pass it.
     """
 
     @staticmethod
@@ -239,11 +291,12 @@ class EnvelopeFactory:
         occurred_at: str | None = None,
         trace_id: str | None = None,
         schema_version: str = DEFAULT_SCHEMA_VERSION,
-        asyncapi_path: Path | None = None,
+        _asyncapi_path: Path | None = None,
     ) -> dict[str, Any]:
         resolved_payload = dict(payload) if payload is not None else {}
         _reject_duplicate_identifiers(resolved_payload)
-        _check_engine_id(resolved_payload)
+        topic = _resolve_topic(event_type, producer, _asyncapi_path=_asyncapi_path)
+        _check_engine_id(resolved_payload, topic)
         _check_known_payload_model(event_type, resolved_payload)
 
         envelope: dict[str, Any] = {
@@ -258,7 +311,6 @@ class EnvelopeFactory:
                 trace_id=trace_id,
                 idempotency_key=idempotency_key,
                 schema_version=schema_version,
-                asyncapi_path=asyncapi_path,
             ),
         }
         _dual_validate(envelope)
@@ -274,11 +326,12 @@ class EnvelopeFactory:
         occurred_at: str | None = None,
         trace_id: str | None = None,
         schema_version: str = DEFAULT_SCHEMA_VERSION,
-        asyncapi_path: Path | None = None,
+        _asyncapi_path: Path | None = None,
     ) -> dict[str, Any]:
         resolved_payload = dict(payload) if payload is not None else {}
         _reject_duplicate_identifiers(resolved_payload)
-        _check_engine_id(resolved_payload)
+        topic = _resolve_topic(event_type, producer, _asyncapi_path=_asyncapi_path)
+        _check_engine_id(resolved_payload, topic)
         _check_known_payload_model(event_type, resolved_payload)
 
         envelope: dict[str, Any] = {
@@ -291,7 +344,6 @@ class EnvelopeFactory:
                 trace_id=trace_id,
                 idempotency_key=idempotency_key,
                 schema_version=schema_version,
-                asyncapi_path=asyncapi_path,
             ),
         }
         _dual_validate(envelope)
@@ -312,11 +364,12 @@ class EnvelopeFactory:
         occurred_at: str | None = None,
         trace_id: str | None = None,
         schema_version: str = DEFAULT_SCHEMA_VERSION,
-        asyncapi_path: Path | None = None,
+        _asyncapi_path: Path | None = None,
     ) -> dict[str, Any]:
         resolved_payload = dict(payload) if payload is not None else {}
         _reject_duplicate_identifiers(resolved_payload)
-        _check_engine_id(resolved_payload)
+        topic = _resolve_topic(event_type, producer, _asyncapi_path=_asyncapi_path)
+        _check_engine_id(resolved_payload, topic)
         _check_known_payload_model(event_type, resolved_payload)
 
         envelope: dict[str, Any] = {
@@ -334,7 +387,6 @@ class EnvelopeFactory:
                 trace_id=trace_id,
                 idempotency_key=idempotency_key,
                 schema_version=schema_version,
-                asyncapi_path=asyncapi_path,
             ),
         }
         _dual_validate(envelope)

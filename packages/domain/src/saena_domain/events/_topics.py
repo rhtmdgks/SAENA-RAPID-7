@@ -2,7 +2,7 @@
 
 Parses `packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml` (read-only
 consumption — this patch unit's exclusive write paths do NOT include
-`packages/contracts/**`) to answer two questions without hardcoding the
+`packages/contracts/**`) to answer three questions without hardcoding the
 catalog inline:
 
 1. Is `event_type` a declared channel address? (`TopicMismatchError` if not)
@@ -10,6 +10,11 @@ catalog inline:
    each `operations.*.summary` string, which follows the fixed convention
    `"<producer-service-id> produces <event_type>."` across all 12 CONFIRMED
    channels in the v1 catalog — see asyncapi.yaml `operations:` block)
+3. Does this channel require `payload.engine_id` to be present (ADR-0013:
+   "observation·citation·experiment 계열 이벤트 **payload**에 필수")? Parsed
+   from each channel's `x-saena-engine-id-required: true` extension key —
+   present on exactly 3 CONFIRMED v1 channels: `observation.captured.v1`,
+   `citation.normalized.v1`, `experiment.outcome.observed.v1`.
 
 Only the 6 channels that also declare a concrete `payload.$ref` under
 `properties.payload` bind to a generated payload model
@@ -46,10 +51,13 @@ _PRODUCES_PATTERN = re.compile(r"^(?P<producer>\S+)\s+produces\s+(?P<event_type>
 
 @dataclass(frozen=True)
 class TopicInfo:
-    """One AsyncAPI channel: its address (== `event_type`) and producer."""
+    """One AsyncAPI channel: its address (== `event_type`), producer, and
+    whether `payload.engine_id` is required (channel `x-saena-engine-id-required`).
+    """
 
     event_type: str
     expected_producer: str
+    engine_id_required: bool = False
 
 
 class TopicCatalogError(RuntimeError):
@@ -67,8 +75,13 @@ def _parse(asyncapi_path: Path) -> dict[str, TopicInfo]:
     operations = document.get("operations", {})
 
     catalog: dict[str, TopicInfo] = {}
-    for address in channels:
-        catalog[address] = TopicInfo(event_type=address, expected_producer="")
+    for address, channel in channels.items():
+        engine_id_required = bool(channel.get("x-saena-engine-id-required", False))
+        catalog[address] = TopicInfo(
+            event_type=address,
+            expected_producer="",
+            engine_id_required=engine_id_required,
+        )
 
     for op in operations.values():
         summary = op.get("summary", "")
@@ -81,10 +94,15 @@ def _parse(asyncapi_path: Path) -> dict[str, TopicInfo]:
             raise TopicCatalogError(msg)
         event_type = match.group("event_type")
         producer = match.group("producer")
-        if event_type not in catalog:
+        existing = catalog.get(event_type)
+        if existing is None:
             msg = f"operation summary references unknown channel address {event_type!r}"
             raise TopicCatalogError(msg)
-        catalog[event_type] = TopicInfo(event_type=event_type, expected_producer=producer)
+        catalog[event_type] = TopicInfo(
+            event_type=event_type,
+            expected_producer=producer,
+            engine_id_required=existing.engine_id_required,
+        )
 
     missing_producer = [t for t, info in catalog.items() if not info.expected_producer]
     if missing_producer:

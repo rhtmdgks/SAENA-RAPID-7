@@ -4,7 +4,8 @@ Covers the task spec's required cases: happy paths x3 contexts, non-Z
 timestamp reject, bad trace_id, UUIDv7 format+ordering (see test_uuid7.py),
 topic/producer mismatch, google engine reject, payload dup tenant_id reject,
 payload schema violation reject, system-context envelope with tenant_id
-reject (structural absence).
+reject (structural absence). Plus critic SHOULD-FIX 2: engine_id
+required-presence for the 3 x-saena-engine-id-required channels.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from saena_domain.events import (
+    EngineIdRequiredError,
     EngineNotPermittedError,
     EnvelopeFactory,
     EnvelopeValidationError,
@@ -65,7 +67,7 @@ def test_build_system_envelope_happy_path() -> None:
         event_type="adapter.config.updated.v1",
         idempotency_key="adapter-config:chatgpt-search:v1.3.0",
         payload={"engine_id": "chatgpt-search", "adapter_version": "1.3.0"},
-        asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
+        _asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
     )
 
     assert envelope["context_type"] == "system"
@@ -129,7 +131,7 @@ def test_empty_payload_is_valid_minimal_value() -> None:
         producer="policy-gate",
         event_type="adapter.config.updated.v1",
         idempotency_key="adapter-config:noop",
-        asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
+        _asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
     )
     assert envelope["payload"] == {}
 
@@ -295,9 +297,116 @@ def test_chatgpt_search_engine_id_is_permitted() -> None:
         event_type="adapter.config.updated.v1",
         idempotency_key="k1",
         payload={"engine_id": "chatgpt-search"},
-        asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
+        _asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
     )
     assert envelope["payload"]["engine_id"] == "chatgpt-search"
+
+
+# --------------------------------------------------------------------------
+# engine_id required-presence (critic SHOULD-FIX 2, ADR-0013 observation/
+# citation/experiment families; x-saena-engine-id-required in the AsyncAPI
+# catalog)
+# --------------------------------------------------------------------------
+
+# (event_type, expected_producer) for the 3 CONFIRMED v1 channels carrying
+# x-saena-engine-id-required: true.
+_ENGINE_ID_REQUIRED_CHANNELS = [
+    ("observation.captured.v1", "chatgpt-observer-service"),
+    ("citation.normalized.v1", "citation-intelligence-service"),
+    ("experiment.outcome.observed.v1", "experiment-attribution-service"),
+]
+
+
+@pytest.mark.parametrize(
+    ("event_type", "producer"),
+    _ENGINE_ID_REQUIRED_CHANNELS,
+    ids=[event_type for event_type, _ in _ENGINE_ID_REQUIRED_CHANNELS],
+)
+def test_engine_id_required_channel_without_engine_id_is_rejected(
+    event_type: str, producer: str
+) -> None:
+    with pytest.raises(EngineIdRequiredError, match=event_type):
+        EnvelopeFactory.build_tenant_envelope(
+            producer=producer,
+            event_type=event_type,
+            tenant_id="acme-co",
+            run_id="run-1",
+            idempotency_key="k1",
+            payload={},
+        )
+
+
+@pytest.mark.parametrize(
+    ("event_type", "producer"),
+    _ENGINE_ID_REQUIRED_CHANNELS,
+    ids=[event_type for event_type, _ in _ENGINE_ID_REQUIRED_CHANNELS],
+)
+def test_engine_id_required_channel_with_no_payload_at_all_is_rejected(
+    event_type: str, producer: str
+) -> None:
+    """`payload=None` (factory default -> `{}`) must also trip the
+    required-presence guard, not just an explicitly empty dict.
+    """
+    with pytest.raises(EngineIdRequiredError):
+        EnvelopeFactory.build_tenant_envelope(
+            producer=producer,
+            event_type=event_type,
+            tenant_id="acme-co",
+            run_id="run-1",
+            idempotency_key="k1",
+        )
+
+
+@pytest.mark.parametrize(
+    ("event_type", "producer"),
+    _ENGINE_ID_REQUIRED_CHANNELS,
+    ids=[event_type for event_type, _ in _ENGINE_ID_REQUIRED_CHANNELS],
+)
+def test_engine_id_required_channel_with_chatgpt_search_passes(
+    event_type: str, producer: str
+) -> None:
+    envelope = EnvelopeFactory.build_tenant_envelope(
+        producer=producer,
+        event_type=event_type,
+        tenant_id="acme-co",
+        run_id="run-1",
+        idempotency_key="k1",
+        payload={"engine_id": "chatgpt-search"},
+    )
+    assert envelope["payload"]["engine_id"] == "chatgpt-search"
+    SaenaEventEnvelopeV1.model_validate(envelope)
+
+
+def test_engine_id_required_channel_with_google_engine_is_rejected_as_not_permitted() -> None:
+    """Present-but-wrong-value still raises EngineNotPermittedError (not
+    EngineIdRequiredError) even on a required-presence channel -- presence
+    and value are independent checks.
+    """
+    with pytest.raises(EngineNotPermittedError):
+        EnvelopeFactory.build_tenant_envelope(
+            producer="chatgpt-observer-service",
+            event_type="observation.captured.v1",
+            tenant_id="acme-co",
+            run_id="run-1",
+            idempotency_key="k1",
+            payload={"engine_id": "gemini"},
+        )
+
+
+def test_engine_id_not_required_on_channels_without_the_asyncapi_flag() -> None:
+    """A channel with no x-saena-engine-id-required flag must NOT raise
+    EngineIdRequiredError even with an empty payload (regression guard for
+    the required-presence check being scoped too broadly).
+    """
+    envelope = EnvelopeFactory.build_tenant_envelope(
+        producer="agent-runner-service",
+        event_type="patch.unit.completed.v1",
+        tenant_id="acme-co",
+        run_id="run-1",
+        idempotency_key="k1",
+        payload={"patch_unit_id": "p", "worktree_commit": "9f1c2e7"},
+    )
+    assert "engine_id" not in envelope["payload"]
 
 
 # --------------------------------------------------------------------------
@@ -405,7 +514,7 @@ def test_system_envelope_builder_has_no_tenant_id_parameter() -> None:
             event_type="adapter.config.updated.v1",
             idempotency_key="k1",
             tenant_id="acme-co",
-            asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
+            _asyncapi_path=_SYSTEM_CHANNEL_ASYNCAPI,
         )
 
 

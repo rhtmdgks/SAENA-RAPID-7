@@ -37,6 +37,25 @@ def test_real_catalog_every_entry_has_a_producer() -> None:
     assert all(info.expected_producer for info in catalog.values())
 
 
+def test_real_catalog_engine_id_required_flag_exactly_three_channels() -> None:
+    """ADR-0013: engine_id required for observation/citation/experiment
+    event families -- exactly 3 CONFIRMED v1 channels carry
+    x-saena-engine-id-required: true.
+    """
+    catalog = load_topic_catalog()
+    required = {event_type for event_type, info in catalog.items() if info.engine_id_required}
+    assert required == {
+        "observation.captured.v1",
+        "citation.normalized.v1",
+        "experiment.outcome.observed.v1",
+    }
+
+
+def test_real_catalog_engine_id_not_required_for_patch_unit_completed() -> None:
+    catalog = load_topic_catalog()
+    assert catalog["patch.unit.completed.v1"].engine_id_required is False
+
+
 def test_fixture_catalog_adds_system_channel() -> None:
     catalog = load_topic_catalog(_SYSTEM_CHANNEL_ASYNCAPI)
     info = catalog["adapter.config.updated.v1"]

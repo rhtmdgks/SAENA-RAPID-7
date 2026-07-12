@@ -76,6 +76,27 @@ class EngineNotPermittedError(EnvelopeError):
         )
 
 
+class EngineIdRequiredError(EnvelopeError):
+    """`payload.engine_id` is missing for a channel that requires it.
+
+    ADR-0013 §Current decision "engine_id": "observation·citation·experiment
+    계열 이벤트 **payload**에 필수." The AsyncAPI catalog marks exactly 3
+    CONFIRMED v1 channels with `x-saena-engine-id-required: true`
+    (`observation.captured.v1`, `citation.normalized.v1`,
+    `experiment.outcome.observed.v1`, see
+    `packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml`) — this is
+    the runtime-side enforcement of that requirement, distinct from
+    `EngineNotPermittedError` (present-but-wrong-value).
+    """
+
+    def __init__(self, event_type: str) -> None:
+        self.event_type = event_type
+        super().__init__(
+            f"event_type {event_type!r} requires payload.engine_id to be present "
+            "(ADR-0013 — observation/citation/experiment event families)"
+        )
+
+
 class PayloadDuplicatesEnvelopeFieldError(EnvelopeError):
     """`payload` re-projects an envelope-level identifier (ADR-0024(e)-1).
 
