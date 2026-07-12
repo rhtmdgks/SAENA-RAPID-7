@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/source-snapshot/v1/source-snapshot.schema.json",
+  "title": "SourceSnapshot",
+  "description": "Reference-only record of a customer repository/source intake snapshot. Never carries source content or file listings — customer-proprietary highest sensitivity, ref+hash only.",
+  "$comment": "compat_class: closed. Authority: approved plan §2 domain row 3 (docs/... virtual-cooking-map.md §2, §5); docs/architecture/contract-catalog.md P0 table 'SourceSnapshot' row (Owner repository-intake, Idempotency key 'repo SHA (content hash)', Sensitivity 'customer-proprietary 최고', Retention 'per-run workspace+TTL; 중앙 보존은 customer policy, hash만 ledger'). content_hash is the sole ledger anchor per contract-catalog.md:25 ('hash만 ledger') — no raw content, no file paths, no directory listing field exists anywhere in this schema by design (k3s spec §4.1 is ref-only for repository intake; paths themselves are treated as customer-proprietary, matching PatchArtifact.changed_files' 'paths only never content' constraint).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "run_id",
+    "repo_commit",
+    "content_hash",
+    "snapshot_uri",
+    "source_type",
+    "sbom_uri",
+    "secret_scan_status",
+    "captured_at"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list."
+    },
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list."
+    },
+    "repo_commit": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/git_sha",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list."
+    },
+    "content_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list, explicit $comment: idempotency key + sole ledger anchor — docs/architecture/contract-catalog.md:25 ('Idempotency key: repo SHA (content hash)') and 'hash만 ledger' retention note."
+    },
+    "snapshot_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list — 'uri 패턴 R9'. Ruling R9-5 (Security MUST-FIX, docs/... virtual-cooking-map.md §1.1): query/fragment forbidden on uri_ref to defend against presigned-token smuggling; docs/architecture/security-model.md 감사·합성 반영 hardening list."
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["git", "zip"],
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list."
+    },
+    "sbom_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list; ADR-0021 (SBOM + dependency policy) intake anchor."
+    },
+    "secret_scan_status": {
+      "type": "string",
+      "enum": ["passed", "failed"],
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list. A 'failed' value is a schema-VALID instance — this schema does not itself block anything; blocking on secret-scan failure is an Input Gate RUNTIME behavior (Algorithm §5.4 Input Gate: 'secrets scan ... 실패 시 run 격리·중단'), enforced at W2B, not at the schema layer."
+    },
+    "captured_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 3 field list."
+    }
+  }
+}

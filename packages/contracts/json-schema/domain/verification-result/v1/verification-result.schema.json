@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/verification-result/v1/verification-result.schema.json",
+  "title": "VerificationResult",
+  "description": "Result of a single quality gate evaluation for a patch unit. The only open-class contract in the domain catalog — additional properties are permitted at the root for forward-compatible gate-specific metadata (Contract Acceptance Matrix §5 'tolerant-read 후속 의무').",
+  "$comment": "compat_class: open (root additionalProperties intentionally UNSET/true — this is the only domain contract without additionalProperties:false at the root; nested items ARE closed via $ref to common/error-detail, which is itself a closed schema). Authority: approved plan §2 domain row 5 (docs/... virtual-cooking-map.md §2, §5); docs/architecture/contract-catalog.md P0 table 'VerificationResult' row (Owner quality-eval, Idempotency key 'run_id+patch_unit_id+gate_id', Retention 'audit retention (성공 선언 증거)'). Ruling R4 (docs/... virtual-cooking-map.md §1.1): 'quality.gate passed 에 failures 잔존 가능' resolved via BIDIRECTIONAL conditional below — failed MUST carry >=1 failures, passed MUST NOT carry a failures key at all. status enum deliberately excludes 'skipped' — Prompt package §8:404 'gate skip = release-reject'; a 'conditional_pass' value is likewise excluded — REVIEW-level P1 contract concept (k3s §4.3 REMEDIATION/HANDOFF_READY state machine), not a gate-level VerificationResult status in W1. gate_id is a free string, NOT an enum, because the canonical gate list lives in quality-gates.yaml (not yet authored in this unit) rather than being duplicated/frozen into this schema.",
+  "type": "object",
+  "required": [
+    "tenant_id",
+    "run_id",
+    "patch_unit_id",
+    "gate_id",
+    "status",
+    "worktree_commit",
+    "evaluated_at"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list."
+    },
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list; contract-catalog.md idempotency key component."
+    },
+    "patch_unit_id": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list; contract-catalog.md idempotency key component; corresponds to ChangePlan.patch_units[].id / PatchArtifact.patch_unit_id."
+    },
+    "gate_id": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list; contract-catalog.md idempotency key component. Deliberately NOT an enum — the canonical gate list lives in quality-gates.yaml (Contract Acceptance Matrix / harness, not authored in this w1-07 unit)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed"],
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list. No 'skipped' value — gate skip is treated as a release-reject condition (Prompt package §8:404), never a recordable VerificationResult status. No 'conditional_pass' value — that is a REVIEW-level P1 (k3s §4.3 REMEDIATION state) contract concept, out of scope for a single gate's pass/fail result."
+    },
+    "worktree_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list — same 7-40 hex short-sha convention as PatchArtifact.worktree_commit (ADR-0013 appendix short-sha examples / ADR-0023 worktree execution conventions)."
+    },
+    "evaluated_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list."
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "$ref": "../../../common/error-detail/v1/error-detail.schema.json"
+      },
+      "minItems": 1,
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list. Each item is the closed common/error-detail shape (error_code/retryable/summary only) — a 'stack_trace' or any other extra key on a failure item is rejected by error-detail's own additionalProperties:false, not by this file."
+    },
+    "report_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 5 field list — optional pointer to a full gate report artifact; uri_ref forbids query/fragment (R9-5)."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["failures"]
+      },
+      "$comment": "Ruling R4 direction 1: status=failed MUST carry failures (>=1 item, enforced by the failures property's own minItems)."
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "passed"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "not": {
+          "required": ["failures"]
+        }
+      },
+      "$comment": "Ruling R4 direction 2 (the bidirectional half): status=passed MUST NOT carry a failures key at all — closes the gap where a gate could declare success while a failures array still lingers in the payload."
+    }
+  ]
+}
