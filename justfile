@@ -19,8 +19,23 @@ lint:
 typecheck:
     uv run mypy
 
+# w2-20 (Wave 2 exit): deterministic lane only — `-m "not integration"`
+# excludes every test under tests/integration/** (auto-marked by that tree's
+# own tests/integration/conftest.py). This is the blocking recipe `verify`
+# runs: unit + contract only, no real Temporal test-server / testcontainers
+# processes, so no cross-suite process contention -> no flake (root-caused
+# and fixed w2-20; see tests/integration/conftest.py docstring and
+# docs/architecture/testing-strategy.md "Two-lane test execution").
 test:
-    uv run pytest -q --cov --cov-report=xml --cov-report=term:skip-covered
+    uv run pytest -q -m "not integration" --cov --cov-report=xml --cov-report=term:skip-covered
+
+# w2-20: the OTHER lane — real Temporal time-skipping test-server +
+# testcontainers postgres/redpanda, run serially and separately from `test`
+# above so real-external-process contention never leaks into the blocking
+# gate. NOT part of `verify` (local convenience + CI's separate serial job,
+# ADR-0018 two-lane note) — run explicitly, or in CI as its own job.
+test-integration:
+    uv run pytest -q -m integration -p no:cacheprovider
 
 # ADR-0017 coverage gates (blocking): harness core >=90, changed-lines >=90,
 # global no-decrease ratchet (committed baseline; manual ratchet-up in-PR).

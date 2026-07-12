@@ -61,16 +61,20 @@ and rejected".
 
 ## Packaging note
 
-`tools/forgectl` is **not** a `uv` workspace member (workspace-membership
-edits touch root `pyproject.toml`/`.importlinter`, both outside this patch
-unit's exclusive write paths — `tools/forgectl/**`, `tests/unit/forgectl/**`
-only). It runs as a plain importable package via `sys.path`/`python -m`
-against the already-synced shared venv (`pyyaml` + `saena-schemas` are both
-already present as root dev-group / workspace dependencies — no new
-dependency was added). `tests/unit/forgectl/conftest.py` inserts
-`tools/forgectl/src` onto `sys.path`, mirroring the existing
-`tests/unit/domain_identity` / `tests/unit/svc_engine_gateway`
-"tests/ is not a package" convention.
+`tools/forgectl` **is** a `uv` workspace member (root `pyproject.toml`
+`[tool.uv.workspace]` members, `[tool.uv.sources]`, dev-group dependency
+`saena-forgectl`; root `[tool.mypy]` files and `[tool.coverage.run]` source
+cover it; `.importlinter` `root_packages` carries `saena_forgectl` with a
+leaf/boundary contract — may import `saena_schemas`, must not be imported by
+`saena_domain` or any service). Registered by w2-20 (Wave 2 exit, Integrator
+root-config edit) — the originating patch unit (w2-19) deliberately left it
+out because doing so required root-config edits outside that unit's
+exclusive write paths (`tools/forgectl/**`, `tests/unit/forgectl/**` only).
+`tests/unit/forgectl/conftest.py` still inserts `tools/forgectl/src` onto
+`sys.path` directly (idempotent no-op now that the workspace editable
+install already puts `saena_forgectl` on `sys.path`) — left as-is by w2-20,
+mirroring the existing `tests/unit/domain_identity` /
+`tests/unit/svc_engine_gateway` "tests/ is not a package" convention.
 
 ## Source specification references
 
