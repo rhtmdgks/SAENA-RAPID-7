@@ -6,7 +6,13 @@
   "$comment": "compat_class: closed (user decision 2026-07-12, plan §1.2 item 4 'closed 승격 5건 일괄' — virtual-cooking-map.md; plan §5 acceptance matrix 'RunContext(=2파일...) | lifecycle open / experiment closed'). Authority: approved plan §1.1 R10 (RunContext split into 2 files, A안 confirmed — registry ties them back together via a shared catalog_name: 'RunContext' field, NOT authored in this schema file itself, out of scope for this unit); data-ownership.md:39 ('실험 설계 파라미터(engine, locale, observation cell) = experiment-attribution (사전등록 불변성 — 등록 시점 hash를 audit-ledger에 앵커링)'); contract-catalog.md:24 (idempotency key run_id, sensitivity customer-proprietary meta, retention 'run 후 재현성 장기; secret 참조 금지'). SECRETS REFERENCING FORBIDDEN (contract-catalog.md:24 'secret 참조 금지') — this object and its fields must never carry secret material or secret references; enforcement is a runtime Input Gate obligation, not schema-structurally provable from field shapes alone. The split JOIN KEY between this file and context/run-context-lifecycle/v1 is run_id (data-ownership.md:39).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["run_id", "engine_id", "locales", "observation_cell_ref", "registration_hash"],
+  "required": [
+    "run_id",
+    "engine_id",
+    "locales",
+    "observation_cell_ref",
+    "registration_hash"
+  ],
   "properties": {
     "run_id": {
       "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
@@ -19,15 +25,18 @@
     "locales": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 35
       },
       "minItems": 1,
-      "$comment": "data-ownership.md:39 lists 'locale' as an experiment design parameter. A concrete BCP-47 pattern constraint is DEFERRED — narrowing the item type with a pattern later is a MAJOR-version change under this catalog's pattern-change-is-breaking rule (plan §1.1 R5), and this deferral/accepted-risk is recorded here explicitly rather than silently narrowed without citation."
+      "$comment": "data-ownership.md:39 lists 'locale' as an experiment design parameter. A concrete BCP-47 pattern constraint is DEFERRED — narrowing the item type with a pattern later is a MAJOR-version change under this catalog's pattern-change-is-breaking rule (plan §1.1 R5), and this deferral/accepted-risk is recorded here explicitly rather than silently narrowed without citation. | w1-06 critic SHOULD-FIX 3: item maxLength 35 (BCP-47 practical bound) + uniqueItems.",
+      "uniqueItems": true
     },
     "observation_cell_ref": {
       "type": "string",
       "minLength": 1,
-      "$comment": "Opaque object-ref to the observation cell for this run's experiment design. The internal structure/fields of an observation cell belong to the QueryExperiment P1 contract family (docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md §4.1), out of scope here — this field is intentionally just an opaque reference string, not an inline object."
+      "$comment": "Opaque object-ref to the observation cell for this run's experiment design. The internal structure/fields of an observation cell belong to the QueryExperiment P1 contract family (docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md §4.1), out of scope here — this field is intentionally just an opaque reference string, not an inline object. | w1-06 critic SHOULD-FIX 1: query/fragment chars excluded (presigned-token smuggling defense, ADR-0024(f) analog).",
+      "pattern": "^[^?#]+$"
     },
     "registration_hash": {
       "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",

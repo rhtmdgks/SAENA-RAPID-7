@@ -30,7 +30,10 @@
     },
     "isolation_profile": {
       "type": "string",
-      "enum": ["internal-k3s", "saas-shared"],
+      "enum": [
+        "internal-k3s",
+        "saas-shared"
+      ],
       "$comment": "ADR-0014:51 — isolation profile enum, verbatim two values."
     },
     "namespace": {
@@ -48,11 +51,16 @@
         "$ref": "../../../common/engine-id/v1/engine-id.schema.json"
       },
       "minItems": 1,
-      "$comment": "ADR-0014:54 — v1 = [\"chatgpt-search\"] only, aligned with ADR-0013's closed engine_id enum and CLAUDE.md Engine scope (Google/Gemini disabled)."
+      "$comment": "ADR-0014:54 — v1 = [\"chatgpt-search\"] only, aligned with ADR-0013's closed engine_id enum and CLAUDE.md Engine scope (Google/Gemini disabled). | w1-06 critic SHOULD-FIX 2 + planner OPEN #13 Lead-approved: uniqueItems (duplicate engines meaningless; closed class — post-tag addition would be major).",
+      "uniqueItems": true
     },
     "status": {
       "type": "string",
-      "enum": ["active", "suspended", "terminating"],
+      "enum": [
+        "active",
+        "suspended",
+        "terminating"
+      ],
       "$comment": "ADR-0014:55 — lifecycle status enum verbatim. Tolerant-read worked example — see top-level $comment."
     },
     "retention_policy_ref": {
