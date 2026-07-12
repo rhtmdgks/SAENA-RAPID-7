@@ -1,0 +1,31 @@
+asyncapi: 3.0.0
+info:
+  title: SAENA events (w2-02 unit-test malformed fixture)
+  version: "1.0.0"
+  description: >-
+    Test-only fixture -- operations.*.summary references an event_type with
+    no matching channels[] address. Exercises TopicCatalogError
+    ("references unknown channel address").
+defaultContentType: application/json
+channels:
+  patch.unit.completed.v1:
+    address: patch.unit.completed.v1
+    messages:
+      patchUnitCompleted:
+        name: PatchUnitCompleted
+        title: patch.unit.completed.v1
+        summary: Patch unit completed (agent-runner-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            type: object
+
+operations:
+  sendSomethingElse:
+    action: send
+    channel:
+      $ref: "#/channels/patch.unit.completed.v1"
+    summary: agent-runner-service produces some.other.topic.v1.
+    messages:
+      - $ref: "#/channels/patch.unit.completed.v1/messages/patchUnitCompleted"
