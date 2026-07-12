@@ -71,10 +71,19 @@ class AggregatePublishSuppressedError(BusError):
     there would be the exact re-identification leak the guard exists to
     prevent.
 
-    `OutboxDrainer` marks the source outbox row published (never retried —
-    the cohort will never un-suppress itself by retrying) after raising this
-    for observability purposes only; no bytes are ever produced to any
-    topic.
+    `OutboxDrainer` constructs and logs (never publishes, never re-raises
+    past its own drain loop — see `OutboxDrainer.drain_once`'s try/except)
+    this exception as a structured, value-free suppression record: `str(exc)`
+    and `exc.context` (`event_id` + `de_identification_status` only — never
+    `cohort_size`/`privacy_threshold`/`aggregate_scope_id`/`payload`, which
+    could otherwise leak the exact cohort-size signal the guard exists to
+    protect even through a LOG line) are the only auditable trace this
+    suppression leaves (CLAUDE.md principle 11 — "증거 없는 완료 선언
+    금지" applies symmetrically to suppression outcomes: a privacy
+    suppression must be observable, just never via a channel that echoes the
+    suppressed data itself). The source outbox row is then marked published
+    (never retried — the cohort will never un-suppress itself by retrying);
+    no bytes are ever produced to any topic, DLQ included.
     """
 
     error_code = "saena.bus.aggregate_publish_suppressed"

@@ -6,8 +6,11 @@ import asyncio
 
 from bus_factories import (
     AlwaysFailsPublisher,
+    AsyncFailingDLQPublisher,
+    AsyncOutboxWrapper,
     FailNTimesPublisher,
     make_aggregate_envelope,
+    make_pending_review_aggregate_envelope,
     make_suppressed_aggregate_envelope,
     make_system_envelope,
     make_tenant_envelope,
@@ -35,6 +38,28 @@ def test_happy_drain_publishes_and_marks_published() -> None:
     assert result.retried_pending == ()
     assert publisher.published == ((envelope["event_type"], envelope),)
     assert outbox.list_pending() == ()
+
+
+def test_async_outbox_port_drains_correctly() -> None:
+    """`OutboxDrainer` must work transparently against an ASYNC-shaped
+    `OutboxPort` (`PostgresOutbox`-shaped `list_pending`/`mark_published`
+    coroutines, not `InMemoryOutbox`'s plain sync methods) — exercises
+    `_maybe_await`'s awaitable branch directly, proving it is not only
+    reachable via the real-Postgres integration suite."""
+    inner = InMemoryOutbox()
+    envelope = make_tenant_envelope()
+    inner.record(envelope)
+    outbox = AsyncOutboxWrapper(inner)
+    publisher = InMemoryPublisher()
+    drainer = OutboxDrainer(outbox, publisher)
+
+    result = asyncio.run(drainer.drain_once())
+
+    assert result.published == (envelope["event_id"],)
+    assert publisher.published == ((envelope["event_type"], envelope),)
+    # The mark_published call genuinely landed on the wrapped inner outbox —
+    # only observable if the coroutine actually ran to completion.
+    assert inner.list_pending() == ()
 
 
 def test_publish_failure_leaves_row_pending_not_marked() -> None:
@@ -140,6 +165,40 @@ def test_unknown_event_type_rejected_to_dlq() -> None:
     assert topics_published == [dlq_topic_for("no.such.channel.v1")]
 
 
+def test_dlq_outage_leaves_row_pending_and_does_not_abort_the_batch() -> None:
+    """SHOULD-FIX (w2-18 review): a DLQ publish failure for one poison
+    envelope must not abort the rest of the drain batch — every OTHER
+    envelope in `pending` is still processed within the same `drain_once`
+    call, and the poison envelope itself is left pending (retried on the
+    next drain), not silently dropped."""
+    outbox = InMemoryOutbox()
+    poison = make_tenant_envelope(idempotency_key="acme-co:run-1:poison")
+    outbox.record(poison)
+    poison_id = poison["event_id"]
+    tampered = dict(poison)
+    del tampered["trace_id"]
+    outbox._entries[poison_id] = tampered  # noqa: SLF001 — white-box test setup
+
+    healthy = make_tenant_envelope(idempotency_key="acme-co:run-1:healthy")
+    outbox.record(healthy)
+
+    publisher = AsyncFailingDLQPublisher()
+    drainer = OutboxDrainer(outbox, publisher)
+
+    result = asyncio.run(drainer.drain_once())
+
+    # The poison envelope's DLQ publish failed -> left pending, not dropped.
+    assert poison_id in result.retried_pending
+    assert poison_id not in result.dead_lettered
+    pending_ids = {e["event_id"] for e in outbox.list_pending()}
+    assert poison_id in pending_ids
+    # The healthy envelope also failed (AsyncFailingDLQPublisher fails EVERY
+    # publish call, main-topic included) but was still ATTEMPTED — proving
+    # the batch was not aborted after the poison envelope's DLQ failure.
+    assert healthy["event_id"] in result.retried_pending
+    assert len(publisher.attempts) == 2
+
+
 def test_aggregate_under_threshold_never_published() -> None:
     """A k-anonymity-suppressed aggregate envelope must NOT be published —
     not to its main topic, not to the DLQ either (privacy at the bus
@@ -157,6 +216,99 @@ def test_aggregate_under_threshold_never_published() -> None:
     assert result.dead_lettered == ()
     assert publisher.published == ()
     # Marked published so it is never retried (deterministic guard verdict).
+    assert outbox.list_pending() == ()
+
+
+def test_aggregate_pending_review_never_published() -> None:
+    """A `pending_review` aggregate envelope must NOT be published — not to
+    its main topic, not to the DLQ (same "never published anywhere" outcome
+    as under-threshold, distinct rejection reason)."""
+    outbox = InMemoryOutbox()
+    envelope = make_pending_review_aggregate_envelope()
+    outbox.record(envelope)
+    publisher = InMemoryPublisher()
+    drainer = OutboxDrainer(outbox, publisher)
+
+    result = asyncio.run(drainer.drain_once())
+
+    assert result.suppressed == (envelope["event_id"],)
+    assert result.published == ()
+    assert result.dead_lettered == ()
+    assert publisher.published == ()
+    assert outbox.list_pending() == ()
+
+
+def test_aggregate_suppressed_and_producer_mismatch_goes_nowhere() -> None:
+    """Critic MUST-FIX: an aggregate envelope that is BOTH
+    suppressed/under-threshold AND fails a structural/topic check (producer
+    mismatch here) must go NOWHERE — not the main topic, not the DLQ. The
+    privacy guard must fire FIRST, before the structural/topic check ever
+    gets a chance to route it to the DLQ with cohort_size/
+    aggregate_scope_id/payload intact."""
+    outbox = InMemoryOutbox()
+    envelope = make_suppressed_aggregate_envelope()
+    outbox.record(envelope)
+    event_id = envelope["event_id"]
+    tampered = dict(envelope)
+    tampered["producer"] = "some-other-service"
+    outbox._entries[event_id] = tampered  # noqa: SLF001 — white-box test setup
+
+    publisher = InMemoryPublisher()
+    drainer = OutboxDrainer(outbox, publisher)
+
+    result = asyncio.run(drainer.drain_once())
+
+    assert result.suppressed == (event_id,)
+    assert result.dead_lettered == ()
+    assert result.published == ()
+    # Nothing was ever published anywhere — no main topic, no DLQ.
+    assert publisher.published == ()
+    assert outbox.list_pending() == ()
+
+
+def test_aggregate_under_threshold_and_malformed_goes_nowhere() -> None:
+    """Critic MUST-FIX: an aggregate envelope that is BOTH under-threshold
+    AND structurally malformed (missing a required field) must go NOWHERE —
+    not the main topic, not the DLQ."""
+    outbox = InMemoryOutbox()
+    envelope = make_suppressed_aggregate_envelope()
+    outbox.record(envelope)
+    event_id = envelope["event_id"]
+    tampered = dict(envelope)
+    del tampered["trace_id"]
+    outbox._entries[event_id] = tampered  # noqa: SLF001 — white-box test setup
+
+    publisher = InMemoryPublisher()
+    drainer = OutboxDrainer(outbox, publisher)
+
+    result = asyncio.run(drainer.drain_once())
+
+    assert result.suppressed == (event_id,)
+    assert result.dead_lettered == ()
+    assert result.published == ()
+    assert publisher.published == ()
+    assert outbox.list_pending() == ()
+
+
+def test_aggregate_pending_review_and_malformed_goes_nowhere() -> None:
+    """Same MUST-FIX scenario, `pending_review` status instead of
+    under-threshold — still must go nowhere, not the DLQ."""
+    outbox = InMemoryOutbox()
+    envelope = make_pending_review_aggregate_envelope()
+    outbox.record(envelope)
+    event_id = envelope["event_id"]
+    tampered = dict(envelope)
+    tampered["producer"] = "some-other-service"
+    outbox._entries[event_id] = tampered  # noqa: SLF001 — white-box test setup
+
+    publisher = InMemoryPublisher()
+    drainer = OutboxDrainer(outbox, publisher)
+
+    result = asyncio.run(drainer.drain_once())
+
+    assert result.suppressed == (event_id,)
+    assert result.dead_lettered == ()
+    assert publisher.published == ()
     assert outbox.list_pending() == ()
 
 

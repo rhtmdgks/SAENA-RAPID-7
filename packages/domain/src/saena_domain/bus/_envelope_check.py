@@ -137,6 +137,24 @@ def _parse_catalog(asyncapi_path: Path) -> dict[str, TopicInfo]:
             raise TopicCatalogError(msg)
         catalog[event_type] = TopicInfo(event_type=event_type, expected_producer=producer)
 
+    # SHOULD-FIX (w2-18 review): mirror `saena_domain.events._topics._parse`'s
+    # own post-parse check — a channel declared under `channels:` with no
+    # matching `operations:` entry would otherwise silently keep its
+    # placeholder `expected_producer=""`, so `topic_producer_errors` would
+    # accept ANY `producer` value for that `event_type` (an empty string
+    # never equals a real producer string, EXCEPT the check is
+    # `info.expected_producer != producer`, which only bites for a
+    # nonempty-vs-mismatched producer — a channel silently missing its
+    # operation is a catalog authoring bug, not a runtime-discoverable
+    # producer, and must fail loudly here rather than open a topic-discipline
+    # bypass window).
+    missing_producer = [
+        event_type for event_type, info in catalog.items() if not info.expected_producer
+    ]
+    if missing_producer:
+        msg = f"channels with no matching operation (no producer derivable): {missing_producer}"
+        raise TopicCatalogError(msg)
+
     return catalog
 
 

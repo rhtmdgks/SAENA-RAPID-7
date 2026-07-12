@@ -86,6 +86,19 @@ def make_suppressed_aggregate_envelope(**overrides: Any) -> dict[str, Any]:
     return make_aggregate_envelope(**base)
 
 
+def make_pending_review_aggregate_envelope(**overrides: Any) -> dict[str, Any]:
+    """An aggregate envelope with `de_identification_status = pending_review`
+    — must fail `guard_aggregate_publish` (`NotPublishableError`), a
+    DIFFERENT rejection reason than "under threshold" but the same "never
+    published anywhere" outcome."""
+    base: dict[str, Any] = {
+        "de_identification_status": "pending_review",
+        "idempotency_key": "strategy-card:aggregate-scope-014:pending-review",
+    }
+    base.update(overrides)
+    return make_aggregate_envelope(**base)
+
+
 @dataclass
 class FailNTimesPublisher(Publisher):
     """Test double: raises `PublishFailedError` for the first `fail_count`
@@ -117,3 +130,58 @@ class AlwaysFailsPublisher:
             f"simulated permanent publish failure for topic {topic!r}",
             context={"topic": topic},
         )
+
+
+class AsyncFailingDLQPublisher:
+    """Test double: main-topic `publish` always fails (routes every envelope
+    to the DLQ path), and the DLQ publish itself ALSO fails every time —
+    used to prove a DLQ outage defers only the poison envelope currently
+    being routed, without aborting the rest of the batch."""
+
+    def __init__(self) -> None:
+        self.attempts: list[str] = []
+
+    async def publish(self, topic: str, envelope: dict[str, Any]) -> None:
+        self.attempts.append(topic)
+        raise PublishFailedError(
+            f"simulated DLQ outage for topic {topic!r}", context={"topic": topic}
+        )
+
+
+class AsyncOutboxWrapper:
+    """Wraps an `InMemoryOutbox` with `async def list_pending`/`mark_published`
+    method signatures — proves `OutboxDrainer._maybe_await`'s awaitable
+    branch actually runs against a `PostgresOutbox`-shaped (async)
+    `OutboxPort`, not just the sync `InMemoryOutbox` path every other
+    drainer test exercises."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    async def list_pending(self, tenant_id: Any = None) -> tuple[dict[str, Any], ...]:
+        return self._inner.list_pending(tenant_id)
+
+    async def mark_published(self, tenant_id: Any, event_id: str) -> None:
+        self._inner.mark_published(tenant_id, event_id)
+
+
+class FakePostgresIdempotencyStore:
+    """Minimal ASYNC-method double shaped like
+    `saena_domain.persistence.postgres.adapters.PostgresIdempotencyStore` —
+    `seen`/`mark` are `async def`, unlike `InMemoryIdempotencyStore`'s plain
+    sync methods (critic MUST-FIX, w2-18 review: `IdempotentConsumer` must
+    `_maybe_await` both calls, or every envelope is silently treated as
+    already-seen against a store shaped like this one, and `mark`'s
+    coroutine is never awaited at all).
+    """
+
+    def __init__(self) -> None:
+        self._seen: set[tuple[str, str]] = set()
+        self.mark_calls: list[tuple[str, str]] = []
+
+    async def seen(self, tenant_id: Any, idempotency_key: str) -> bool:
+        return (tenant_id.value, idempotency_key) in self._seen
+
+    async def mark(self, tenant_id: Any, idempotency_key: str) -> None:
+        self.mark_calls.append((tenant_id.value, idempotency_key))
+        self._seen.add((tenant_id.value, idempotency_key))

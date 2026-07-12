@@ -31,12 +31,32 @@ namespace key — it is never a real tenant, never appears in any tenant
 registry, and is never propagated to any tenant-scoped port beyond this
 consumer's own `IdempotencyStore` calls) so system/aggregate envelopes get
 their own consistent dedup namespace, separate from every real tenant's.
+
+Sync/async `IdempotencyStore` duality (critic MUST-FIX, w2-18 review):
+`saena_domain.persistence.ports.IdempotencyStore.seen`/`.mark` are declared
+as PLAIN (sync) methods on the Protocol, and `InMemoryIdempotencyStore`
+implements them that way — but `PostgresIdempotencyStore` (w2-13,
+`saena_domain.persistence.postgres.adapters`) implements the SAME method
+NAMES as `async def`, returning a coroutine rather than a `bool`/`None`
+directly. Calling `self._store.seen(...)` synchronously against a
+`PostgresIdempotencyStore` therefore returns a coroutine OBJECT (always
+truthy) instead of awaiting it — `process()` would treat EVERY envelope as
+already-seen and silently skip `handler` for all of them, and the
+`.mark(...)` coroutine would never be awaited at all (a real,
+reproducible `RuntimeWarning: coroutine was never awaited` plus zero
+handler invocations). `saena_domain.bus.drainer.OutboxDrainer` solved this
+exact duality for `OutboxPort` via `_maybe_await`; `IdempotentConsumer`
+reuses the identical pattern (duplicated locally, not imported from
+`drainer` — this module has no other dependency on `drainer` and keeping
+the two independent avoids an unnecessary intra-package coupling for a
+five-line helper) for BOTH `seen` and `mark` calls.
 """
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from saena_domain.identity import TenantId
 from saena_domain.persistence import IdempotencyStore
@@ -46,6 +66,37 @@ from saena_domain.persistence import IdempotencyStore
 SYSTEM_SCOPE_TENANT_ID = TenantId("saena-system-scope")
 
 Handler = Callable[[dict[str, Any]], Awaitable[None]]
+
+
+async def _maybe_await(value: Any) -> Any:
+    """Await `value` if it is a coroutine (async `IdempotencyStore` methods,
+    e.g. `PostgresIdempotencyStore`), else return it unchanged (sync
+    methods, e.g. `InMemoryIdempotencyStore`) — see module docstring
+    "Sync/async `IdempotencyStore` duality"."""
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+@runtime_checkable
+class _IdempotencyStoreLike(Protocol):
+    """Structural shape this consumer needs from an `IdempotencyStore` —
+    sync OR async method bodies, both accepted (see `_maybe_await`).
+
+    `Any` return types (not the `IdempotencyStore` Protocol's own declared
+    `bool`/`None`) are DELIBERATE — mirrors `saena_domain.bus.drainer.
+    _OutboxLike`'s identical precedent: mypy structurally checks a
+    concrete async adapter (e.g. `PostgresIdempotencyStore`) against
+    WHATEVER return type this Protocol declares, and an `async def` method
+    returns `Coroutine[..., bool]`/`Coroutine[..., None]` at the type level,
+    not a bare `bool`/`None` — pinning `_IdempotencyStoreLike.seen`/`.mark`
+    to the stricter sync-only return types would make mypy reject the very
+    async adapters this module exists to support.
+    """
+
+    def seen(self, tenant_id: TenantId, idempotency_key: str) -> Any: ...
+
+    def mark(self, tenant_id: TenantId, idempotency_key: str) -> Any: ...
 
 
 def _dedup_scope(envelope: dict[str, Any]) -> TenantId:
@@ -61,7 +112,7 @@ class IdempotentConsumer:
     `idempotency_key` — a redelivered envelope runs `handler` at most once.
     """
 
-    def __init__(self, store: IdempotencyStore) -> None:
+    def __init__(self, store: IdempotencyStore | _IdempotencyStoreLike) -> None:
         self._store = store
 
     async def process(self, envelope: dict[str, Any], handler: Handler) -> bool:
@@ -76,11 +127,12 @@ class IdempotentConsumer:
         idempotency_key = envelope["idempotency_key"]
         scope = _dedup_scope(envelope)
 
-        if self._store.seen(scope, idempotency_key):
+        already_seen = await _maybe_await(self._store.seen(scope, idempotency_key))
+        if already_seen:
             return False
 
         await handler(envelope)
-        self._store.mark(scope, idempotency_key)
+        await _maybe_await(self._store.mark(scope, idempotency_key))
         return True
 
 

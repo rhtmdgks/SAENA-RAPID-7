@@ -5,7 +5,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 
-from bus_factories import make_aggregate_envelope, make_system_envelope, make_tenant_envelope
+from bus_factories import (
+    FakePostgresIdempotencyStore,
+    make_aggregate_envelope,
+    make_system_envelope,
+    make_tenant_envelope,
+)
 from saena_domain.bus.consumer import SYSTEM_SCOPE_TENANT_ID, IdempotentConsumer
 from saena_domain.identity import TenantId
 from saena_domain.persistence import InMemoryIdempotencyStore
@@ -98,6 +103,57 @@ def test_aggregate_envelope_uses_system_scope_dedup_namespace() -> None:
     asyncio.run(consumer.process(envelope, handler))
 
     assert store.seen(SYSTEM_SCOPE_TENANT_ID, envelope["idempotency_key"]) is True
+
+
+def test_async_store_handler_runs_exactly_once_and_mark_is_awaited() -> None:
+    """Critic MUST-FIX (w2-18 review): against an ASYNC `IdempotencyStore`
+    (`PostgresIdempotencyStore`-shaped — `seen`/`mark` are coroutines, not
+    plain sync methods), the handler must actually run on first delivery
+    (not be silently skipped because an un-awaited coroutine object is
+    always truthy), and `mark` must be genuinely awaited (not left as a
+    dangling `RuntimeWarning: coroutine was never awaited`)."""
+    store = FakePostgresIdempotencyStore()
+    consumer = IdempotentConsumer(store)
+    envelope = make_tenant_envelope()
+    calls: list[dict] = []
+
+    async def handler(env: dict) -> None:
+        calls.append(env)
+
+    ran = asyncio.run(consumer.process(envelope, handler))
+
+    assert ran is True
+    assert len(calls) == 1
+    # mark() was actually awaited (not left as a dangling coroutine) — its
+    # side effect (appending to mark_calls / adding to the internal set) is
+    # only observable if the coroutine body actually ran to completion.
+    assert store.mark_calls == [(TENANT_A.value, envelope["idempotency_key"])]
+
+
+def test_async_store_redelivery_still_skips_handler() -> None:
+    """Same async-store double, second delivery of the SAME envelope: proves
+    `seen()`'s coroutine result is correctly awaited and interpreted (not
+    treated as always-truthy) BOTH on the first (not-yet-seen) and second
+    (now-seen) call."""
+    store = FakePostgresIdempotencyStore()
+    consumer = IdempotentConsumer(store)
+    envelope = make_tenant_envelope()
+    calls: list[dict] = []
+
+    async def handler(env: dict) -> None:
+        calls.append(env)
+
+    async def scenario() -> tuple[bool, bool]:
+        first = await consumer.process(envelope, handler)
+        second = await consumer.process(envelope, handler)
+        return first, second
+
+    first_ran, second_ran = asyncio.run(scenario())
+
+    assert first_ran is True
+    assert second_ran is False
+    assert len(calls) == 1
+    assert store.mark_calls == [(TENANT_A.value, envelope["idempotency_key"])]
 
 
 def test_two_different_tenants_have_independent_dedup_scopes() -> None:

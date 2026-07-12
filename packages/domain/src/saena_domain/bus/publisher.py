@@ -31,18 +31,25 @@ every `topic` argument identically (just a destination string), keeping the
 DLQ-naming policy entirely in the drainer/caller layer where ADR-0015 places
 it.
 
-Partition-key choice (documented per task spec instruction): `key =
+Partition-key choice — FLAGGED, NOT a finalized architecture decision
+(`docs/architecture/resilience.md:25`/:42 explicitly lists "partition key
+규약" as an OPEN DECISION, deferred past this patch unit — this module picks
+a reasonable default so w2-18 has SOMETHING concrete to ship and test
+against, it does not close that open decision): `key =
 envelope["idempotency_key"]` when present (every ADR-0013 v1 envelope
 carries a non-empty `idempotency_key` — the 8th common field, frozen), else
-falling back to `tenant_id` for `context_type: tenant` envelopes. This
-maximizes redelivery/ordering affinity for the SAME logical event (the
-idempotency key is unique per logical event, which is a stronger, more
-evenly-distributed partitioning key than `tenant_id` alone would be for a
-tenant with many concurrent events) while still keeping same-tenant events on
-a stable, ordered subset of partitions as a secondary benefit.
-`context_type: system`/`aggregate` envelopes have no `tenant_id` at all, so
-`idempotency_key` is their only available key — using it is not a fallback
-for those two branches, it is the ONLY structurally available choice.
+falling back to `tenant_id` for `context_type: tenant` envelopes. Rationale
+for THIS default (subject to revision when resilience.md's open decision is
+actually confirmed): the idempotency key is unique per logical event, which
+is a stronger, more evenly-distributed partitioning key than `tenant_id`
+alone would be for a tenant with many concurrent events — but it trades away
+per-tenant ORDERING (two different events for the same tenant can land on
+different partitions, so a consumer relying on same-tenant event ordering
+cannot assume it from this key choice alone). `context_type: system`/
+`aggregate` envelopes have no `tenant_id` at all, so `idempotency_key` is
+their only available key regardless of which way the open decision resolves.
+Tracked as a w2-20 follow-up item per critic review (w2-18) — do not treat
+this module's current behavior as the confirmed partition-key convention.
 """
 
 from __future__ import annotations
@@ -128,14 +135,22 @@ class RedpandaConfig:
     `AIOKafkaProducer` constructor keyword this dataclass does not name
     explicitly (e.g. `acks`, `enable_idempotence`) — kept as a plain dict
     rather than growing this dataclass's field list indefinitely.
+
+    `sasl_plain_username`/`sasl_plain_password` are `field(repr=False)`
+    (SHOULD-FIX, w2-18 review) — CLAUDE.md Constraints ("Secrets never in
+    prompts, Helm values plaintext, audit payloads") applies equally to an
+    accidental `repr()`/traceback dump of this dataclass (e.g. an unhandled
+    exception during producer construction, or a debug log statement that
+    naively `%s`-formats a `RedpandaConfig` instance) — neither field's
+    value is ever included in the generated `__repr__`/`__str__`.
     """
 
     bootstrap_servers: str | list[str]
     client_id: str | None = None
     security_protocol: str = "PLAINTEXT"
     sasl_mechanism: str | None = None
-    sasl_plain_username: str | None = None
-    sasl_plain_password: str | None = None
+    sasl_plain_username: str | None = field(default=None, repr=False)
+    sasl_plain_password: str | None = field(default=None, repr=False)
     extra_producer_kwargs: dict[str, Any] = field(default_factory=dict)
 
     def producer_kwargs(self) -> dict[str, Any]:
