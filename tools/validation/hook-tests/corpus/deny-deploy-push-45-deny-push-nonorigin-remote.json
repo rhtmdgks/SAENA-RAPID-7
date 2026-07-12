@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push myfork wave3-execution stays denied (only origin permitted)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push myfork wave3-execution"
+    }
+  },
+  "expect_exit": 2
+}

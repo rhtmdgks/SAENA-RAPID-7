@@ -1,5 +1,5 @@
 {
-  "$comment": "W0 wiring (ADR-0019, T13). Deny rules promoted from settings.example.json (17 rules, strengthening-only). Hooks = dev-repo safety layer, NOT a full security boundary — Forge Policy Gate + k8s remain authoritative. Kill switch: create .claude/hooks/DISABLED (no session restart needed). NOTE (w1-00, user-approved 2026-07-12): Bash(git merge*) deny rule removed — merge control moved to deny-deploy-push.sh precision rule (allowed ONLY on wave* branches merging unit/* sources; main/master/origin merges stay hook-denied; main lands via human PR).",
+  "$comment": "W0 wiring (ADR-0019, T13). Deny rules promoted from settings.example.json (17 rules, strengthening-only). Hooks = dev-repo safety layer, NOT a full security boundary — Forge Policy Gate + k8s remain authoritative. Kill switch: create .claude/hooks/DISABLED (no session restart needed). NOTE (w1-00, user-approved 2026-07-12): Bash(git merge*) deny rule removed — merge control moved to deny-deploy-push.sh precision rule (allowed ONLY on wave* branches merging unit/* sources; main/master/origin merges stay hook-denied; main lands via human PR). NOTE (w3-entry, user-approved 2026-07-13): Bash(git push*) / Bash(git -c*push*) deny rules removed — push control moved to deny-deploy-push.sh precision rule (allowed ONLY as 'git push [-u] origin wave<N>-<branch>' checkpoint push; force/delete/tags/refspec/non-origin/non-wave targets stay hook-denied; main lands via human PR).",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
@@ -7,8 +7,6 @@
   "permissions": {
     "defaultMode": "plan",
     "deny": [
-      "Bash(git push*)",
-      "Bash(git -c*push*)",
       "Bash(kubectl apply*)",
       "Bash(kubectl create*)",
       "Bash(kubectl patch*)",

@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push origin wave2-runtime (checkpoint push, user-approved 2026-07-13) must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push origin wave2-runtime"
+    }
+  },
+  "expect_exit": 0
+}

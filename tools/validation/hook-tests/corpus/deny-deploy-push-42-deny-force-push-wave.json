@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: force-flag push of a wave branch stays denied (no force even on wave branches)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push --force origin wave3-execution"
+    }
+  },
+  "expect_exit": 2
+}

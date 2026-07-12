@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: bare git push (implicit remote/branch) stays denied — explicit origin wave<N>-* only",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push"
+    }
+  },
+  "expect_exit": 2
+}

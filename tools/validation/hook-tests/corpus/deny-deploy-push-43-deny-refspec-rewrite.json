@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push origin wave3-execution:main stays denied (refspec rewrite to main)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push origin wave3-execution:main"
+    }
+  },
+  "expect_exit": 2
+}

@@ -99,7 +99,53 @@ printf '%s\n' "$_segments" | while IFS= read -r _seg; do
             _sub="$(printf '%s' "$_seg" | awk '{print $2}')"
             case "$_sub" in
                 push)
-                    _deny "git push is forbidden in dev-repo sessions (CLAUDE.md #10)"
+                    # Precision rule (user-approved 2026-07-13, Wave 3 entry
+                    # gate): the ONLY permitted push is a checkpoint push of a
+                    # wave integration branch to origin — exactly
+                    # `git push [-u|--set-upstream] origin wave<N>-<name>`.
+                    # Any other flag (--force/-f/--force-with-lease/--delete/
+                    # --tags/--all/--mirror/...), any refspec containing `:`,
+                    # any non-origin remote, any non-wave branch (main/master/
+                    # HEAD/tags/unit/*) stays denied. main lands via human PR
+                    # only (CLAUDE.md #10).
+                    _push_ok=1
+                    _push_remote=""
+                    _push_branch=""
+                    _push_rest="$(printf '%s' "$_seg" | awk '{$1=""; $2=""; print}')"
+                    for _push_tok in $_push_rest; do
+                        case "$_push_tok" in
+                            -u|--set-upstream)
+                                : # upstream tracking on first checkpoint push — harmless
+                                ;;
+                            -*)
+                                _push_ok=0 # every other flag: force/delete/tags/all/mirror/... fail-closed
+                                ;;
+                            *:*)
+                                _push_ok=0 # refspec rewrite (e.g. wave3-x:main)
+                                ;;
+                            *)
+                                if [ -z "$_push_remote" ]; then
+                                    _push_remote="$_push_tok"
+                                elif [ -z "$_push_branch" ]; then
+                                    _push_branch="$_push_tok"
+                                else
+                                    _push_ok=0 # extra positional args
+                                fi
+                                ;;
+                        esac
+                    done
+                    [ "$_push_remote" = "origin" ] || _push_ok=0
+                    case "$_push_branch" in
+                        wave[0-9]*-*)
+                            : # wave integration branch — permitted target
+                            ;;
+                        *)
+                            _push_ok=0
+                            ;;
+                    esac
+                    if [ "$_push_ok" -ne 1 ]; then
+                        _deny "git push is allowed ONLY as 'git push [-u] origin wave<N>-<branch>' (checkpoint push, user-approved 2026-07-13); everything else forbidden (CLAUDE.md #10)"
+                    fi
                     ;;
                 merge)
                     # Precision rule (W1, user-approved 2026-07-12): the ONLY

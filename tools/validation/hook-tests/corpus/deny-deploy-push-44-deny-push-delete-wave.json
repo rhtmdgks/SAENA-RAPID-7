@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push --delete origin wave2-runtime stays denied (remote branch deletion)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push --delete origin wave2-runtime"
+    }
+  },
+  "expect_exit": 2
+}
