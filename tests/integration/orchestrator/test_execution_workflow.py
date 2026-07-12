@@ -28,8 +28,10 @@ from collections.abc import Iterator
 import pytest
 from orchestrator_factories import (
     APPROVER_1,
+    APPROVER_2,
     CONTRACT_HASH,
     PROPOSER,
+    make_decision,
     make_signal,
 )
 from saena_domain.policy import DecisionRecord
@@ -214,6 +216,211 @@ def test_duplicate_approve_signal_after_executing_is_a_no_op(
             result = await handle.result()
             # Exactly one EXECUTING result — the duplicate signal did not
             # re-schedule a second Activity or otherwise mutate state.
+            assert result.run_state.value == "executing"
+
+    asyncio.run(_scenario())
+
+
+def test_forged_conflicting_signal_does_not_poison_seen_decisions_ledger(
+    temporal_env: WorkflowEnvironment,
+) -> None:
+    """critic MUST-FIX regression: a forged signal impersonating a REAL
+    approver's `decision_key` (same contract_hash + canonicalized
+    approver_actor_id, DIFFERENT decision value) must be refused WITHOUT
+    overwriting that approver's prior legitimate `_seen_decisions` entry.
+    Uses a high-risk (2-distinct-approver quorum) plan so the workflow stays
+    WAITING_APPROVAL after APPROVER_1's first legitimate "approved" decision
+    — this is the attack window the critic identified: a forged "rejected"
+    signal for APPROVER_1 sent into that window must not permanently poison
+    APPROVER_1's replay slot.
+    """
+
+    async def _scenario() -> None:
+        async with Worker(
+            temporal_env.client,
+            task_queue=_TASK_QUEUE,
+            workflows=[ExecutionWorkflow],
+            activities=[run_execution_activity],
+        ):
+            handle = await temporal_env.client.start_workflow(
+                ExecutionWorkflow.run,
+                ExecutionWorkflowInput(
+                    contract_hash=CONTRACT_HASH,
+                    manifest_ref="manifest://run/ledger-poisoning",
+                    proposer_actor_id=PROPOSER,
+                ),
+                id="wf-ledger-poisoning",
+                task_queue=_TASK_QUEUE,
+            )
+
+            # 1. APPROVER_1's REAL, legitimate "approved" decision (high-risk
+            # plan: quorum needs a second, distinct approver -> workflow
+            # stays WAITING_APPROVAL after this one).
+            legit_approval = make_signal(
+                approvals=(ApproverRecord(APPROVER_1, "approved"),),
+                high_risk=True,
+                incoming_decision=make_decision(
+                    approver=APPROVER_1, decision="approved", high_risk=True
+                ),
+            )
+            await handle.signal(APPROVE_SIGNAL_NAME, legit_approval)
+            await asyncio.sleep(0.2)
+            status_after_legit = await handle.query(ExecutionWorkflow.status)
+            assert status_after_legit.run_state.value == "waiting_approval"
+            # Legitimate accepted-but-quorum-pending decision: NOT refused.
+            assert status_after_legit.last_refused_reason is None
+
+            # 2. A FORGED signal impersonating APPROVER_1 with a CONFLICTING
+            # decision ("rejected") for the SAME contract_hash — same
+            # decision_key, different decision value. transition() refuses
+            # this (ConflictingDecisionError) and apply_approval_signal
+            # collapses it to REFUSED; the ledger-poisoning bug would have
+            # let this overwrite APPROVER_1's real "approved" entry anyway.
+            forged_conflicting = make_signal(
+                approvals=(ApproverRecord(APPROVER_1, "approved"),),
+                high_risk=True,
+                incoming_decision=make_decision(
+                    approver=APPROVER_1, decision="rejected", high_risk=True
+                ),
+            )
+            await handle.signal(APPROVE_SIGNAL_NAME, forged_conflicting)
+            await asyncio.sleep(0.2)
+            status_after_forged = await handle.query(ExecutionWorkflow.status)
+            assert status_after_forged.run_state.value == "waiting_approval"
+            # The forged signal WAS refused (this assertion alone does not
+            # yet prove no ledger poisoning happened — step 3 below is the
+            # load-bearing assertion for that).
+            assert status_after_forged.last_refused_reason is not None
+
+            # 3. Resubmit APPROVER_1's ORIGINAL, legitimate decision again
+            # (ordinary Temporal at-least-once redelivery of the SAME
+            # signal). Under the pre-fix bug, step 2's forged signal would
+            # have unconditionally overwritten
+            # _seen_decisions[(CONTRACT_HASH, APPROVER_1)] with the
+            # "rejected" DecisionRecord — so THIS resubmission of the real
+            # "approved" decision would then itself look like a conflicting
+            # decision against that poisoned entry and be refused
+            # (ConflictingDecisionError -> REFUSED,
+            # last_refused_reason is not None) — a PERMANENT block on
+            # APPROVER_1's real approval. The fix (only record non-REFUSED
+            # outcomes) means this resubmission is instead accepted as an
+            # idempotent replay of the ORIGINAL "approved" decision:
+            # last_refused_reason must be None again.
+            await handle.signal(APPROVE_SIGNAL_NAME, legit_approval)
+            await asyncio.sleep(0.2)
+            status_after_resubmit = await handle.query(ExecutionWorkflow.status)
+            assert status_after_resubmit.run_state.value == "waiting_approval"
+            assert status_after_resubmit.last_refused_reason is None, (
+                "APPROVER_1's legitimate decision was refused after resubmission — "
+                "the forged signal in step 2 poisoned the _seen_decisions ledger"
+            )
+
+            # 4. APPROVER_2 (distinct, legitimate) completes H-7 quorum ->
+            # EXECUTING, confirming no lasting corruption.
+            second_approval = make_signal(
+                approvals=(
+                    ApproverRecord(APPROVER_1, "approved"),
+                    ApproverRecord(APPROVER_2, "approved"),
+                ),
+                high_risk=True,
+                incoming_decision=make_decision(
+                    approver=APPROVER_2, decision="approved", high_risk=True
+                ),
+            )
+            await handle.signal(APPROVE_SIGNAL_NAME, second_approval)
+            result = await handle.result()
+            assert result.run_state.value == "executing"
+            assert result.plan_state.value == "approved"
+
+    asyncio.run(_scenario())
+
+
+def test_at_least_once_redelivery_of_legit_decision_after_refusal_is_idempotent(
+    temporal_env: WorkflowEnvironment,
+) -> None:
+    """Ordinary Temporal at-least-once redelivery of the SAME legitimate
+    decision (identical `decision_key` AND identical decision value — the
+    realistic at-least-once transport-redelivery case, as opposed to the
+    forged-conflicting-value case covered by
+    `test_forged_conflicting_signal_does_not_poison_seen_decisions_ledger`
+    above), sent again after an UNRELATED refused signal (a different
+    approver's forged self-approval) was processed in between, must still be
+    idempotent-accepted (not blocked) — isolating the property that a
+    refusal for one `decision_key` has no side effect on a DIFFERENT,
+    unrelated `decision_key`'s replay slot.
+    """
+
+    async def _scenario() -> None:
+        async with Worker(
+            temporal_env.client,
+            task_queue=_TASK_QUEUE,
+            workflows=[ExecutionWorkflow],
+            activities=[run_execution_activity],
+        ):
+            handle = await temporal_env.client.start_workflow(
+                ExecutionWorkflow.run,
+                ExecutionWorkflowInput(
+                    contract_hash=CONTRACT_HASH,
+                    manifest_ref="manifest://run/redelivery-after-refusal",
+                    proposer_actor_id=PROPOSER,
+                ),
+                id="wf-redelivery-after-refusal",
+                task_queue=_TASK_QUEUE,
+            )
+
+            legit_approval = make_signal(
+                approvals=(ApproverRecord(APPROVER_1, "approved"),),
+                high_risk=True,
+                incoming_decision=make_decision(
+                    approver=APPROVER_1, decision="approved", high_risk=True
+                ),
+            )
+            await handle.signal(APPROVE_SIGNAL_NAME, legit_approval)
+            await asyncio.sleep(0.2)
+            assert (await handle.query(ExecutionWorkflow.status)).last_refused_reason is None
+
+            # An unrelated refused signal (self-approval by the proposer —
+            # a DIFFERENT decision_key: approver_actor_id == PROPOSER, not
+            # APPROVER_1) processed in between.
+            unrelated_forged = make_signal(
+                approvals=(ApproverRecord(PROPOSER, "approved"),),
+                high_risk=True,
+                incoming_decision=make_decision(
+                    approver=PROPOSER, decision="approved", high_risk=True
+                ),
+            )
+            await handle.signal(APPROVE_SIGNAL_NAME, unrelated_forged)
+            await asyncio.sleep(0.2)
+            status_after_unrelated_forged = await handle.query(ExecutionWorkflow.status)
+            assert status_after_unrelated_forged.run_state.value == "waiting_approval"
+            assert status_after_unrelated_forged.last_refused_reason is not None
+
+            # At-least-once redelivery of APPROVER_1's ORIGINAL signal — a
+            # DIFFERENT decision_key from the unrelated refusal above, so
+            # this must still be an idempotent no-conflict accept.
+            await handle.signal(APPROVE_SIGNAL_NAME, legit_approval)
+            await asyncio.sleep(0.2)
+            status_after_redelivery = await handle.query(ExecutionWorkflow.status)
+            assert status_after_redelivery.run_state.value == "waiting_approval"
+            assert status_after_redelivery.last_refused_reason is None, (
+                "APPROVER_1's at-least-once redelivered decision was refused after an "
+                "UNRELATED approver's refusal — refusal state leaked across decision_keys"
+            )
+
+            # Quorum completion still reachable -> proves APPROVER_1's entry
+            # was never disturbed by the unrelated refusal in between.
+            second_approval = make_signal(
+                approvals=(
+                    ApproverRecord(APPROVER_1, "approved"),
+                    ApproverRecord(APPROVER_2, "approved"),
+                ),
+                high_risk=True,
+                incoming_decision=make_decision(
+                    approver=APPROVER_2, decision="approved", high_risk=True
+                ),
+            )
+            await handle.signal(APPROVE_SIGNAL_NAME, second_approval)
+            result = await handle.result()
             assert result.run_state.value == "executing"
 
     asyncio.run(_scenario())

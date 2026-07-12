@@ -14,10 +14,11 @@ from orchestrator_factories import (
     make_signal,
     make_snapshot,
 )
-from saena_domain.policy import DecisionRecord, PlanState
+from saena_domain.policy import DecisionRecord, InconsistentPlanSnapshotError, PlanState
 from saena_domain.policy.two_person import ApproverRecord
 from saena_orchestrator.errors import SignalRefusedError
 from saena_orchestrator.workflow_logic import (
+    ApprovalSignal,
     RunState,
     apply_approval_signal,
     require_valid_approval,
@@ -231,3 +232,38 @@ def test_contract_hash_constant_matches_sha256_shape() -> None:
     # the factories aligned with contract_hash's expected sha256: prefix
     # shape used throughout saena_domain.policy's own tests.
     assert CONTRACT_HASH.startswith("sha256:")
+
+
+# --- structural wiring bugs propagate, they do not collapse to REFUSED -----
+
+
+def test_inconsistent_plan_snapshot_propagates_not_refused() -> None:
+    # critic SHOULD-FIX 1: InconsistentPlanSnapshotError (exactly one of
+    # stored_plan_snapshot/plan_snapshot supplied) is a caller WIRING BUG in
+    # THIS module's own construction of the ApprovalSignal (ApprovalSignal's
+    # own field types are non-Optional PlanSnapshot — this can only happen
+    # if a caller bypasses that typing, e.g. a future refactor that
+    # accidentally omits one snapshot). It must fail LOUD (propagate), not
+    # silently collapse into an ordinary REFUSED result indistinguishable
+    # from a merely-forged signal.
+    signal = make_signal()
+    # Bypass ApprovalSignal's own (non-Optional) typing to simulate the
+    # wiring-bug construction path — frozen dataclasses still permit
+    # constructing with an explicit None via object.__setattr__ workaround,
+    # but the simplest honest way is to build a fresh instance with one
+    # snapshot field forced to None (mypy would reject this at the call
+    # site; this test intentionally exercises the runtime behavior a static
+    # type system does not fully prevent).
+    broken_signal = ApprovalSignal(
+        contract_hash=signal.contract_hash,
+        proposer_actor_id=signal.proposer_actor_id,
+        approvals=signal.approvals,
+        high_risk=signal.high_risk,
+        decided_at=signal.decided_at,
+        incoming_decision=signal.incoming_decision,
+        plan_snapshot=signal.plan_snapshot,
+        stored_plan_snapshot=None,  # type: ignore[arg-type]
+        gate_decision_ref=signal.gate_decision_ref,
+    )
+    with pytest.raises(InconsistentPlanSnapshotError):
+        apply_approval_signal(PlanState.WAITING_APPROVAL, broken_signal)

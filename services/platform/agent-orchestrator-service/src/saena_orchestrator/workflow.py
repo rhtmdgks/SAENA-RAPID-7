@@ -27,6 +27,22 @@ idempotent-replay branch and, having already reached EXECUTING, is a no-op
 are ignored outright, which is itself the single-transition guarantee at the
 workflow level, on top of `transition()`'s own idempotency at the domain
 level).
+
+`_seen_decisions` ledger-poisoning fix (critic MUST-FIX): `_handle_approve`
+records a decision into `_seen_decisions` ONLY when `apply_approval_signal`'s
+outcome is NOT `RunState.REFUSED` — never unconditionally. A REFUSED signal
+(forged, self-approval, tampered contract_hash, impersonating a real
+approver's `decision_key` with a conflicting decision value, ...) is, by
+definition, NOT authoritative over that `decision_key`'s replay slot; writing
+it into the ledger anyway would let a single forged/conflicting signal
+permanently overwrite — and thereby poison — a legitimate approver's prior
+recorded decision, so that approver's later resubmission of their ORIGINAL,
+genuine decision (including ordinary at-least-once redelivery of the exact
+same signal) would incorrectly hit `transition()`'s own
+`ConflictingDecisionError` forever (a permanent, one-signal denial-of-service
+on that approver's approval path). Only a decision that `transition()` itself
+accepted as consistent (EXECUTING, or a legitimate WAITING_APPROVAL
+quorum-pending outcome) is written to `_seen_decisions`.
 """
 
 from __future__ import annotations
@@ -55,10 +71,14 @@ class ExecutionWorkflowInput:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionWorkflowStatus:
-    """Queryable projection of the workflow's current state (for tests/ops;
-    no `@workflow.query` handler is exposed beyond what tests need directly
-    via workflow state in the time-skipping harness — kept as a plain
-    dataclass so it stays serializable and simple).
+    """Point-in-time projection of the workflow's current state. Returned by
+    `run()` on completion AND by the `status` `@workflow.query` handler
+    (below) for point-in-time observability while the workflow is still
+    WAITING_APPROVAL/RUNNING — added so a caller/test can distinguish "the
+    last-processed signal was REFUSED" from "the last-processed signal was
+    legitimately accepted but quorum-pending" without waiting for `run()` to
+    return (both leave the workflow externally RUNNING; `last_refused_reason`
+    is the only observable difference).
     """
 
     run_state: RunState
@@ -74,7 +94,18 @@ class ExecutionWorkflow:
     def __init__(self) -> None:
         self._input: ExecutionWorkflowInput | None = None
         self._run_state: RunState = RunState.WAITING_APPROVAL
-        self._plan_state: PlanState = PlanState.APPROVED  # set on run(); placeholder pre-run
+        # Placeholder pre-run() value (critic SHOULD-FIX 2): WAITING_APPROVAL,
+        # NOT APPROVED. A signal processed before run() sets the real value
+        # at line ~94 would otherwise start from PlanState.APPROVED, whose
+        # _ALLOWED_TRANSITIONS adjacency is empty — any such signal would
+        # incidentally end up REFUSED only because APPROVED has no outgoing
+        # transitions, not because the machine is deliberately closed. Using
+        # WAITING_APPROVAL here means an early signal fails closed BY
+        # CONSTRUCTION (WAITING_APPROVAL is a real, is-this-actually-the-
+        # plan's-current-state precondition each of transition()'s guards
+        # checks), not incidentally via an unrelated empty-adjacency side
+        # effect of a state that was never true.
+        self._plan_state: PlanState = PlanState.WAITING_APPROVAL
         self._last_refused_reason: str | None = None
         self._activity_result: ExecutionActivityResult | None = None
         self._activity_task: ActivityHandle[ExecutionActivityResult] | None = None
@@ -133,16 +164,38 @@ class ExecutionWorkflow:
         result = apply_approval_signal(
             self._plan_state, signal, seen_decisions=self._seen_decisions
         )
-        # Record this decision into the idempotency map exactly as
-        # transition() would expect a caller-maintained store to (mirrors
-        # saena_domain.policy.transition's own seen_decisions contract).
-        self._seen_decisions[signal.incoming_decision.decision_key] = signal.incoming_decision
         self._plan_state = result.plan_state
 
+        if result.run_state == RunState.REFUSED:
+            # critic MUST-FIX: do NOT record a REFUSED decision into
+            # _seen_decisions. A forged/self-approval/tampered signal that
+            # impersonates a legitimate approver (same decision_key,
+            # different decision value) would otherwise OVERWRITE that
+            # approver's prior legitimate entry — apply_approval_signal
+            # already refused the transition, but writing the ledger
+            # unconditionally here would permanently poison
+            # decision_key's idempotency-replay slot: the real approver's
+            # later resubmission (including ordinary Temporal
+            # at-least-once redelivery of their ORIGINAL decision) would
+            # then hit transition()'s own ConflictingDecisionError forever
+            # — a single forged signal would permanently block a
+            # legitimate approver (DoS on the approval path). Only
+            # accepted/valid decisions (EXECUTING or a legitimate
+            # WAITING_APPROVAL quorum-pending outcome) are recorded, below.
+            self._last_refused_reason = result.refused_reason
+            return
+
+        # Record this decision into the idempotency map exactly as
+        # transition() would expect a caller-maintained store to (mirrors
+        # saena_domain.policy.transition's own seen_decisions contract) —
+        # ONLY for a non-REFUSED outcome (see guard above).
+        self._seen_decisions[signal.incoming_decision.decision_key] = signal.incoming_decision
+
         if result.run_state != RunState.EXECUTING:
-            # Refused (forged/gate-denied signal) or still WAITING_APPROVAL
-            # (quorum pending) — do NOT transition. Workflow stays put
-            # (ADR-0003 "Gate 거부 시 Temporal 전이 불가").
+            # Still WAITING_APPROVAL (quorum pending) — a legitimate,
+            # accepted-but-insufficient decision. Do NOT transition; the
+            # workflow stays put (ADR-0003 "Gate 거부 시 Temporal 전이 불가"
+            # applies to REFUSED above, not to this legitimate pending case).
             self._last_refused_reason = result.refused_reason
             return
 
@@ -156,6 +209,24 @@ class ExecutionWorkflow:
             ),
             start_to_close_timeout=ACTIVITY_START_TO_CLOSE_TIMEOUT,
             heartbeat_timeout=HEARTBEAT_TIMEOUT,
+        )
+
+    @workflow.query
+    def status(self) -> ExecutionWorkflowStatus:
+        """Point-in-time status query — lets a caller (or a test, without
+        waiting for `run()` to return) observe `run_state`/`plan_state`/
+        `last_refused_reason` while the workflow is still WAITING_APPROVAL,
+        distinguishing "the last-processed signal was REFUSED" from "the
+        last-processed signal was legitimately accepted but quorum-pending"
+        (both leave the workflow RUNNING/WAITING_APPROVAL from the outside,
+        but `last_refused_reason` differs: non-None only for the REFUSED
+        case, per `_handle_approve`'s guard above).
+        """
+        return ExecutionWorkflowStatus(
+            run_state=self._run_state,
+            plan_state=self._plan_state,
+            last_refused_reason=self._last_refused_reason,
+            activity_result=self._activity_result,
         )
 
 

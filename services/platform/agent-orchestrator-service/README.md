@@ -47,7 +47,14 @@
   (ADR-0003 "Gate 거부 시 Temporal 전이 불가", proven under a REAL Temporal
   test server — see Testing below). Duplicate signal delivery after
   EXECUTING is a no-op (idempotent replay at the workflow level, on top of
-  `saena_domain.policy.transition`'s own idempotent-replay branch).
+  `saena_domain.policy.transition`'s own idempotent-replay branch). A
+  REFUSED signal is recorded into the internal `_seen_decisions` replay
+  ledger ONLY if it was accepted (never on refusal) — see "Fixes" below;
+  `_plan_state`'s pre-`run()` placeholder is `WAITING_APPROVAL`, not
+  `APPROVED`, so an out-of-order signal fails closed by construction. A
+  `status` `@workflow.query` handler exposes point-in-time
+  `ExecutionWorkflowStatus` (including `last_refused_reason`) without
+  waiting for `run()` to return.
 - `activities.py`: `run_execution_activity` — a STUB (`@activity.defn`) that
   heartbeats once and returns an accepted result. Real execution work lands
   in W3; this only proves the Activity signature + heartbeat wiring.
@@ -96,28 +103,82 @@
   REVIEW, HANDOFF_READY, FAILED, REMEDIATION are out of scope (later patch
   units / W3).
 
+## Fixes (critic review)
+
+- **MUST-FIX — `_seen_decisions` ledger poisoning (fixed):** `_handle_approve`
+  previously wrote `signal.incoming_decision` into `_seen_decisions`
+  UNCONDITIONALLY, before checking whether `apply_approval_signal` refused
+  the signal. A forged signal impersonating a real approver's
+  `decision_key` with a conflicting decision value was correctly refused
+  (no transition), but the ledger write still happened and overwrote that
+  approver's prior legitimate entry — permanently poisoning it, so the
+  approver's later resubmission of their ORIGINAL decision (including
+  ordinary Temporal at-least-once redelivery) would hit
+  `ConflictingDecisionError` forever (a one-signal permanent DoS on that
+  approver's approval path). Fixed: the ledger write now happens only when
+  `result.run_state != RunState.REFUSED`. Regression tests: (integration)
+  `test_forged_conflicting_signal_does_not_poison_seen_decisions_ledger`,
+  `test_at_least_once_redelivery_of_legit_decision_after_refusal_is_idempotent`
+  — both run against a real Temporal test server and use a `status`
+  `@workflow.query` (added for this fix) to observe `last_refused_reason`
+  precisely; verified to fail against the pre-fix code with the exact
+  predicted `ConflictingDecisionError`.
+- **SHOULD-FIX — `InconsistentPlanSnapshotError` no longer collapses to
+  REFUSED (fixed):** `apply_approval_signal`'s broad
+  `except PolicyViolationError` previously also caught
+  `InconsistentPlanSnapshotError` (a `PolicyViolationError` subclass),
+  silently turning a structural caller wiring bug (exactly one of
+  `stored_plan_snapshot`/`plan_snapshot` supplied — both-or-neither is the
+  only legal `ApprovalSignal` shape) into an ordinary REFUSED result
+  indistinguishable from a merely-forged signal. Fixed: this exception is
+  now re-raised explicitly before the broad catch, so it propagates and
+  fails loud. Regression test:
+  `tests/unit/svc_orchestrator/test_workflow_logic.py::test_inconsistent_plan_snapshot_propagates_not_refused`.
+- **SHOULD-FIX — pre-`run()` `_plan_state` placeholder (fixed):** was
+  `PlanState.APPROVED`, whose `_ALLOWED_TRANSITIONS` adjacency is empty —
+  any signal processed before `run()` sets the real value would have ended
+  up REFUSED only incidentally (APPROVED has no outgoing transitions at
+  all), not because the machine was deliberately fail-closed for a plan
+  that was never actually approved. Changed to `PlanState.WAITING_APPROVAL`
+  so an out-of-order signal fails closed by construction (a real,
+  is-this-actually-the-plan's-current-state precondition), not via an
+  unrelated side effect. Regression test:
+  `tests/unit/svc_orchestrator/test_workflow_wiring.py::test_pre_run_plan_state_placeholder_is_waiting_approval_not_approved`.
+- **SHOULD-FIX — `gate_decision_ref` opaque trust:** left as-is per critic
+  direction (ADR-0003 scope) — see the existing OPEN item above.
+
 ## Testing
 
-- `tests/unit/svc_orchestrator/` — pure `workflow_logic` core: full
+- `tests/unit/svc_orchestrator/` (36 tests) — pure `workflow_logic` core: full
   §4.3-adjacent `PlanState` transition matrix reused via
   `saena_domain.policy.transition`, signal re-validation (valid ->
   EXECUTING; forged/self-approval/contract-hash-mismatch/immutability-
   violation/gate-denied -> refused, stays WAITING_APPROVAL), idempotent
   signal replay, `guard_execution` reuse (including a monkeypatched
   defense-in-depth branch that is not reachable via `transition()`'s public
-  contract today), timeout/heartbeat constant assertions. Runs WITHOUT a
+  contract today), timeout/heartbeat constant assertions,
+  `InconsistentPlanSnapshotError` propagation (not collapsed to REFUSED),
+  and the `_plan_state` pre-`run()` placeholder value. Runs WITHOUT a
   Temporal server.
-- `tests/integration/orchestrator/` — **ran successfully against a REAL
-  embedded Temporal test-server process** via
+- `tests/integration/orchestrator/` (6 tests) — **ran successfully against a
+  REAL embedded Temporal test-server process** via
   `temporalio.testing.WorkflowEnvironment.start_time_skipping()` (not a
   mock of the Temporal client/server). Covers: a valid approval signal
   driving WAITING_APPROVAL -> EXECUTING with the Activity scheduled and
   completed; a forged self-approval signal leaving the workflow RUNNING
   (never transitioning) and a subsequent legitimate signal still able to
-  complete it; duplicate signal delivery after EXECUTING as a no-op; and
-  `TemporalSignalClient` driving the same transition over a real
-  `temporalio.client.Client`. Marked `pytest.mark.integration`
+  complete it; duplicate signal delivery after EXECUTING as a no-op; a
+  forged signal impersonating a real approver's `decision_key` with a
+  conflicting decision NOT poisoning that approver's `_seen_decisions`
+  replay slot (critic MUST-FIX regression); at-least-once redelivery of a
+  legitimate decision remaining idempotent-accepted after an unrelated
+  refusal; and `TemporalSignalClient` driving the same transition over a
+  real `temporalio.client.Client`. Marked `pytest.mark.integration`
   (registered locally in this directory's `conftest.py`); a startup probe
   with a bounded timeout skips the whole module with the captured exception
   if the test-server binary cannot be obtained/started — this did NOT occur
-  in this patch unit's own verification run.
+  in this patch unit's own verification run. The two MUST-FIX regression
+  tests were verified to actually FAIL (with the exact predicted
+  `ConflictingDecisionError`) when run against a temporarily reintroduced
+  pre-fix (unconditional-ledger-write) version of `workflow.py`, confirming
+  they are load-bearing.

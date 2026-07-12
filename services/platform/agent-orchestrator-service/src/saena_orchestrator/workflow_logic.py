@@ -30,6 +30,7 @@ from enum import StrEnum
 from saena_domain.policy import (
     DecisionRecord,
     ExecutionBlockedError,
+    InconsistentPlanSnapshotError,
     InvalidTransitionError,
     PlanSnapshot,
     PlanState,
@@ -117,8 +118,17 @@ def apply_approval_signal(
     signal handler can simply not-transition and stay in WAITING_APPROVAL
     (ADR-0003 "Gate 거부 시 Temporal 전이 불가"). It DOES let
     `saena_domain.policy` structural/programmer errors
-    (`InconsistentPlanSnapshotError`) propagate, since those indicate a
-    caller bug in this module's own wiring, not an untrusted-signal outcome.
+    (`InconsistentPlanSnapshotError`) propagate — critic MUST-FIX/SHOULD-FIX
+    review: that error means a caller supplied EXACTLY ONE of
+    stored_plan_snapshot/plan_snapshot (both-or-neither is the only legal
+    `ApprovalSignal` shape), which is a wiring bug in THIS module's own
+    construction of the signal, not an attacker-controlled outcome — it MUST
+    fail loud (propagate), not silently collapse into an ordinary REFUSED
+    result indistinguishable from a merely-forged signal. It is therefore
+    re-raised explicitly, BEFORE the broad `PolicyViolationError` catch
+    below (which would otherwise also catch it, since
+    `InconsistentPlanSnapshotError` is itself a `PolicyViolationError`
+    subclass).
     """
     try:
         outcome = transition(
@@ -133,6 +143,10 @@ def apply_approval_signal(
             stored_plan=signal.stored_plan_snapshot,
             presented_plan=signal.plan_snapshot,
         )
+    except InconsistentPlanSnapshotError:
+        # Structural wiring bug (partial snapshot pair) — fail loud, do NOT
+        # collapse into REFUSED (SHOULD-FIX 1).
+        raise
     except InvalidTransitionError as exc:
         return RunTransitionResult(
             run_state=RunState.REFUSED,
