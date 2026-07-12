@@ -91,12 +91,19 @@ two-leg check ADR-0012 mandates:
    itself (self-diff must be empty) and against synthetic before/after
    dicts.
 
-   For **signed contracts** (`additionalProperties: false`, closed —
-   ADR-0012), *any* diff at all — including a plain optional-property
-   addition — is breaking; the diff function's leg-2 output should be
-   interpreted more strictly for that contract class than for open event
-   payloads. W1 implementers: gate this distinction on the contract's
-   `registry.json` category, not on ad hoc per-call flags.
+   For **closed contracts** (`additionalProperties: false` — ADR-0012),
+   *any* diff at all — including a plain optional-property addition — is
+   breaking; the diff function's leg-2 output should be interpreted more
+   strictly for that contract class than for open event payloads. W1
+   implementers: gate this distinction on the contract's `registry.json`
+   **`compat_class`** field (`closed`/`open`/`frozen`), not on ad hoc
+   per-call flags and not on the separate `signed` boolean — `compat_class`
+   and `signed` are independent registry fields (a contract can be closed
+   without being signed). See
+   `docs/decisions/ADR-0024-w1-contract-deviations.md` §(b) for the
+   `compat_class`/`signed` vocabulary correction (ADR-0012's "signed
+   contracts (closed)" phrasing is imprecise — the two axes are recorded
+   separately in the registry).
 
    `oasdiff` is an OpenAPI-only **secondary** detector (ADR-0012) — it
    supplements, never replaces, the primary structural-diff harness for
@@ -167,12 +174,21 @@ not a loophole that makes enum widening non-breaking — ADR-0012 is
 explicit that it is not a "free pass," it is a second, independent
 safety net.
 
-W1 implementers: this obligation currently has no worked example in this
-repo (W0 shipped the envelope's `engine_id` enum as single-valued,
-`["chatgpt-search"]`, so there is no "unknown value" to construct yet
-without inventing a second engine). The first contract that ships with a
-multi-value enum in W1 must include this test as part of its
-`validate/` module — do not defer it a second time.
+W1 implementers: this obligation had no worked example as of W0 (the
+envelope's `engine_id` enum shipped single-valued, `["chatgpt-search"]`,
+so there was no "unknown value" to construct without inventing a second
+engine). **Worked-example bookkeeping (corrected, w1-03):** `TenantContext.status`
+(`active | suspended | terminating`, ADR-0014) is the **first** worked
+example of this obligation in W1 — its `validate/` module carries the
+tolerant-read fixture and consumer-stub test first. `VerificationResult.status`
+(`passed | failed`) and the envelope's `de_identification_status`
+(`k_anonymized | suppressed | pending_review`, ADR-0013 AggregateContext)
+are **subsequent instances of the same obligation**, not separate
+first-time obligations — each must carry its own tolerant-read fixture
+and stub, but the pattern itself (fixture shape, stub degrade-safely
+assertion) is established once by `TenantContext.status` and repeated,
+not reinvented, for the other two. Do not defer this obligation a second
+time for any of the three.
 
 ## What ships in W0 vs. W1
 
@@ -183,16 +199,24 @@ multi-value enum in W1 must include this test as part of its
 | `test_envelope_fixtures.py` | shipped | extended or retargeted once the authoritative schema lands |
 | `test_compat_selfdiff.py` (`structural_diff()`) | shipped, self-diff only | wired to real N-1 git-tag pairs in `compat/` |
 | `validate/`, `compat/` directories | **not created** — no content to validate yet beyond the envelope draft | created, populated per contract |
-| Root `pyproject.toml` `testpaths` wiring | **not touched** (see Constraints) | T17/T18 |
+| Root `pyproject.toml` `testpaths` wiring | root `testpaths` already includes `"tests"` (see Constraints, corrected) | T17/T18 (invocation wiring, CI job) |
 
 ## Constraints
 
 - No fake green by deleting assertions.
-- Root `pyproject.toml`'s `[tool.pytest.ini_options] testpaths = ["packages"]`
-  is out of scope for this patch unit — `tests/contract` is invoked via
-  explicit path (`uv run pytest tests/contract`) until T17/T18 wires it
-  into `testpaths`. Do not edit root `pyproject.toml` from this harness
-  work.
+- **Corrected (w1-03):** root `pyproject.toml`'s
+  `[tool.pytest.ini_options] testpaths` already reads
+  `testpaths = ["packages", "tests"]` — `"tests"` is present, so
+  `tests/contract` is already inside the default pytest discovery root
+  (running plain `uv run pytest` picks it up; explicit-path invocation
+  `uv run pytest tests/contract` continues to work identically). This
+  supersedes the earlier "not touched, out of scope, `["packages"]` only"
+  claim in this file, which was stale at the time it was written. T17/T18
+  remain the owners of any further CI-job-level wiring (e.g. splitting
+  contract tests into their own job) — this correction only fixes the
+  factual description of the current `testpaths` value, it does not
+  change `pyproject.toml` itself. Do not edit root `pyproject.toml` from
+  this harness work.
 - `fixtures/envelope/draft-envelope.schema.json` is a harness bootstrap
   artifact, not a contract. It must never be imported/referenced by
   service code — only by this directory's tests.
