@@ -1,20 +1,39 @@
-"""CODEGEN_LOSSLESS gate tests (Lead verdict, 2026-07-12 — BINDING mechanism A).
+"""CODEGEN_LOSSLESS gate tests (Lead verdict, 2026-07-12 — BINDING mechanism A;
+critic rework 2026-07-12: M1/M2/M3/S1/S4/N6 — see justfile `codegen` recipe
+comment and tools/validation/codegen-patch-openroot.py docstring for the
+mechanism A extension this file also exercises).
 
 For every OPEN-class generated root model: build a schema-valid instance,
-inject nested + top-level unknown fields, round-trip it through
-`model_validate` -> `model_dump(mode="json", by_alias=True, exclude_none=True)`,
-and assert the original data is a recursive subset of the dump (lossless —
-unknown fields survive the round-trip because the root carries
-`extra='allow'`).
+inject nested + top-level unknown fields (including a NEW key inserted inside
+an already-schema-valid nested dict value, not just appended structure —
+critic N6), round-trip it through `model_validate` ->
+`model_dump(mode="json", by_alias=True, exclude_none=True)`, and assert the
+original data is a recursive subset of the dump (lossless — unknown fields
+survive the round-trip because the root carries `extra='allow'`).
 
 For every CLOSED-class generated root model: build a schema-valid instance,
 add an unrecognized top-level field, and assert `model_validate` raises
 `pydantic.ValidationError` (sealed — `extra='forbid'`).
 
-Plus an envelope parity smoke test: the 3 valid envelope fixtures parse
-through the generated union root model, and the `engine-id-google.json`
-invalid fixture is rejected somewhere in the validation chain (the closed
-`payload.engine_id` enum).
+Plus envelope-specific tests:
+  - parity smoke: the 3 valid envelope fixtures parse through the generated
+    union root model, and the `engine-id-google.json` invalid fixture is
+    rejected somewhere in the validation chain (the closed
+    `payload.engine_id` enum).
+  - payload losslessness (critic M3 — mechanism A extension, not a waiver):
+    the envelope ROOT/branches stay sealed (`extra='forbid'`,
+    `unevaluatedProperties: false`), but the nested `payload` sub-object is
+    open by schema design (no `additionalProperties` key at all on
+    commonFields.payload) and must not silently drop unknown payload fields
+    on dump. Exercised against all 3 valid ADR-0013 fixtures, whose
+    payloads already carry non-schema-declared fields
+    (patch_unit_id/worktree_commit/quality_gate_status,
+    adapter_version/changed_fields, strategy_card_id/intervention_category).
+  - 3-branch sealing regression (critic S4): confirms patching the nested
+    Payload class with extra='allow' did NOT weaken the root/branch-level
+    `unevaluatedProperties: false` sealing — system-with-run-id.json and
+    aggregate-with-tenant-id.json (forbidden identifier leaked across
+    context_type branches) must still raise ValidationError.
 
 Instance construction is schema-driven (walks each original JSON Schema's
 own `required`/`properties`/`pattern`/`enum`/`$ref`/`anyOf`/`oneOf`), not
@@ -47,6 +66,19 @@ ENVELOPE_FIXTURES_DIR = REPO_ROOT / "tests" / "contract" / "fixtures" / "envelop
 # OPEN-class contract set — MUST stay in lockstep with the `codegen` justfile
 # recipe's OPEN_CONTRACTS list (same $comment applies: hardcoded until
 # packages/contracts/registry.json carries compat_class per contract, w1-15).
+#
+# This dict only lists contracts that PHYSICALLY EXIST under
+# packages/contracts/json-schema in THIS worktree (w1-12) and are therefore
+# testable here. The justfile recipe's OPEN_CONTRACTS list additionally names
+# all 6 event/* payload contracts (patch-unit-completed, quality-gate-result,
+# plan-contract-proposed, plan-contract-approved, repo-intaken,
+# site-inventory-completed) — none of them exist in this worktree as of
+# 2026-07-12 (w1-08 has not merged yet); the codegen recipe is glob-driven so
+# they auto-join on the next `just codegen` once landed, but they cannot be
+# exercised by THIS test file until then. Do not add them here until they are
+# actually present — `test_open_and_closed_lists_cover_all_generated_object_root_contracts`
+# below only checks lockstep against what was actually generated, not the
+# justfile's full (future-inclusive) list.
 OPEN_CONTRACTS: dict[str, str] = {
     "context/workspace_context_v1": "context/workspace-context/v1",
     "context/project_context_v1": "context/project-context/v1",
@@ -291,6 +323,13 @@ def test_open_root_is_lossless_for_unknown_fields(contract_dir: str) -> None:
     with_unknown = dict(instance)
     with_unknown["__unknown_top_level_field"] = {"nested": {"deeply": ["unknown", "values", 1]}}
     with_unknown["__another_unknown"] = "plain-string-value"
+    # critic N6: also inject a NEW key into an object value that already
+    # exists in the payload (not just append fresh structure alongside it) —
+    # proves the round-trip preserves an unknown key introduced inside an
+    # already-nested dict, one level deeper than the dict's own creation.
+    with_unknown["__unknown_top_level_field"]["nested"]["__injected_inside_existing_dict"] = {
+        "even_deeper": "value"
+    }
 
     model_cls = _import_root_model(contract_dir)
     model_config = getattr(model_cls, "model_config", {})
@@ -364,6 +403,69 @@ def test_envelope_engine_id_google_fixture_rejected() -> None:
     from saena_schemas.envelope.event_envelope_v1 import SaenaEventEnvelopeV1
 
     data = _load_fixture(ENVELOPE_FIXTURES_DIR / "invalid" / "engine-id-google.json")
+    with pytest.raises(ValidationError):
+        SaenaEventEnvelopeV1.model_validate(data)
+
+
+# ---------------------------------------------------------------------------
+# Envelope payload losslessness (critic M3 — mechanism A extension, NOT a
+# waiver): the envelope root/branches stay sealed, but `payload` is open by
+# schema design (commonFields.payload has no additionalProperties key) and
+# must not silently drop fields on model_dump. All 3 valid ADR-0013 fixtures
+# already carry payload fields the envelope schema does not itself declare
+# (only payload.engine_id is declared; everything else in each fixture's
+# payload is exactly the kind of unknown-to-the-schema-but-valid-by-design
+# field this test proves survives the round-trip.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    [
+        "tenant-patch-unit-completed-v1.json",
+        "system-adapter-config-updated-v1.json",
+        "aggregate-strategy-card-eligible-v1.json",
+    ],
+)
+def test_envelope_payload_is_lossless(fixture_name: str) -> None:
+    from saena_schemas.envelope.event_envelope_v1 import SaenaEventEnvelopeV1
+
+    data = _load_fixture(ENVELOPE_FIXTURES_DIR / "valid" / fixture_name)
+    assert set(data["payload"]) - {"engine_id"}, (
+        f"{fixture_name}: fixture payload has no fields beyond the schema-declared "
+        f"engine_id — this test needs a payload with at least one field the "
+        f"envelope schema does not itself declare to prove losslessness"
+    )
+
+    parsed = SaenaEventEnvelopeV1.model_validate(data)
+    dumped = parsed.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    assert _recursive_subset(data["payload"], dumped["payload"]), (
+        f"{fixture_name}: payload round-trip lost data — the nested Payload "
+        f"model must carry extra='allow' (critic M3) for this to pass.\n"
+        f"input payload={data['payload']!r}\ndumped payload={dumped['payload']!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 3-branch sealing regression (critic S4): patching the nested Payload class
+# with extra='allow' must NOT weaken the root/branch-level
+# unevaluatedProperties:false sealing. A forbidden identifier leaked across
+# context_type branches (system carrying run_id; aggregate carrying
+# tenant_id) must still be rejected.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    ["system-with-run-id.json", "aggregate-with-tenant-id.json"],
+)
+def test_envelope_branch_sealing_still_rejects_forbidden_identifiers(
+    fixture_name: str,
+) -> None:
+    from saena_schemas.envelope.event_envelope_v1 import SaenaEventEnvelopeV1
+
+    data = _load_fixture(ENVELOPE_FIXTURES_DIR / "invalid" / fixture_name)
     with pytest.raises(ValidationError):
         SaenaEventEnvelopeV1.model_validate(data)
 

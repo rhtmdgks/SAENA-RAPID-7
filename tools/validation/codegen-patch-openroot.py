@@ -40,6 +40,29 @@ the script exits 1 rather than silently leaving an unsealed closed contract —
 a poisoned or misconfigured codegen run must fail loudly, not degrade contract
 sealing.
 
+Mechanism A extension — nested open sub-objects (Lead ruling, 2026-07-12,
+critic M3): the open/closed classification above only reaches a contract's
+ROOT model. But a contract can be FROZEN/CLOSED at its own root while still
+declaring a genuinely open nested sub-object inside it (no `additionalProperties`
+key at all on that nested schema node) — event-envelope's `payload` is exactly
+this: the envelope root (and its 3 oneOf branches) are sealed
+(`unevaluatedProperties: false`, ADR-0013), but `commonFields.payload` itself
+carries no `additionalProperties` constraint at all, i.e. it is open by
+design (arbitrary per-event-type payload fields). datamodel-code-generator
+does not infer `extra='allow'` for a nested object the way it does for an
+explicit `additionalProperties: true` root, so without this extension such a
+nested-open object would silently default to pydantic's `extra='ignore'` and
+DROP unknown fields on `model_dump` — a real losslessness gap, not a waiver:
+the schema's own openness signal must survive codegen at every level it
+appears, not just at the root. `--nested-allow CONTRACT_DIR:ClassName` (module
+path relative to package_dir, exact generated class name) opts a specific
+nested class into the same `extra='allow'` insertion used for open roots.
+This is NOT root-field-matching (a nested class's fields are not compared
+against any schema's top-level `properties`) — it targets an exact class name
+inside an already-discovered contract module, coexists with the root
+tripwire logic (which is untouched), and is idempotent by the same
+has-model-config check.
+
 Idempotent: re-running against an already-patched tree is a no-op (byte-for-byte
 identical output) because the insertion is a no-op when `model_config` is
 already present with `extra='allow'`.
@@ -138,6 +161,51 @@ def _find_root_model_by_fields(
         module_path=module_path,
         class_name=root.name,
         class_lineno=root.lineno,
+        has_model_config=has_model_config,
+        model_config_extra_value=extra_value,
+    )
+
+
+def _find_model_config_by_class_name(module_path: Path, class_name: str) -> RootModelInfo | None:
+    """Same model_config inspection as `_find_root_model_by_fields`, but for a
+    nested (non-root) class identified by its exact generated name rather
+    than a root-field match. Used for --nested-allow (mechanism A extension,
+    critic M3 — nested open sub-objects, e.g. event-envelope's Payload).
+    """
+    source = module_path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(module_path))
+
+    matches = [
+        node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == class_name
+    ]
+    if not matches:
+        return None
+    if len(matches) > 1:
+        raise TripwireError(
+            f"{module_path}: {len(matches)} classes named {class_name!r} — "
+            f"ambiguous --nested-allow target"
+        )
+    node = matches[0]
+
+    has_model_config = False
+    extra_value: str | None = None
+    for stmt in node.body:
+        assign_stmt: ast.Assign | ast.AnnAssign | None = None
+        target_names: list[str] = []
+        if isinstance(stmt, ast.Assign):
+            assign_stmt = stmt
+            target_names = [t.id for t in stmt.targets if isinstance(t, ast.Name)]
+        elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+            assign_stmt = stmt
+            target_names = [stmt.target.id]
+        if assign_stmt is not None and "model_config" in target_names:
+            has_model_config = True
+            extra_value = _extract_extra_value(assign_stmt)
+
+    return RootModelInfo(
+        module_path=module_path,
+        class_name=node.name,
+        class_lineno=node.lineno,
         has_model_config=has_model_config,
         model_config_extra_value=extra_value,
     )
@@ -295,6 +363,60 @@ def patch_open_roots(
     return changed
 
 
+def patch_nested_allow(
+    package_dir: Path,
+    nested_allow: list[tuple[str, str]],
+) -> list[str]:
+    """Insert extra='allow' into named nested classes (critic M3 — mechanism A
+    extension for open sub-objects that aren't a contract's own root).
+
+    `nested_allow` entries are `(contract_dir, class_name)` pairs, e.g.
+    `("envelope/event_envelope_v1", "Payload")`.
+
+    Returns the list of module paths (relative to package_dir) that were
+    actually modified (empty on an idempotent re-run).
+    """
+    changed: list[str] = []
+    for contract_dir, class_name in nested_allow:
+        module_path = package_dir / contract_dir / "__init__.py"
+        if not module_path.is_file():
+            print(
+                f"codegen-patch-openroot: note — --nested-allow target "
+                f"{contract_dir}:{class_name} not found (module not generated "
+                f"in this worktree)",
+                file=sys.stderr,
+            )
+            continue
+
+        info = _find_model_config_by_class_name(module_path, class_name)
+        if info is None:
+            raise TripwireError(
+                f"{contract_dir}: --nested-allow class {class_name!r} not found "
+                f"in generated module {module_path} — codegen output does not "
+                f"match the expected nested class name"
+            )
+
+        if info.has_model_config and info.model_config_extra_value == "allow":
+            continue  # already patched — idempotent
+        if info.has_model_config:
+            raise TripwireError(
+                f"{contract_dir}: --nested-allow class {class_name!r} has an "
+                f"unexpected model_config (extra={info.model_config_extra_value!r}), "
+                f"refusing to override — investigate before re-running"
+            )
+        _insert_extra_allow(info)
+        changed.append(str(module_path.relative_to(package_dir)) + f"::{class_name}")
+
+    return changed
+
+
+def _parse_nested_allow_arg(raw: str) -> tuple[str, str]:
+    contract_dir, sep, class_name = raw.partition(":")
+    if not sep:
+        raise ValueError(f"--nested-allow value must be CONTRACT_DIR:ClassName, got {raw!r}")
+    return contract_dir, class_name
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -317,6 +439,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Open-class contract module path, relative to package_dir "
         "(repeatable, e.g. --open context/workspace_context_v1)",
     )
+    parser.add_argument(
+        "--nested-allow",
+        dest="nested_allow_raw",
+        action="append",
+        default=[],
+        metavar="CATEGORY/NAME_vN:ClassName",
+        help="Nested open sub-object to patch with extra='allow' (mechanism A "
+        "extension, critic M3 — e.g. envelope root/branches stay sealed but a "
+        "nested payload-shaped object is open by schema design). Repeatable, "
+        "e.g. --nested-allow envelope/event_envelope_v1:Payload",
+    )
     args = parser.parse_args(argv)
 
     package_dir: Path = args.package_dir
@@ -327,7 +460,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"--contracts-root does not exist or is not a directory: {contracts_root}")
 
     try:
+        nested_allow = [_parse_nested_allow_arg(raw) for raw in args.nested_allow_raw]
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    try:
         changed = patch_open_roots(package_dir, contracts_root, args.open_contract_dirs)
+        changed += patch_nested_allow(package_dir, nested_allow)
     except TripwireError as exc:
         print(f"codegen-patch-openroot: TRIPWIRE — {exc}", file=sys.stderr)
         return 1

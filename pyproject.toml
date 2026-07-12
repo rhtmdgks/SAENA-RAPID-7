@@ -70,4 +70,9 @@ addopts = "-ra"
 [tool.coverage.run]
 source = ["packages"]
 # Exclusions must be explicit per ADR-0017 — no implicit patterns.
-omit = []
+# packages/schemas/saena_schemas/* is 100% codegen output (ADR-0011 SSOT
+# split; packages/schemas/README.md) — coverage over generated pydantic
+# models measures datamodel-code-generator's output shape, not this repo's
+# own logic, so it is explicitly omitted here (critic S2, approved plan §2
+# codegen-output-coverage-exclusion obligation).
+omit = ["packages/schemas/saena_schemas/*"]

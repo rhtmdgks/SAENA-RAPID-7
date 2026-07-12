@@ -121,6 +121,9 @@ class TraceId(RootModel[str]):
 
 
 class Payload(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+    )
     engine_id: Annotated[
         engine_id_1.Schema | None,
         Field(
