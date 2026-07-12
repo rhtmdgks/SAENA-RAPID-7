@@ -1,0 +1,4 @@
+{
+  "value": "gemini",
+  "_expected_violation": "engine_id enum v1 = [\"chatgpt-search\"] only (ADR-0013:58, CLAUDE.md Engine scope — Google/Gemini disabled/forbidden)."
+}

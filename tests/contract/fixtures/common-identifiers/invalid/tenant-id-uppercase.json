@@ -1,0 +1,5 @@
+{
+  "_defs_pointer": "tenant_id",
+  "value": "ACME-CORP",
+  "_expected_violation": "tenant_id pattern requires lowercase alphanumeric+hyphen slug (ADR-0014); uppercase characters are rejected."
+}

@@ -1,0 +1,17 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0003",
+  "patch_unit_id": "PU-03",
+  "worktree_commit": "cccfff2",
+  "base_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "artifact_uri": "s3://saena-artifacts/run-0003/PU-03.diff",
+  "artifact_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "manifest_uri": "s3://saena-artifacts/run-0003/PU-03.manifest.json",
+  "changed_files": ["apps/web/docs/new-page.md"],
+  "quality_gate_ids": ["gate-lint"],
+  "evidence_ids": [],
+  "contract_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "rollback_ref": "git-revert:PU-03",
+  "created_at": "2026-07-12T15:00:00Z",
+  "_expected_violation": "evidence_ids requires minItems 1 (Algorithm §5.3 Proof-Carrying Change Set hunk<->evidence linkage); an empty array violates that constraint."
+}

@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0005",
+  "engine_id": "chatgpt-search",
+  "locales": ["en-US"],
+  "observation_cell_ref": "cell-0005?token=example-not-real",
+  "registration_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "_expected_violation": "observation_cell_ref pattern excludes query/fragment characters ('?','#' -- w1-06 critic SHOULD-FIX 1, presigned-token smuggling defense); the '?' character is rejected."
+}

@@ -1,0 +1,13 @@
+{
+  "contract_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tenant_id": "acme-corp",
+  "run_id": "run-0003",
+  "approver_actor_id": "actor-approver-0004",
+  "decision": "approved",
+  "patch_unit_decisions": [
+    {"patch_unit_id": "PU-01", "decision": "approved"}
+  ],
+  "signature_algorithm": "ed25519",
+  "decided_at": "2026-07-12T12:00:00Z",
+  "_expected_violation": "signature is required; this instance omits it."
+}

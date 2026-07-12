@@ -1,0 +1,4 @@
+{
+  "repo_commit": "dddddddddddddddddddddddddddddddddddddddd",
+  "_expected_violation": "content_hash is required ('hash만 ledger' sole anchor); this instance omits it."
+}

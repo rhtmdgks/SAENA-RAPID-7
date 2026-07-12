@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0002",
+  "engine_id": "gemini",
+  "locales": ["en-US"],
+  "observation_cell_ref": "cell-0002",
+  "registration_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "_expected_violation": "engine_id enum v1 = ['chatgpt-search'] only (ADR-0013:58, CLAUDE.md Engine scope); 'gemini' is rejected."
+}

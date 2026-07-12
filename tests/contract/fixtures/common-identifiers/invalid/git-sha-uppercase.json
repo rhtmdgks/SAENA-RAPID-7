@@ -1,0 +1,5 @@
+{
+  "_defs_pointer": "git_sha",
+  "value": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+  "_expected_violation": "git_sha pattern requires lowercase 40-hex only; uppercase hex characters are rejected."
+}

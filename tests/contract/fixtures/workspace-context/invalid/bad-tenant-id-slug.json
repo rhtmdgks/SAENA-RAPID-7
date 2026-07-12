@@ -1,0 +1,5 @@
+{
+  "workspace_id": "workspace-0003",
+  "tenant_id": "Not A Slug!",
+  "_expected_violation": "tenant_id must match the ADR-0014 slug pattern (common/identifiers $defs.tenant_id); this value contains uppercase, spaces, and punctuation."
+}

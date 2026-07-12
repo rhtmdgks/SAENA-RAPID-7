@@ -1,0 +1,14 @@
+{
+  "contract_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tenant_id": "acme-corp",
+  "run_id": "run-0007",
+  "approver_actor_id": "actor-approver-0008",
+  "decision": "approved",
+  "patch_unit_decisions": [
+    {"patch_unit_id": "PU-01", "decision": "approved", "reviewer_notes": "looks fine"}
+  ],
+  "signature": "opaque-signature-value-0007",
+  "signature_algorithm": "ed25519",
+  "decided_at": "2026-07-12T16:00:00Z",
+  "_expected_violation": "patch_unit_decisions[] items are closed (additionalProperties:false); reviewer_notes is not a declared property and is rejected."
+}

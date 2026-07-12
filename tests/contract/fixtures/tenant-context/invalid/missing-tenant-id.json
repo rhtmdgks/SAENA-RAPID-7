@@ -1,0 +1,12 @@
+{
+  "display_name": "Acme Corp",
+  "isolation_profile": "internal-k3s",
+  "namespace": "saena-tenant-acme-corp",
+  "policy_version": "1.0.0",
+  "engine_scope": ["chatgpt-search"],
+  "status": "active",
+  "retention_policy_ref": "retention-policy-default",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z",
+  "_expected_violation": "tenant_id is required (ADR-0014:49); this instance omits it."
+}

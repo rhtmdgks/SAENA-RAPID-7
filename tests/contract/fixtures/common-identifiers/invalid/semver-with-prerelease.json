@@ -1,0 +1,5 @@
+{
+  "_defs_pointer": "semver",
+  "value": "1.0.0-rc.1",
+  "_expected_violation": "semver $def is full-core MAJOR.MINOR.PATCH only (ADR-0013 rev.2 prerelease exclusion); -rc.1 prerelease suffix is rejected."
+}

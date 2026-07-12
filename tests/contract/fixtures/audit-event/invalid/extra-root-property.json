@@ -1,0 +1,11 @@
+{
+  "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prev_event_hash": null,
+  "action": "system.health.check.v1",
+  "recorded_at": "2026-07-12T17:00:00Z",
+  "scope": "system",
+  "trace_id": "11111111111111111111111111111111",
+  "payload": {},
+  "severity": "info",
+  "_expected_violation": "AuditEvent is closed at the envelope level (additionalProperties:false); severity is not a declared root property and is rejected -- only the payload sub-object is intentionally open."
+}

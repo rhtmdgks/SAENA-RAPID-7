@@ -1,0 +1,7 @@
+{
+  "run_id": "run-0005",
+  "tenant_id": "acme-corp",
+  "state": "PLAN_DRAFT",
+  "base_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "_expected_violation": "human_approval_required is required (k3s spec §4.3 WAITING_APPROVAL transition gate); this instance omits it."
+}

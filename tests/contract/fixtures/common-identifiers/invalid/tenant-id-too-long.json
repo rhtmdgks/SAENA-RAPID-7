@@ -1,0 +1,5 @@
+{
+  "_defs_pointer": "tenant_id",
+  "value": "a234567890123456789012345678901234567890",
+  "_expected_violation": "tenant_id pattern caps total slug length (max 32 chars, ADR-0014); this value exceeds the pattern's length bound."
+}

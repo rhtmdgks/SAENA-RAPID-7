@@ -1,0 +1,12 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0004",
+  "repo_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "snapshot_uri": "s3://saena-snapshots/run-0004/snapshot.tar.gz",
+  "source_type": "tarball",
+  "sbom_uri": "s3://saena-sboms/run-0004/sbom.json",
+  "secret_scan_status": "passed",
+  "captured_at": "2026-07-12T10:30:00Z",
+  "_expected_violation": "source_type enum is exactly ['git', 'zip']; 'tarball' is not a member."
+}

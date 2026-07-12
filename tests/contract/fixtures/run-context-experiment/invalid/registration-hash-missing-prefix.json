@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0006",
+  "engine_id": "chatgpt-search",
+  "locales": ["en-US"],
+  "observation_cell_ref": "cell-0006",
+  "registration_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "_expected_violation": "registration_hash must carry the 'sha256:' prefix (common/identifiers sha256_ref pattern); this value omits the prefix."
+}

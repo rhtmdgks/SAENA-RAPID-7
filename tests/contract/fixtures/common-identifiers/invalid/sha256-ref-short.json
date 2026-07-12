@@ -1,0 +1,5 @@
+{
+  "_defs_pointer": "sha256_ref",
+  "value": "sha256:aaaa",
+  "_expected_violation": "sha256_ref pattern requires exactly 64 lowercase hex chars after the 'sha256:' prefix; this value is truncated."
+}

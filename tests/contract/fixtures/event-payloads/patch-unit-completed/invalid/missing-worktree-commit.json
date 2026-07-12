@@ -1,0 +1,6 @@
+{
+  "patch_unit_id": "PU-02",
+  "manifest_uri": "s3://saena-artifacts/run-0002/PU-02.manifest.json",
+  "changed_files": ["apps/web/docs/new-page.md"],
+  "_expected_violation": "worktree_commit is required (k3s §4.2:206); this instance omits it."
+}

@@ -1,0 +1,12 @@
+{
+  "tenant_id": "example-tenant",
+  "display_name": "Example Tenant",
+  "isolation_profile": "saas-shared",
+  "namespace": "saena-tenant-example-tenant",
+  "policy_version": "2.3.1",
+  "engine_scope": ["chatgpt-search"],
+  "status": "suspended",
+  "retention_policy_ref": "retention-policy-saas-shared",
+  "created_at": "2026-02-15T12:30:00Z",
+  "updated_at": "2026-06-01T09:00:00.123Z"
+}

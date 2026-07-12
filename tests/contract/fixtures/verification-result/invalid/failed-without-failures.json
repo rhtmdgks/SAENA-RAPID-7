@@ -1,0 +1,10 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0003",
+  "patch_unit_id": "PU-03",
+  "gate_id": "gate-test",
+  "status": "failed",
+  "worktree_commit": "cccfff2",
+  "evaluated_at": "2026-07-12T14:30:00Z",
+  "_expected_violation": "Ruling R4 direction 1: status=failed MUST carry a failures key (>=1 item); this instance declares failed but omits failures entirely."
+}

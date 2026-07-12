@@ -1,0 +1,7 @@
+{
+  "site_id": "site-0001",
+  "tenant_id": "acme-corp",
+  "project_id": "project-0001",
+  "domain": "example.com",
+  "inventory_version": "2026-07-12T00:00:00Z-v1"
+}

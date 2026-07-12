@@ -1,0 +1,40 @@
+"""common/error-detail/v1 fixture validation (w1-11)."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+from _support import ERROR_DETAIL_SCHEMA, build_validator, fixture_pairs, load_json, strip_metadata
+
+FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "error-detail"
+VALID_FIXTURES = fixture_pairs(FIXTURE_DIR / "valid")
+INVALID_FIXTURES = fixture_pairs(FIXTURE_DIR / "invalid")
+
+
+def test_fixture_inventory_complete() -> None:
+    assert len(VALID_FIXTURES) == 1
+    assert len(INVALID_FIXTURES) == 1
+
+
+@pytest.mark.parametrize("fixture_path", VALID_FIXTURES, ids=lambda p: p.name)
+def test_valid_fixture_passes(fixture_path: Path) -> None:
+    validator = build_validator(ERROR_DETAIL_SCHEMA)
+    data = strip_metadata(load_json(fixture_path))
+    errors = list(validator.iter_errors(data))
+    assert not errors, f"expected {fixture_path.name} to be valid: {[e.message for e in errors]}"
+
+
+@pytest.mark.parametrize("fixture_path", INVALID_FIXTURES, ids=lambda p: p.name)
+def test_invalid_fixture_fails(fixture_path: Path) -> None:
+    validator = build_validator(ERROR_DETAIL_SCHEMA)
+    raw = load_json(fixture_path)
+    data = strip_metadata(raw)
+    errors = list(validator.iter_errors(data))
+    assert errors, f"expected {fixture_path.name} to FAIL validation but it passed"
+    assert raw.get("_expected_violation")
+
+
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__, "-v"]))

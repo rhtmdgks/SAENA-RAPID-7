@@ -1,0 +1,7 @@
+{
+  "run_id": "run-0001",
+  "engine_id": "chatgpt-search",
+  "locales": ["en-US", "en-GB"],
+  "observation_cell_ref": "cell-0001",
+  "registration_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

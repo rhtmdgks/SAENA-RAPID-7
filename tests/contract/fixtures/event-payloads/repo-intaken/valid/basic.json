@@ -1,0 +1,5 @@
+{
+  "repo_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "snapshot_uri": "s3://saena-snapshots/run-0001/snapshot.tar.gz"
+}

@@ -1,0 +1,9 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0001",
+  "patch_unit_id": "PU-01",
+  "gate_id": "gate-lint",
+  "status": "passed",
+  "worktree_commit": "cccffff",
+  "evaluated_at": "2026-07-12T14:10:00Z"
+}
