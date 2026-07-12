@@ -20,7 +20,14 @@ typecheck:
     uv run mypy
 
 test:
-    uv run pytest -q
+    uv run pytest -q --cov --cov-report=xml --cov-report=term:skip-covered
+
+# ADR-0017 coverage gates (blocking): harness core >=90, changed-lines >=90,
+# global no-decrease ratchet (committed baseline; manual ratchet-up in-PR).
+coverage-gates:
+    uv run coverage report --include="tests/contract/harness/*" --fail-under=90
+    uv run diff-cover coverage.xml --compare-branch origin/main --fail-under=90
+    sh tools/validation/coverage-ratchet.sh
 
 # Module boundary contracts (dependency-policy rule 11 / ADR-0002)
 boundaries:
@@ -138,7 +145,7 @@ codegen-check: codegen
     test -z "$(git status --porcelain -- packages/schemas)"
 
 # Local gate — mirrors CI (ADR-0018)
-verify: lint typecheck test boundaries contracts-validate
+verify: lint typecheck test coverage-gates boundaries contracts-validate registry-validate
     @echo "verify: all local gates green"
 
 # Worktree lifecycle (ADR-0023)
@@ -155,3 +162,13 @@ worktree-audit:
 dev-up +services:
     @test -f tools/development/docker-compose.dev.yaml || { echo "dev-up: tools/development/docker-compose.dev.yaml not present yet (T15/W2A)"; exit 1; }
     docker compose -f tools/development/docker-compose.dev.yaml up -d {{services}}
+
+registry-validate:
+    uv run check-jsonschema --schemafile packages/contracts/registry.schema.json packages/contracts/registry.json
+    uv run openapi-spec-validator packages/contracts/openapi/contract-validation/v1/openapi.yaml
+
+# AsyncAPI CLI smoke — pinned-limitation check (see tools/contract-lint/README.md).
+# Blocking AsyncAPI gate = pytest tests/contract/validate (2020-12-real).
+contract-lint-smoke:
+    @out=$(SUPPRESS_NO_CONFIG_WARNING=1 npx --prefix tools/contract-lint asyncapi validate packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml --diagnostics-format=json 2>/dev/null || true); \
+    echo "$out" | uv run --no-project python3 tools/contract-lint/check_known_limitation.py
