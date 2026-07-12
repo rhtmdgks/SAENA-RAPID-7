@@ -5,6 +5,7 @@ requires-python = "==3.12.*"
 [manifest]
 members = [
     "saena-monorepo",
+    "saena-schemas",
     "saena-shared",
     "saena-testing",
 ]
@@ -843,14 +844,15 @@ dev = [
     { name = "import-linter" },
     { name = "mypy" },
     { name = "openapi-spec-validator" },
-    { name = "pydantic" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pyyaml" },
     { name = "ruff" },
     { name = "rust-just" },
+    { name = "saena-schemas" },
     { name = "saena-shared" },
     { name = "saena-testing" },
+    { name = "types-jsonschema" },
 ]
 
 [package.metadata]
@@ -863,15 +865,27 @@ dev = [
     { name = "import-linter", specifier = ">=2.1,<3" },
     { name = "mypy", specifier = ">=1.14,<2" },
     { name = "openapi-spec-validator", specifier = ">=0.7,<1" },
-    { name = "pydantic", specifier = ">=2,<3" },
     { name = "pytest", specifier = ">=9.0.3,<10" },
     { name = "pytest-cov", specifier = ">=6,<7" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "ruff", specifier = ">=0.14,<0.15" },
     { name = "rust-just", specifier = ">=1.36,<3" },
+    { name = "saena-schemas", editable = "packages/schemas" },
     { name = "saena-shared", editable = "packages/shared" },
     { name = "saena-testing", editable = "packages/testing" },
+    { name = "types-jsonschema", specifier = ">=4,<5" },
 ]
+
+[[package]]
+name = "saena-schemas"
+version = "0.1.0"
+source = { editable = "packages/schemas" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2,<3" }]
 
 [[package]]
 name = "saena-shared"
@@ -908,6 +922,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/67/1c/dfba5c4633cafc4c701f237d2ba63b416805047fd6d96aab4cfc40969f98/typeguard-4.5.2.tar.gz", hash = "sha256:5a16dcac23502039299c97c8941651bc33d7ea8cc4b2f7d6bbb1b528f6eea423", size = 80240, upload-time = "2026-05-14T12:59:40.857Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5b/29/74eeb4d3f3ae61ca096b018ad486b3b3c74b17bec09ab4edab721cbefec3/typeguard-4.5.2-py3-none-any.whl", hash = "sha256:fcf9de18bd945cdb4c7b996e12b4c51ce83f92f191314a6d7cf1739586ec98cf", size = 36748, upload-time = "2026-05-14T12:59:39.473Z" },
+]
+
+[[package]]
+name = "types-jsonschema"
+version = "4.26.0.20260518"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "referencing" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/46/73b6a5d61a61015c4248030a8cb07e5bdddb4041430fae9e585a68692578/types_jsonschema-4.26.0.20260518.tar.gz", hash = "sha256:e1dd53dc97a64f5eccdd6fa9839666e09bb500a8ebba2db6fdaf1789faea81a6", size = 16638, upload-time = "2026-05-18T06:06:44.106Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/d5/134f8a147dcecda10db7f60cfc6af0578a25a5c53c87b3907a64385e0184/types_jsonschema-4.26.0.20260518-py3-none-any.whl", hash = "sha256:30b30a518c7fe335df85c919fcbcc631b69c03d4a4b5b632fa916bea03065307", size = 16072, upload-time = "2026-05-18T06:06:43.264Z" },
 ]
 
 [[package]]

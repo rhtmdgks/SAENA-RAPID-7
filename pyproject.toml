@@ -14,6 +14,7 @@ package = false
 members = [
     "packages/shared",
     "packages/testing",
+    "packages/schemas",
 ]
 
 [dependency-groups]
@@ -28,15 +29,17 @@ dev = [
     "check-jsonschema>=0.30,<1",
     "saena-shared",
     "saena-testing",
+    "saena-schemas",
     "datamodel-code-generator>=0.26,<1",
-    "pydantic>=2,<3",
     "openapi-spec-validator>=0.7,<1",
     "pyyaml>=6,<7",
+    "types-jsonschema>=4,<5",
 ]
 
 [tool.uv.sources]
 saena-shared = { workspace = true }
 saena-testing = { workspace = true }
+saena-schemas = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"
@@ -44,6 +47,13 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Generated code carries verbatim JSON Schema description/$comment text as
+# Field(description=...) strings (packages/contracts is the SSOT for that
+# prose, ADR-0011) — reflowing it would diverge from source. Codegen output
+# only, never hand-edited (packages/schemas/README.md).
+"packages/schemas/saena_schemas/**/*.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
