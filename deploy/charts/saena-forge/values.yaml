@@ -1,0 +1,406 @@
+# saena-forge Helm values — production-leaning defaults.
+#
+# Shape mirrors the k3s Package and Operations Spec v1 §7 skeleton and the
+# exact fixture `tests/unit/forgectl/fixtures/values-passing.yaml` that
+# `forgectl preflight` (tools/forgectl) validates against — this file is
+# built to PASS forgectl preflight with engineScope.chatgptSearch=true and
+# every google/gemini flag off, and to FAIL if a google/gemini flag is
+# flipped on (values.schema.json rejects the key outright; forgectl's
+# engine_flags check independently rejects it too, defense in depth).
+#
+# Digest placeholders below use the sha256:<64-hex> shape values.schema.json
+# and forgectl require, but are NOT real digests (`sha256:0000...`
+# repeated) — a real release pins these to the actual signed image digest
+# at release-build time. This is intentional placeholder discipline, not a
+# floating-tag shortcut: values.schema.json's `pattern` rejects anything
+# that is not `sha256:` + 64 hex chars, so a floating tag (`:latest`,
+# `:v1`) cannot validate here even by accident.
+
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  environment: production
+  imageRegistry: registry.saena.internal/saena
+  imagePullPolicy: IfNotPresent
+  engineScope:
+    chatgptSearch: true
+    googleAiOverviews: false
+    googleAiMode: false
+    gemini: false
+  policyBundle:
+    version: 1.0.0
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+  skillBundle:
+    version: 1.0.0
+    digest: "sha256:0000000000000000000000000000000000000000000000000000000000000002"
+  network:
+    defaultDeny: true
+
+# --- namespaces (k3s spec §1: saena-system, saena-data, saena-observability,
+# saena-tenant-<id>) --------------------------------------------------------
+namespaces:
+  system: saena-system
+  data: saena-data
+  observability: saena-observability
+  # Tenant namespaces are NOT created by this chart's default install — the
+  # tenant namespace template (templates/namespaces/tenant-namespace.yaml)
+  # is rendered only when `tenants` below is non-empty (ADR-0007/ADR-0014:
+  # internal-k3s currently uses a fixed/single-operator tenant_id; SaaS
+  # per-tenant provisioning is a separate future control-plane action, not
+  # a `helm upgrade` on this chart in v1).
+  tenants: []
+  # Example entry (uncomment/override via -f or --set for a synthetic
+  # tenant): { id: "synthetic-01", isolationProfile: "internal-k3s" }
+
+# --- default-deny NetworkPolicy + explicit allow rules (k3s spec §6.2) -----
+networkPolicy:
+  defaultDeny: true
+  runner:
+    ingress: []
+    egress:
+      - internal-policy-gate
+      - internal-artifact-registry
+      - approved-git-host
+      - approved-model-provider
+      - approved-customer-domain
+  browser:
+    egress:
+      - approved-observation-hosts
+      - customer-domain-read-only
+    denied:
+      - git-write
+      - kubernetes-api
+      - cloud-metadata
+
+# --- data dependencies — CONNECTION config only, external services, not
+# bundled subcharts (Postgres/Temporal/MinIO/Redpanda are managed outside
+# this chart per k3s spec §7 `postgres.external: true` /
+# `objectStorage.external: true`; ADR-0007 D-6 stages Wave 2 = Postgres +
+# Temporal + Redpanda + MinIO, all external/managed, not in-chart). Every
+# credential is a *SecretRef, never an inline value (ADR-0020 secret
+# lifecycle: "secret은 Helm values ... 에 절대 저장하지 않는다").
+# ---------------------------------------------------------------------------
+postgres:
+  external: true
+  host: postgres.saena-data.svc.cluster.local
+  port: 5432
+  database: saena
+  credentialsSecretRef: saena-postgres-credentials
+
+temporal:
+  enabled: true
+  externalDatabase: true
+  host: temporal-frontend.saena-data.svc.cluster.local
+  port: 7233
+  namespace: saena-forge
+
+objectStorage:
+  external: true
+  type: minio
+  endpoint: minio.saena-data.svc.cluster.local:9000
+  useTLS: true
+  bucket: saena-forge-artifacts
+  credentialsSecretRef: saena-minio-credentials
+
+eventBus:
+  type: redpanda
+  brokers:
+    - redpanda-0.saena-data.svc.cluster.local:9092
+    - redpanda-1.saena-data.svc.cluster.local:9092
+    - redpanda-2.saena-data.svc.cluster.local:9092
+  credentialsSecretRef: saena-redpanda-credentials
+
+# externalSecrets — every entry's `valueFrom` MUST be a real external-secrets.io
+# `secretStoreRef.kind` (SecretStore or ClusterSecretStore — a provider such
+# as Vault is configured INSIDE one of those two objects, never a `kind`
+# value itself), never a plaintext ConfigMap (forgectl external_secrets
+# check; k3s spec §8.1 condition 3).
+externalSecrets:
+  - name: saena-postgres-credentials
+    source: external-secrets-operator
+    valueFrom: SecretStore
+  - name: saena-minio-credentials
+    source: external-secrets-operator
+    valueFrom: SecretStore
+  - name: saena-redpanda-credentials
+    source: external-secrets-operator
+    valueFrom: ClusterSecretStore
+  - name: saena-temporal-credentials
+    source: external-secrets-operator
+    valueFrom: ClusterSecretStore
+
+# egressProxy — the k3s spec §6.1/§6.2 egress allowlist proxy is an
+# out-of-band dependency NOT rendered by this chart. Default off so the
+# NetworkPolicy allow rules targeting it are only emitted when the proxy
+# workload actually exists in the namespace.
+egressProxy:
+  enabled: false
+
+observability:
+  openTelemetry: true
+  prometheus: true
+  loki: true
+  tempo: true
+  grafana:
+    dashboardSidecarLabel: grafana_dashboard
+    dashboardSidecarLabelValue: "1"
+  otelCollectorEndpoint: otel-collector.saena-observability.svc.cluster.local:4317
+
+agentRunner:
+  enabled: true
+  job:
+    serviceAccount: saena-agent-runner
+    activeDeadlineSeconds: 7200
+    ttlSecondsAfterFinished: 1800
+    rbac:
+      clusterAdmin: false
+      productionDeploy: false
+      rules:
+        - apiGroups: [""]
+          resources: [pods]
+          verbs: [get, list]
+    securityContext:
+      runAsNonRoot: true
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+  limits:
+    maxConcurrentRunsPerTenant: 3
+    maxCostUsdPerRun: 100
+    maxArtifactsMiBPerRun: 1024
+
+migrations: []
+# Example (expand/contract only — destructive migrations use a separate
+# approval runbook per k3s spec §8.2, not this values file):
+# - id: 2026_07_add_tenant_column
+#   strategy: expand-contract
+#   reversible: true
+#   reviewedBy: alice
+
+featureFlags:
+  absorptionAnalysis: false
+  digitalTwin: false
+  portfolioOptimizer: false
+  experimentAttribution: false
+  strategySkillBank: false
+
+# --- shared defaults every service template inherits unless overridden ----
+serviceDefaults:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+  podSecurityContext:
+    fsGroup: 10001
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readinessProbe:
+    # Services implemented so far (e.g. tenant-control-service) expose only
+    # `/health` (no separate `/ready`) — readiness reuses the same endpoint
+    # until a distinct readiness check lands. Override per-service once a
+    # service adds a real `/ready` (dependency-aware) endpoint.
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  podDisruptionBudget:
+    minAvailable: 1
+  port: 8080
+  serviceAccount:
+    create: true
+    automountServiceAccountToken: true
+
+# --- 8 independently-deployed services (service-catalog.md "Independent
+# Deployment" rendering class, 8 of 24 logical capabilities). Each entry
+# merges over serviceDefaults above; only per-service deltas (namespace,
+# image name, RBAC rules, resources where they legitimately differ) are
+# declared here to avoid duplicating the shared defaults 8x.
+# ---------------------------------------------------------------------------
+services:
+  forgeConsoleApi:
+    enabled: true
+    nameSuffix: forge-console-api
+    namespace: saena-system
+    domain: platform
+    image:
+      repository: forge-console-api
+      digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      signature: "cosign-bundle:forge-console-api@sha256:aaaa111111111111111111111111111111111111111111111111111111"
+    replicaCount: 3
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { cpu: "1", memory: 1Gi }
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+
+  tenantControl:
+    enabled: true
+    nameSuffix: tenant-control
+    namespace: saena-system
+    domain: foundation
+    image:
+      repository: tenant-control-service
+      digest: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      signature: "cosign-bundle:tenant-control@sha256:aaaa222222222222222222222222222222222222222222222222222222"
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+
+  planContract:
+    enabled: true
+    nameSuffix: plan-contract
+    namespace: saena-system
+    domain: foundation
+    image:
+      repository: plan-contract-service
+      digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      signature: "cosign-bundle:plan-contract@sha256:aaaa333333333333333333333333333333333333333333333333333333"
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+
+  policyGate:
+    enabled: true
+    nameSuffix: policy-gate
+    namespace: saena-system
+    domain: foundation
+    image:
+      repository: policy-gate-service
+      digest: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+      signature: "cosign-bundle:policy-gate@sha256:aaaa444444444444444444444444444444444444444444444444444444"
+    replicaCount: 3
+    # policy-gate is fail-closed (security-model.md) — no gate downtime
+    # tolerated, so PDB is stricter than the shared default.
+    podDisruptionBudget:
+      minAvailable: 2
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+
+  auditLedger:
+    enabled: true
+    nameSuffix: audit-ledger
+    namespace: saena-system
+    domain: foundation
+    image:
+      repository: audit-ledger-service
+      digest: "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      signature: "cosign-bundle:audit-ledger@sha256:aaaa555555555555555555555555555555555555555555555555555555"
+    # audit-ledger holds append-only evidence — RBAC "상위 tier" per
+    # service-catalog.md; still least-privilege, no cluster-wide grant.
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+
+  agentOrchestrator:
+    enabled: true
+    nameSuffix: agent-orchestrator
+    namespace: saena-system
+    domain: platform
+    image:
+      repository: agent-orchestrator-service
+      digest: "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+      signature: "cosign-bundle:agent-orchestrator@sha256:aaaa666666666666666666666666666666666666666666666666666666"
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["batch"]
+          resources: ["jobs"]
+          verbs: ["create", "get", "list", "watch", "delete"]
+
+  artifactRegistry:
+    enabled: true
+    nameSuffix: artifact-registry
+    namespace: saena-system
+    domain: platform
+    image:
+      repository: artifact-registry-service
+      digest: "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      signature: "cosign-bundle:artifact-registry@sha256:aaaa777777777777777777777777777777777777777777777777777777"
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+
+  engineAdapterGateway:
+    enabled: true
+    nameSuffix: engine-adapter-gateway
+    namespace: saena-system
+    domain: platform
+    image:
+      repository: engine-adapter-gateway
+      digest: "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      signature: "cosign-bundle:engine-adapter-gateway@sha256:aaaa888888888888888888888888888888888888888888888888888888"
+    rbac:
+      rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list", "watch"]
+
+# images[] — flat mirror list forgectl's image_digest_signature check reads
+# (k3s spec §7 skeleton shape / tests/unit/forgectl/fixtures/values-passing.yaml).
+# Kept in sync with `services.*.image` above; templates render from
+# `services.*.image` directly, this list exists for the forgectl static
+# preflight contract and for `helm template ... | kubectl apply --dry-run`
+# operators who want a flat digest inventory without walking the services map.
+images:
+  - name: forge-console-api
+    digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    signature: "cosign-bundle:forge-console-api@sha256:aaaa111111111111111111111111111111111111111111111111111111"
+  - name: tenant-control-service
+    digest: "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    signature: "cosign-bundle:tenant-control@sha256:aaaa222222222222222222222222222222222222222222222222222222"
+  - name: plan-contract-service
+    digest: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    signature: "cosign-bundle:plan-contract@sha256:aaaa333333333333333333333333333333333333333333333333333333"
+  - name: policy-gate-service
+    digest: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    signature: "cosign-bundle:policy-gate@sha256:aaaa444444444444444444444444444444444444444444444444444444"
+  - name: audit-ledger-service
+    digest: "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    signature: "cosign-bundle:audit-ledger@sha256:aaaa555555555555555555555555555555555555555555555555555555"
+  - name: agent-orchestrator-service
+    digest: "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    signature: "cosign-bundle:agent-orchestrator@sha256:aaaa666666666666666666666666666666666666666666666666666666"
+  - name: artifact-registry-service
+    digest: "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+    signature: "cosign-bundle:artifact-registry@sha256:aaaa777777777777777777777777777777777777777777777777777777"
+  - name: engine-adapter-gateway
+    digest: "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+    signature: "cosign-bundle:engine-adapter-gateway@sha256:aaaa888888888888888888888888888888888888888888888888888888"

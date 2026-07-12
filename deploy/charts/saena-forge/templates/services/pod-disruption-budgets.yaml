@@ -1,0 +1,21 @@
+{{- range $key, $svc := .Values.services }}
+{{- if $svc.enabled }}
+{{- $pdb := $svc.podDisruptionBudget | default $.Values.serviceDefaults.podDisruptionBudget }}
+{{- $fullname := include "saena-forge.serviceFullname" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $selectorLabels := include "saena-forge.serviceSelectorLabels" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $labels := include "saena-forge.serviceLabels" (dict "root" $ "service" $svc.nameSuffix) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $svc.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  minAvailable: {{ $pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- $selectorLabels | nindent 6 }}
+{{- end }}
+{{- end }}

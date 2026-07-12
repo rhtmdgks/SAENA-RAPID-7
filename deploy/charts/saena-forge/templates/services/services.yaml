@@ -1,0 +1,25 @@
+{{- range $key, $svc := .Values.services }}
+{{- if $svc.enabled }}
+{{- $port := $svc.port | default $.Values.serviceDefaults.port }}
+{{- $fullname := include "saena-forge.serviceFullname" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $selectorLabels := include "saena-forge.serviceSelectorLabels" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $labels := include "saena-forge.serviceLabels" (dict "root" $ "service" $svc.nameSuffix) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $svc.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- $selectorLabels | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+{{- end }}

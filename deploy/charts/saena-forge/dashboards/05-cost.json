@@ -1,0 +1,93 @@
+{
+  "title": "SAENA FORGE — Cost",
+  "uid": "saena-forge-cost",
+  "tags": ["saena-forge", "cost"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "editable": false,
+  "time": { "from": "now-24h", "to": "now" },
+  "description": "k3s spec §9.2 dashboard 5: tokens, browser minutes, storage, retries, per-tenant budgets. Enforcement values: agentRunner.limits.maxCostUsdPerRun / maxConcurrentRunsPerTenant / maxArtifactsMiBPerRun (values.yaml).",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tokens consumed, per tenant",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_cost_token_total[1h])) by (saena_tenant_id)",
+          "legendFormat": "{{saena_tenant_id}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Browser minutes consumed, per tenant",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_cost_browser_minutes_total[1h])) by (saena_tenant_id)",
+          "legendFormat": "{{saena_tenant_id}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Object storage bytes, per tenant",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(saena_cost_storage_bytes) by (saena_tenant_id)",
+          "legendFormat": "{{saena_tenant_id}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Retries, per run",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_cost_retry_total[1h])) by (saena_run_id)",
+          "legendFormat": "{{saena_run_id}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Per-tenant budget consumption ratio (agentRunner.limits.maxCostUsdPerRun)",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(saena_cost_tenant_budget_ratio) by (saena_tenant_id)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "red", "value": 1.0 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

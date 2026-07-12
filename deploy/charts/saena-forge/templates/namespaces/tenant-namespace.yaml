@@ -1,0 +1,24 @@
+{{- /*
+Tenant namespace template — saena-tenant-<id> (ADR-0007 / ADR-0014). Rendered
+only when values.namespaces.tenants is non-empty; internal-k3s currently uses
+a fixed/single-operator tenant_id (ADR-0014), so a default install with no
+`tenants` entries renders none of these — tenant provisioning is a deliberate
+opt-in, not an implicit side effect of installing the control-plane chart.
+The namespace name is DERIVED from tenant_id (ADR-0014: "namespace 필드는
+tenant_id에서 결정적으로 파생되어야 하며 독립적으로 임의 값을 받아서는 안 된다"),
+never taken as a separate free-form input.
+*/ -}}
+{{- range .Values.namespaces.tenants }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "saena-forge.tenantNamespace" .id }}
+  labels:
+    {{- include "saena-forge.labels" $ | nindent 4 }}
+    saena.io/namespace-role: tenant
+    saena.io/tenant-id: {{ .id | quote }}
+    {{- if .isolationProfile }}
+    saena.io/isolation-profile: {{ .isolationProfile | quote }}
+    {{- end }}
+---
+{{- end }}
