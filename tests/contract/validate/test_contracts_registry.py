@@ -46,15 +46,19 @@ def test_load_registry_returns_typed_entries() -> None:
     assert isinstance(entries, list)
 
 
-def test_registry_currently_has_zero_entries() -> None:
-    """Documents current bootstrap state (w1-11 authoring time) -- not a
-    silent assumption. If this ever fails because entries were added, that
-    is expected and this assertion should be updated/removed by whichever
-    unit adds the first entry (w1-15 per the plan's dependency DAG), not by
-    this unit.
-    """
+def test_registry_populated_state_invariants() -> None:
+    """w1-15: registry carries all hand-authored contracts. Every relational
+    check must run clean on the REAL entry list (no longer vacuous)."""
     entries = registry_mod.load_registry()
-    assert entries == []
+    assert len(entries) == 26
+    closed = {e.name for e in entries if e.compat_class == "closed"}
+    assert {"change-plan", "approval-decision"} <= closed
+    assert all((not e.signed) or e.compat_class == "closed" for e in entries)
+    frozen = [e for e in entries if e.compat_class == "frozen"]
+    assert [e.name for e in frozen] == ["event-envelope"]
+    assert frozen[0].frozen_authority_adr == "ADR-0013"
+    runctx = [e for e in entries if e.catalog_name == "RunContext"]
+    assert len(runctx) == 2, "R10 split back-reference"
 
 
 @pytest.mark.parametrize(
@@ -74,7 +78,7 @@ def test_registry_currently_has_zero_entries() -> None:
 )
 def test_relational_check_runs_clean_on_empty_registry(check_fn) -> None:  # type: ignore[no-untyped-def]
     """Each individual relational check function runs without raising and
-    returns no violations against the current (empty) entry list --
+    returns no violations against the current (populated) entry list --
     parametrize-ready: once entries exist, `iter_entries()` below feeds real
     data through the exact same function objects.
     """

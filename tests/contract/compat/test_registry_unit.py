@@ -17,11 +17,14 @@ from harness.registry import RegistryEntry
 
 
 def test_real_registry_loads_and_validates() -> None:
-    """The actual packages/contracts/registry.json (empty in W1 bootstrap)
+    """The actual packages/contracts/registry.json (populated at w1-15)
     must load and validate cleanly against the actual registry.schema.json.
     """
     entries = registry_mod.load_registry()
-    assert entries == []
+    assert len(entries) == 26, "w1-15 populated 26 entries (24 json-schema + openapi + asyncapi)"
+    names = [e.name for e in entries]
+    assert len(set((e.name, e.major) for e in entries)) == 26, "name+major unique"
+    assert "event-envelope" in names and "change-plan" in names
 
 
 def test_real_registry_relational_checks_are_clean_when_empty() -> None:
@@ -222,4 +225,4 @@ def test_load_registry_with_one_valid_synthetic_entry(tmp_path: Path) -> None:
 
 
 def test_iter_entries_uses_default_paths() -> None:
-    assert registry_mod.iter_entries() == []
+    assert registry_mod.iter_entries() == registry_mod.load_registry()

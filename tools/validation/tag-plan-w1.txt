@@ -1,0 +1,28 @@
+# W1 tag plan — PREPARED ONLY. Tag creation + push = human action (user directive 2026-07-12).
+# Run from repo root on wave1-contracts AFTER human review:
+git tag contracts/engine-id/v1.0.0 && git push origin contracts/engine-id/v1.0.0
+git tag contracts/error-detail/v1.0.0 && git push origin contracts/error-detail/v1.0.0
+git tag contracts/identifiers/v1.0.0 && git push origin contracts/identifiers/v1.0.0
+git tag contracts/problem-detail/v1.0.0 && git push origin contracts/problem-detail/v1.0.0
+git tag contracts/actor-context/v1.0.0 && git push origin contracts/actor-context/v1.0.0
+git tag contracts/project-context/v1.0.0 && git push origin contracts/project-context/v1.0.0
+git tag contracts/run-context-experiment/v1.0.0 && git push origin contracts/run-context-experiment/v1.0.0
+git tag contracts/run-context-lifecycle/v1.0.0 && git push origin contracts/run-context-lifecycle/v1.0.0
+git tag contracts/site-context/v1.0.0 && git push origin contracts/site-context/v1.0.0
+git tag contracts/tenant-context/v1.0.0 && git push origin contracts/tenant-context/v1.0.0
+git tag contracts/workspace-context/v1.0.0 && git push origin contracts/workspace-context/v1.0.0
+git tag contracts/approval-decision/v1.0.0 && git push origin contracts/approval-decision/v1.0.0
+git tag contracts/audit-event/v1.0.0 && git push origin contracts/audit-event/v1.0.0
+git tag contracts/change-plan/v1.0.0 && git push origin contracts/change-plan/v1.0.0
+git tag contracts/patch-artifact/v1.0.0 && git push origin contracts/patch-artifact/v1.0.0
+git tag contracts/source-snapshot/v1.0.0 && git push origin contracts/source-snapshot/v1.0.0
+git tag contracts/verification-result/v1.0.0 && git push origin contracts/verification-result/v1.0.0
+git tag contracts/event-envelope/v1.0.0 && git push origin contracts/event-envelope/v1.0.0
+git tag contracts/patch-unit-completed/v1.0.0 && git push origin contracts/patch-unit-completed/v1.0.0
+git tag contracts/plan-contract-approved/v1.0.0 && git push origin contracts/plan-contract-approved/v1.0.0
+git tag contracts/plan-contract-proposed/v1.0.0 && git push origin contracts/plan-contract-proposed/v1.0.0
+git tag contracts/quality-gate-result/v1.0.0 && git push origin contracts/quality-gate-result/v1.0.0
+git tag contracts/repo-intaken/v1.0.0 && git push origin contracts/repo-intaken/v1.0.0
+git tag contracts/site-inventory-completed/v1.0.0 && git push origin contracts/site-inventory-completed/v1.0.0
+git tag contracts/contract-validation/v1.0.0 && git push origin contracts/contract-validation/v1.0.0
+git tag contracts/saena-events/v1.0.0 && git push origin contracts/saena-events/v1.0.0
