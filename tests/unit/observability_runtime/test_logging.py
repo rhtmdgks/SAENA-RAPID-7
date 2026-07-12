@@ -49,6 +49,21 @@ class TestBaseShape:
         assert payload["timestamp"].endswith("Z")
         assert "+00:00" not in payload["timestamp"]
 
+    def test_multiline_body_still_emits_single_line_json(self) -> None:
+        # SHOULD-FIX (critic re-verify): a body containing embedded
+        # newlines (e.g. a formatted traceback-like message) must not
+        # break the "single-line JSON per record" invariant (ADR-0016) —
+        # json.dumps escapes embedded "\n" as the two-character sequence
+        # "\\n" inside the JSON string, so the emitted log LINE itself
+        # never contains a literal newline character.
+        formatter = SaenaJsonFormatter()
+        multiline_msg = "line one\nline two\nline three"
+        record = _make_record(multiline_msg)
+        line = formatter.format(record)
+        assert "\n" not in line
+        payload = json.loads(line)
+        assert payload["body"] == multiline_msg
+
 
 class TestLogBodyRedaction:
     """MUST-FIX 1 (critic): `logger.info("token=%s", token)` and f-string

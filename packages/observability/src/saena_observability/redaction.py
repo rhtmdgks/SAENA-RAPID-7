@@ -190,6 +190,92 @@ def _keyword_assignment_span_re(pattern: re.Pattern[str]) -> re.Pattern[str]:
     return re.compile(pattern.pattern + r"[=:]\s*(?P<secret_value>\S+)", pattern.flags)
 
 
+# Rule ids whose canonical leak shape is a scheme-prefix keyword directly
+# FOLLOWED BY its value with a plain whitespace separator, not an "="/":"
+# assignment operator — e.g. R-SECRET-BEARER's own
+# redaction-rules.yaml description: "Bearer <token> scheme strings". This
+# is a narrower, more confident case than the general "keyword ... value"
+# filler-word ambiguity `_keyword_assignment_span_re` deliberately declines
+# to handle (see its docstring): "Bearer" is not a description of the
+# value that happens to precede it in a sentence, it IS the fixed scheme
+# prefix of the RFC 6750 `Authorization: Bearer <token>` header shape, so
+# "the next whitespace-delimited token is the secret" is a reasonable
+# default here — GUARDED by `_ENGLISH_FILLER_WORDS` below so ordinary prose
+# ("the bearer of good news") is not treated as a leak. Scoped narrowly to
+# this one rule id rather than generalized to every bare-keyword pattern,
+# to avoid reintroducing the general "was"/"is" filler-word ambiguity the
+# assignment-only design was chosen to avoid for the other rules.
+_WHITESPACE_VALUE_RULE_IDS = frozenset({"R-SECRET-BEARER"})
+
+# Short, closed set of common English function words that must NOT be
+# treated as a leaked credential even when they immediately follow a
+# whitespace-value keyword like "Bearer" (e.g. "the bearer OF good news").
+# A real Bearer-scheme token is opaque (base64url/JWT-shaped, high
+# cardinality) and is never one of these grammatical filler words — this
+# guard is what lets `_keyword_whitespace_value_span_re` redact
+# `"Bearer abc123token"` (a real credential) while leaving
+# `"the bearer of good news"` alone (ordinary prose), satisfying the
+# critic's explicit "no over-redaction of None" requirement.
+_ENGLISH_FILLER_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "of",
+        "is",
+        "was",
+        "are",
+        "were",
+        "to",
+        "in",
+        "on",
+        "at",
+        "and",
+        "or",
+        "for",
+        "with",
+        "by",
+        "has",
+        "have",
+        "had",
+        "will",
+        "be",
+        "as",
+    }
+)
+
+
+def _keyword_whitespace_value_span_re(pattern: re.Pattern[str]) -> re.Pattern[str]:
+    """Build an expanded regex for a scheme-prefix keyword pattern (see
+    `_WHITESPACE_VALUE_RULE_IDS`) that also consumes a trailing
+    whitespace-separated token — covers the `Bearer <token>` shape
+    (space-separated, no `=`/`:`), which `_keyword_assignment_span_re`
+    does not match. Trailing sentence punctuation (`.`, `,`, `;`, `:`,
+    `!`, `?`) is excluded from the captured token so prose punctuation is
+    never absorbed into the redaction.
+    """
+    return re.compile(pattern.pattern + r"\s+(?P<secret_value>[^\s.,;:!?]+)", pattern.flags)
+
+
+def _keyword_whitespace_value_sub(pattern: re.Pattern[str], text: str) -> str:
+    """Apply `_keyword_whitespace_value_span_re` to `text`, but only commit
+    the expanded (keyword+value) replacement when the captured trailing
+    token is NOT a common English filler word (`_ENGLISH_FILLER_WORDS`) —
+    otherwise leave the filler word untouched and let the narrower
+    bare-keyword pass redact just the keyword portion of that match."""
+    expanded = _keyword_whitespace_value_span_re(pattern)
+
+    def _replace(match: re.Match[str]) -> str:
+        value = match.group("secret_value")
+        if value.lower() in _ENGLISH_FILLER_WORDS:
+            # Not a credential — leave this match entirely as-is; the
+            # subsequent bare-keyword pass will redact just the keyword.
+            return match.group(0)
+        return REDACTED_VALUE
+
+    return expanded.sub(_replace, text)
+
+
 def redact_text(text: str) -> str:
     """Scrub `text` (e.g. a formatted log message body) against every
     VALUE-applicable denylist pattern (`redaction-rules.yaml`
@@ -198,28 +284,55 @@ def redact_text(text: str) -> str:
     This is distinct from `decide_redaction`'s value-matching, which
     decides a whole-attribute-value fate (allow/redact/drop). Log bodies
     are free text that may interpolate a secret alongside safe words (e.g.
-    ``"token=%s" % token`` -> ``"token=abc123secret"``). Two match shapes
-    are handled:
+    ``"token=%s" % token`` -> ``"token=abc123secret"``). Three match shapes
+    are handled, tried in this order per pattern (most-specific first, so
+    a wider match consumes the secret before a narrower one could leave a
+    fragment of it exposed):
 
-    - Content-shaped patterns (e.g. `R-PII-EMAIL`, whose regex matches the
-      leaked value itself) — the matched span is replaced directly.
-    - Bare-keyword patterns (e.g. `R-SECRET-TOKEN`'s `(?i)token`,
-      `R-SECRET-PASSWORD`'s `(?i)password`) — matching only the keyword
-      and replacing just that word would leave an interpolated secret
-      value sitting right next to it fully exposed (e.g.
-      ``"token=%s" % token`` -> naive replace gives
-      ``"[REDACTED]=abc123secret"``, which still leaks the value). For
-      these, the keyword match is first expanded to also consume a
-      trailing `key=value` / `key:value` assignment-shaped span
-      (`_keyword_assignment_span_re`) so the actual secret is covered by
-      the same redaction; the bare keyword pattern is then also applied so
-      a keyword with no trailing assignment (e.g. mid-sentence mention) is
-      still redacted on its own. See `_keyword_assignment_span_re` for the
-      documented scope boundary (assignment-operator shapes only, not
-      arbitrary filler-word phrases).
+    1. Scheme-prefix whitespace-value patterns (`_WHITESPACE_VALUE_RULE_IDS`
+       — currently only `R-SECRET-BEARER`): `Bearer <token>` is a fixed
+       RFC 6750 scheme prefix directly followed by its value with a plain
+       space, no `=`/`:` — e.g. ``"Bearer abc123token"``,
+       ``"Authorization: Bearer abc123token"``. Expanded via
+       `_keyword_whitespace_value_span_re`.
+    2. Content-shaped patterns (e.g. `R-PII-EMAIL`, whose regex matches the
+       leaked value itself) — the matched span is replaced directly (no
+       expansion needed).
+    3. Bare-keyword patterns (e.g. `R-SECRET-TOKEN`'s `(?i)token`,
+       `R-SECRET-PASSWORD`'s `(?i)password`) — matching only the keyword
+       and replacing just that word would leave an interpolated secret
+       value sitting right next to it fully exposed (e.g.
+       ``"token=%s" % token`` -> naive replace gives
+       ``"[REDACTED]=abc123secret"``, which still leaks the value). For
+       these, the keyword match is first expanded to also consume a
+       trailing `key=value` / `key:value` assignment-shaped span
+       (`_keyword_assignment_span_re`) so the actual secret is covered by
+       the same redaction; the bare keyword pattern is then also applied so
+       a keyword with no trailing assignment (e.g. mid-sentence mention) is
+       still redacted on its own. See `_keyword_assignment_span_re` for the
+       documented scope boundary (assignment-operator shapes only, not
+       arbitrary filler-word phrases) — `R-SECRET-BEARER` is deliberately
+       carved out of that general restriction via step 1 above, because its
+       whitespace-form is its OWN canonical/documented leak shape, not an
+       arbitrary filler-word phrase.
     """
     rules = load_redaction_rules()
     redacted = text
+
+    # Pass 1 (runs BEFORE any other pattern, regardless of registry order):
+    # scheme-prefix whitespace-value rules (R-SECRET-BEARER). This must go
+    # first — otherwise a preceding assignment-shaped match from another
+    # rule (e.g. R-SECRET-AUTHORIZATION's "authorization: <next-token>"
+    # expansion on "Authorization: Bearer abc123token") would consume the
+    # literal word "Bearer" as ITS assignment value before this pass ever
+    # sees it, leaving the real Bearer-scheme token unguarded and only
+    # caught (if at all) by an unrelated bare-keyword match downstream.
+    for pattern in rules.denylist_patterns:
+        if "value" in pattern.applies_to and pattern.id in _WHITESPACE_VALUE_RULE_IDS:
+            redacted = _keyword_whitespace_value_sub(pattern.pattern, redacted)
+
+    # Pass 2: assignment-shaped (`key=value`/`key:value`) and bare-keyword
+    # matches for every VALUE-applicable pattern, in registry order.
     for pattern in rules.denylist_patterns:
         if "value" not in pattern.applies_to:
             continue

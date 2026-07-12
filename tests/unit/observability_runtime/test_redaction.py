@@ -250,6 +250,65 @@ class TestRedactText:
         assert REDACTED_VALUE in result
         assert "token" not in result.lower()
 
+    def test_redacts_across_embedded_newlines(self) -> None:
+        # SHOULD-FIX (critic re-verify): redact_text must scan the whole
+        # multi-line string (regexes here have no MULTILINE-sensitive
+        # anchors, so this is mostly a non-regression guard), and a clean
+        # line elsewhere in the same message must not be affected by a
+        # secret on another line.
+        body = "line one is clean\ntoken=abc123secret\nline three is clean too"
+        result = redact_text(body)
+        assert "abc123secret" not in result
+        assert "line one is clean" in result
+        assert "line three is clean too" in result
+        assert result.count("\n") == 2
+
+
+class TestRedactTextBearerWhitespaceForm:
+    """Critic re-verify MUST-FIX: R-SECRET-BEARER's own canonical leak
+    shape (redaction-rules.yaml:53-57, "Bearer <token> scheme strings") is
+    whitespace-separated, not "="/":"-separated — the general
+    assignment-only expansion missed it. `Bearer <token>` (RFC 6750) is
+    covered end to end (keyword + token both redacted) while ordinary
+    prose use of the word "bearer" is not over-redacted."""
+
+    def test_bearer_space_form_is_fully_redacted(self) -> None:
+        result = redact_text("Bearer abc123token")
+        assert "abc123token" not in result
+        assert result == REDACTED_VALUE
+
+    def test_authorization_header_dump_with_bearer_is_fully_redacted(self) -> None:
+        result = redact_text("Authorization: Bearer abc123token")
+        assert "abc123token" not in result
+        assert "Bearer" not in result
+
+    def test_authorization_assignment_with_bearer_is_fully_redacted(self) -> None:
+        result = redact_text("authorization=Bearer xyz")
+        assert "xyz" not in result
+        assert "Bearer" not in result
+
+    def test_plain_prose_bearer_without_following_token_is_not_over_redacted(
+        self,
+    ) -> None:
+        # "bearer" used as an ordinary English noun, followed only by
+        # common filler words ("of", "good", "news") — must not be
+        # mistaken for a credential; only the keyword itself is redacted,
+        # the surrounding sentence is preserved.
+        result = redact_text("the bearer of good news arrived")
+        assert result == f"the {REDACTED_VALUE} of good news arrived"
+
+    def test_bare_bearer_word_alone_redacts_only_keyword(self) -> None:
+        assert redact_text("bearer") == REDACTED_VALUE
+
+    def test_bearer_at_end_of_sentence_with_punctuation_redacts_only_keyword(
+        self,
+    ) -> None:
+        assert redact_text("bearer.") == f"{REDACTED_VALUE}."
+
+    def test_lowercase_bearer_scheme_is_case_insensitive(self) -> None:
+        result = redact_text("bearer abc123token")
+        assert "abc123token" not in result
+
     def test_key_only_pattern_is_skipped_for_text_scrubbing(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
