@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0003",
+  "tenant_id": "acme-corp",
+  "state": "IN_PROGRESS",
+  "base_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "human_approval_required": true,
+  "_expected_violation": "state enum is the 11 k3s spec §4.3 verbatim values; 'IN_PROGRESS' is not a member."
+}

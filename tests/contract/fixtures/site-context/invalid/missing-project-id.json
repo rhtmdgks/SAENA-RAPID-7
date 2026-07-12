@@ -1,0 +1,7 @@
+{
+  "site_id": "site-0002",
+  "tenant_id": "acme-corp",
+  "domain": "example.org",
+  "inventory_version": "v1",
+  "_expected_violation": "project_id is required (tenancy-model.md:41 site-under-project hierarchy link); this instance omits it."
+}

@@ -1,0 +1,10 @@
+{
+  "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prev_event_hash": null,
+  "action": "plan.contract.proposed.v1",
+  "recorded_at": "2026-07-12T16:40:00Z",
+  "scope": "tenant",
+  "trace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "payload": {},
+  "_expected_violation": "Ruling R9-1 branch 1: scope=tenant requires tenant_id; this instance declares scope=tenant but omits tenant_id."
+}

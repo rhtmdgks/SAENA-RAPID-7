@@ -1,0 +1,6 @@
+{
+  "actor_id": "actor-0003",
+  "actor_type": "robot",
+  "session_id": "session-example-0004",
+  "_expected_violation": "actor_type enum is exactly ['human', 'system']; 'robot' is not a member."
+}

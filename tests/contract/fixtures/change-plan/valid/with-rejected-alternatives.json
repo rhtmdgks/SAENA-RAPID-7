@@ -1,0 +1,42 @@
+{
+  "run_id": "run-0002",
+  "tenant_id": "example-tenant",
+  "repo_commit": "dddddddddddddddddddddddddddddddddddddddd",
+  "approved_scope": ["apps/web/docs/*", "apps/web/components/*"],
+  "engine_scope": ["chatgpt-search"],
+  "hypotheses": [
+    {
+      "id": "H-01",
+      "query_cluster_ids": ["cluster-0001", "cluster-0002"],
+      "evidence_ids": ["evidence-0001", "evidence-0002"],
+      "predicted_layers": ["absorption", "prominence", "referral"],
+      "expected_effect_distribution": {"p_7d": 0.31, "p_30d": 0.58},
+      "risk": "medium"
+    }
+  ],
+  "patch_units": [
+    {
+      "id": "PU-01",
+      "files": ["apps/web/components/faq.tsx"],
+      "allowed_transformations": ["edit-file"],
+      "tests": ["tests/components/test_faq.py"],
+      "rollback": "git-revert:PU-01"
+    },
+    {
+      "id": "PU-02",
+      "files": ["apps/web/docs/faq.md"],
+      "allowed_transformations": ["edit-file"],
+      "tests": ["tests/docs/test_faq.py"],
+      "rollback": "git-revert:PU-02"
+    }
+  ],
+  "approval_required": true,
+  "no_deploy": true,
+  "no_push": true,
+  "evidence_ledger_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "scope_limits": {"max_globs": 3},
+  "diff_budget": {"max_files": 5, "max_lines": 250},
+  "rejected_alternatives": [
+    {"id": "ALT-01", "reason": "higher risk, lower predicted effect"}
+  ]
+}

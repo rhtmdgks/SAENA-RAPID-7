@@ -1,0 +1,13 @@
+{
+  "tenant_id": "acme-corp",
+  "display_name": "Acme Corp",
+  "isolation_profile": "internal-k3s",
+  "namespace": "saena-tenant-acme-corp",
+  "policy_version": "1.0.0",
+  "engine_scope": [],
+  "status": "active",
+  "retention_policy_ref": "retention-policy-default",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z",
+  "_expected_violation": "engine_scope requires minItems 1 (ADR-0014:54); an empty array violates the minimum-items constraint."
+}

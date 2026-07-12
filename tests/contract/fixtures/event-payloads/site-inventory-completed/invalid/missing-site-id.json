@@ -1,0 +1,4 @@
+{
+  "inventory_version": "v1",
+  "_expected_violation": "site_id is required; this instance omits it."
+}

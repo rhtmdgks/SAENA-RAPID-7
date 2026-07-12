@@ -1,0 +1,8 @@
+{
+  "site_id": "site-0005",
+  "tenant_id": "acme-corp",
+  "project_id": "project-0001",
+  "domain": "example.edu",
+  "inventory_version": "",
+  "_expected_violation": "inventory_version requires minLength 1; an empty string violates that constraint."
+}

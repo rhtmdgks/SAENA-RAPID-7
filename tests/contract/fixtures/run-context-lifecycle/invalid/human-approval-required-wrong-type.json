@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0006",
+  "tenant_id": "acme-corp",
+  "state": "WAITING_APPROVAL",
+  "base_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "human_approval_required": "yes",
+  "_expected_violation": "human_approval_required must be a boolean; a string value is rejected by the type constraint."
+}

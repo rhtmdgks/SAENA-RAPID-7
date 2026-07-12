@@ -1,0 +1,9 @@
+{
+  "patch_unit_id": "PU-03",
+  "worktree_commit": "cccfff3",
+  "manifest_uri": "s3://saena-artifacts/run-0003/PU-03.manifest.json",
+  "changed_files": ["apps/web/docs/new-page.md"],
+  "quality_gate_ids": ["gate-lint"],
+  "tenant_id": "acme-corp",
+  "_note": "PERMANENT gap fixture (non-expiring, tests/contract/README.md fixture metadata convention). ADR-0024(e)-1 BANS re-projecting tenant_id (or run_id) into an event payload -- the envelope's tenant context_type branch already carries tenant_id, and duplicating it here is a review-reject condition (ADR-0014 duplicate-identifier ban, extended by ADR-0024(e)-1). This payload schema is open-class (no additionalProperties:false), so a tenant_id key here is structurally SCHEMA-VALID even though it violates the ADR-0024(e) policy -- JSON Schema's open shape cannot itself reject an extra key it never declared as forbidden. Caught only by review/policy-gate, not by this schema. Do not 'fix' this fixture into schema-detectable invalidity -- it exists specifically to document/lock the gap an open-class payload leaves for this specific banned re-projection."
+}

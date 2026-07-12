@@ -1,0 +1,8 @@
+{
+  "contract_uri": "s3://saena-plans/run-0001/plan.json",
+  "contract_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "base_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "evidence_ids": ["evidence-0001"],
+  "patch_unit_ids": ["PU-01"],
+  "evidence_ledger_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

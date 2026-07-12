@@ -1,0 +1,4 @@
+{
+  "workspace_id": "workspace-0002",
+  "_expected_violation": "tenant_id is required; this instance omits it."
+}

@@ -1,0 +1,11 @@
+{
+  "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prev_event_hash": null,
+  "action": "system.health.check.v1",
+  "recorded_at": "2026-07-12T16:30:00Z",
+  "scope": "system",
+  "tenant_id": "acme-corp",
+  "trace_id": "dddddddddddddddddddddddddddddddd",
+  "payload": {},
+  "_expected_violation": "Ruling R9-1 branch 2: scope=system forbids tenant_id (and run_id) -- this instance declares scope=system while still carrying tenant_id, closing the leak path Security MUST-FIX #1 identified."
+}

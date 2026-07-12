@@ -1,0 +1,5 @@
+{
+  "contract_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "decision": "pending",
+  "_expected_violation": "decision enum is exactly ['approved', 'rejected'] (mirrors domain/approval-decision.decision verbatim); 'pending' is not a member."
+}

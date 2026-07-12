@@ -1,0 +1,12 @@
+{
+  "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prev_event_hash": null,
+  "action": "plan.contract.approved.v1",
+  "recorded_at": "2026-07-12T16:00:00Z",
+  "scope": "tenant",
+  "tenant_id": "acme-corp",
+  "run_id": "run-0001",
+  "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "actor_id": "actor-approver-0001",
+  "payload": {"decision": "approved"}
+}

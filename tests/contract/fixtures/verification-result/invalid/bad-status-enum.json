@@ -1,0 +1,10 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0006",
+  "patch_unit_id": "PU-06",
+  "gate_id": "gate-test",
+  "status": "skipped",
+  "worktree_commit": "cccfff5",
+  "evaluated_at": "2026-07-12T15:00:00Z",
+  "_expected_violation": "status enum is exactly ['passed', 'failed'] -- 'skipped' is deliberately excluded (Prompt package §8:404 'gate skip = release-reject'); this instance is rejected."
+}

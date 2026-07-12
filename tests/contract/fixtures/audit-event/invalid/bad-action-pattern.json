@@ -1,0 +1,10 @@
+{
+  "event_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "prev_event_hash": null,
+  "action": "PlanApproved",
+  "recorded_at": "2026-07-12T16:50:00Z",
+  "scope": "system",
+  "trace_id": "ffffffffffffffffffffffffffffffff",
+  "payload": {},
+  "_expected_violation": "action must match the 3-4 dot-segment lowercase_snake pattern ending in a version suffix; 'PlanApproved' (CamelCase, no dots, no version suffix) is rejected."
+}

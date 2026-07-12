@@ -1,0 +1,7 @@
+{
+  "error_code": "saena.internal.unhandled_exception",
+  "retryable": true,
+  "summary": "internal error while processing request",
+  "stack_trace": "Traceback (most recent call last): ...",
+  "_expected_violation": "error-detail is closed (additionalProperties:false, ADR-0015 minimal 3-field shape); stack_trace is an extra property not declared in the schema and is rejected."
+}

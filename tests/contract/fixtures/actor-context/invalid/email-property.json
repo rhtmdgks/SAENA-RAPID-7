@@ -1,0 +1,8 @@
+{
+  "actor_id": "actor-human-0004",
+  "actor_type": "human",
+  "session_id": "session-example-0005",
+  "tenant_id": "acme-corp",
+  "email": "user@example.com",
+  "_expected_violation": "ActorContext is closed (additionalProperties:false) AND structurally omits identity fields by design (contract-catalog.md:20 PII minimization -- ledger stores actor_id only, identity mapping kept separately); email is not a declared property and is rejected regardless of the RFC 2606 example.com domain used here."
+}

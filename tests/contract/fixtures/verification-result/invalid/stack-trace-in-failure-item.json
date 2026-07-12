@@ -1,0 +1,18 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0005",
+  "patch_unit_id": "PU-05",
+  "gate_id": "gate-test",
+  "status": "failed",
+  "worktree_commit": "cccfff4",
+  "evaluated_at": "2026-07-12T14:50:00Z",
+  "failures": [
+    {
+      "error_code": "saena.internal.unhandled_exception",
+      "retryable": true,
+      "summary": "internal error",
+      "stack_trace": "Traceback (most recent call last): ..."
+    }
+  ],
+  "_expected_violation": "failures[] items are the closed common/error-detail shape (additionalProperties:false, error_code/retryable/summary only); stack_trace is rejected by error-detail's own closed schema, not by this file."
+}

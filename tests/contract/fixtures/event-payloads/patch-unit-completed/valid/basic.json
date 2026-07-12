@@ -1,0 +1,7 @@
+{
+  "patch_unit_id": "PU-01",
+  "worktree_commit": "cccffff",
+  "manifest_uri": "s3://saena-artifacts/run-0001/PU-01.manifest.json",
+  "changed_files": ["apps/web/docs/new-page.md"],
+  "quality_gate_ids": ["gate-lint", "gate-test"]
+}

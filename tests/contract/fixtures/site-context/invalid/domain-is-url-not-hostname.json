@@ -1,0 +1,8 @@
+{
+  "site_id": "site-0003",
+  "tenant_id": "acme-corp",
+  "project_id": "project-0001",
+  "domain": "https://example.com/path?query=1",
+  "inventory_version": "v1",
+  "_expected_violation": "domain must be a bare hostname (no scheme/path/query per the schema's pattern, which is the actually-enforcing check per the file's own VERIFIED FINDING $comment -- format:hostname alone is annotation-only in this repo's tooling); a full URL with scheme and query is rejected by the pattern's excluded characters (':' , '/', '?')."
+}

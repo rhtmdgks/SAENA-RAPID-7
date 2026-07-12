@@ -1,0 +1,17 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0004",
+  "patch_unit_id": "PU-04",
+  "gate_id": "gate-lint",
+  "status": "passed",
+  "worktree_commit": "cccfff3",
+  "evaluated_at": "2026-07-12T14:40:00Z",
+  "failures": [
+    {
+      "error_code": "saena.validation.lint_warning",
+      "retryable": false,
+      "summary": "unused import (non-blocking, should have been cleared before passed declaration)"
+    }
+  ],
+  "_expected_violation": "Ruling R4 direction 2 (bidirectional half): status=passed MUST NOT carry a failures key at all; this instance declares passed while a failures array still lingers in the payload."
+}

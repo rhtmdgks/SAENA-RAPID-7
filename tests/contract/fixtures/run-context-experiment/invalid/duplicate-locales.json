@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0004",
+  "engine_id": "chatgpt-search",
+  "locales": ["en-US", "en-US"],
+  "observation_cell_ref": "cell-0004",
+  "registration_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "_expected_violation": "locales requires uniqueItems (w1-06 critic SHOULD-FIX 3); duplicate entries 'en-US','en-US' violate that constraint."
+}

@@ -1,0 +1,6 @@
+{
+  "actor_id": "actor-human-0002",
+  "actor_type": "human",
+  "session_id": "session-example-0003",
+  "_expected_violation": "Security MUST-FIX 2 (R9): actor_type=human requires tenant_id via the allOf/if/then conditional; this instance omits tenant_id."
+}

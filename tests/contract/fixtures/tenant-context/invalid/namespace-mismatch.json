@@ -1,0 +1,13 @@
+{
+  "tenant_id": "acme-corp",
+  "display_name": "Acme Corp",
+  "isolation_profile": "internal-k3s",
+  "namespace": "saena-tenant-totally-different-slug",
+  "policy_version": "1.0.0",
+  "engine_scope": ["chatgpt-search"],
+  "status": "active",
+  "retention_policy_ref": "retention-policy-default",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z",
+  "_note": "PERMANENT gap fixture (non-expiring, tests/contract/README.md fixture metadata convention; schema $comment 'namespace' property). namespace must equal 'saena-tenant-' + tenant_id (ADR-0014 Constraints:65) but this is a cross-field invariant JSON Schema 2020-12 cannot express structurally in a single-schema form -- this instance is schema-VALID (namespace matches the SHAPE pattern) despite tenant_id='acme-corp' and namespace embedding a different slug ('totally-different-slug'). Caught only by a runtime gate, per the schema's own $comment. Do not 'fix' this fixture into schema-detectable invalidity -- it exists specifically to document/lock the gap."
+}

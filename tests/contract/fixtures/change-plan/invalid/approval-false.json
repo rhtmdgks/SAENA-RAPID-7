@@ -1,0 +1,34 @@
+{
+  "run_id": "run-0005",
+  "tenant_id": "acme-corp",
+  "repo_commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "approved_scope": ["apps/web/docs/*"],
+  "engine_scope": ["chatgpt-search"],
+  "hypotheses": [
+    {
+      "id": "H-01",
+      "query_cluster_ids": ["cluster-0001"],
+      "evidence_ids": ["evidence-0001"],
+      "predicted_layers": ["discovery"],
+      "expected_effect_distribution": {"p_7d": 0.42},
+      "risk": "low"
+    }
+  ],
+  "patch_units": [
+    {
+      "id": "PU-01",
+      "files": ["apps/web/docs/new-page.md"],
+      "allowed_transformations": ["create-file"],
+      "tests": ["tests/docs/test_new_page.py"],
+      "rollback": "git-revert:PU-01"
+    }
+  ],
+  "approval_required": false,
+  "no_deploy": true,
+  "no_push": true,
+  "evidence_ledger_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scope_limits": {"max_globs": 5},
+  "diff_budget": {"max_files": 10, "max_lines": 500},
+  "rejected_alternatives": [],
+  "_expected_violation": "approval_required is const:true (Plan Gate invariant, Algorithm §5.2:277); false is rejected -- no Action Contract instance may declare itself pre-approved."
+}

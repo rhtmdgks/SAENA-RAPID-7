@@ -1,0 +1,17 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0002",
+  "patch_unit_id": "PU-02",
+  "gate_id": "gate-test",
+  "status": "failed",
+  "worktree_commit": "cccfff1",
+  "evaluated_at": "2026-07-12T14:20:00Z",
+  "failures": [
+    {
+      "error_code": "saena.validation.assertion_failed",
+      "retryable": false,
+      "summary": "test_new_page.py::test_renders failed: expected 200, got 404"
+    }
+  ],
+  "report_uri": "s3://saena-reports/run-0002/PU-02-gate-test.json"
+}

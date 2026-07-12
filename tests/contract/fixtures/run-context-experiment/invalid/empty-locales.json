@@ -1,0 +1,8 @@
+{
+  "run_id": "run-0003",
+  "engine_id": "chatgpt-search",
+  "locales": [],
+  "observation_cell_ref": "cell-0003",
+  "registration_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "_expected_violation": "locales requires minItems 1; an empty array violates the minimum-items constraint."
+}
