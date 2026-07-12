@@ -42,16 +42,9 @@ import pytest
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
-CONTRACTS_DIR = (
-    Path(__file__).parent.parent.parent
-    / "packages"
-    / "contracts"
-    / "json-schema"
-)
+CONTRACTS_DIR = Path(__file__).parent.parent.parent / "packages" / "contracts" / "json-schema"
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "envelope"
-SCHEMA_PATH = (
-    CONTRACTS_DIR / "envelope" / "event-envelope" / "v1" / "event-envelope.schema.json"
-)
+SCHEMA_PATH = CONTRACTS_DIR / "envelope" / "event-envelope" / "v1" / "event-envelope.schema.json"
 IDENTIFIERS_PATH = CONTRACTS_DIR / "common" / "identifiers" / "v1" / "identifiers.schema.json"
 ENGINE_ID_PATH = CONTRACTS_DIR / "common" / "engine-id" / "v1" / "engine-id.schema.json"
 VALID_DIR = FIXTURES_DIR / "valid"
