@@ -27,6 +27,14 @@ class ContractHashViolationError(PolicyViolationError):
     contract_hash but with different content (post-approval immutability, H-3/H-7)."""
 
 
+class InconsistentPlanSnapshotError(PolicyViolationError):
+    """Raised when transition() receives exactly one of stored_plan/
+    presented_plan. Both-or-neither are the only legal states: supplying only
+    one would silently skip the guard_immutability choke point (fail-open),
+    so this module fails closed instead of treating a partial snapshot pair
+    as "no immutability check requested" (critic MUST-FIX 1 re-verify)."""
+
+
 class ConflictingDecisionError(PolicyViolationError):
     """Raised when two non-identical ApprovalDecision instances are submitted
     for the same (contract_hash, approver_actor_id) idempotency key."""

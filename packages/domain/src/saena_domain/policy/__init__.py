@@ -18,6 +18,7 @@ from saena_domain.policy.errors import (
     ConflictingDecisionError,
     ContractHashViolationError,
     ExecutionBlockedError,
+    InconsistentPlanSnapshotError,
     InvalidTransitionError,
     PolicyViolationError,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "ContractHashViolationError",
     "DecisionRecord",
     "ExecutionBlockedError",
+    "InconsistentPlanSnapshotError",
     "InvalidTransitionError",
     "PatchUnitLease",
     "PlanSnapshot",

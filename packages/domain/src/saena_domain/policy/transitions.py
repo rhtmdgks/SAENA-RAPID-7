@@ -22,6 +22,7 @@ from saena_domain.policy.errors import (
     ConflictingDecisionError,
     ContractHashViolationError,
     ExecutionBlockedError,
+    InconsistentPlanSnapshotError,
     InvalidTransitionError,
 )
 from saena_domain.policy.identity import canonical_actor_id
@@ -130,16 +131,21 @@ def transition(
 ) -> TransitionOutcome:
     """Compute the next PlanState given the current state and an approval set.
 
-    `stored_plan`/`presented_plan` (critic MUST-FIX 1): when both are
-    supplied, guard_immutability() runs FIRST, before any other state logic —
-    a caller cannot reach APPROVED (or any other outcome) through this
-    function while bypassing the post-approval immutability check.
+    `stored_plan`/`presented_plan` (critic MUST-FIX 1): BOTH-OR-NEITHER are
+    the only legal states. When both are supplied, guard_immutability() runs
+    FIRST, before any other state logic — a caller cannot reach APPROVED (or
+    any other outcome) through this function while bypassing the
+    post-approval immutability check. When NEITHER is supplied (both None,
+    the default), the check is skipped entirely — this is the only way to
+    opt out, used by the PROPOSED->WAITING_APPROVAL submission path, which
+    has no "stored" plan to compare against yet. Supplying EXACTLY ONE of
+    the two raises InconsistentPlanSnapshotError immediately — a partial
+    pair would otherwise silently skip guard_immutability (fail-open), which
+    this module refuses to do (critic MUST-FIX 1 re-verify: fail closed).
     `stored_plan` is the plan content as already persisted/previously
     approved; `presented_plan` is the plan content presented alongside this
-    decision. Both are optional (default None, check skipped) because the
-    PROPOSED->WAITING_APPROVAL submission path has no "stored" plan to
-    compare against yet — callers on the WAITING_APPROVAL decision path
-    (where post-approval immutability actually matters) MUST pass both.
+    decision. Callers on the WAITING_APPROVAL decision path (where
+    post-approval immutability actually matters) MUST pass both.
 
     Idempotency note (SHOULD-FIX 5): transition() is a pure, stateless
     function — "idempotent replay" means that calling it again with the same
@@ -206,7 +212,15 @@ def transition(
     # Immutability choke point (critic MUST-FIX 1): runs BEFORE any other
     # state logic on the approval path. A caller cannot reach APPROVED (or
     # any other WAITING_APPROVAL outcome) through this function while
-    # bypassing this check.
+    # bypassing this check. Both-or-neither of stored_plan/presented_plan
+    # are the only legal states — supplying exactly one would silently skip
+    # guard_immutability (fail-open), so a partial pair fails closed instead
+    # (critic MUST-FIX 1 re-verify).
+    if (stored_plan is None) != (presented_plan is None):
+        raise InconsistentPlanSnapshotError(
+            "transition() requires both stored_plan and presented_plan, or "
+            f"neither: got stored_plan={stored_plan!r}, presented_plan={presented_plan!r}"
+        )
     if stored_plan is not None and presented_plan is not None:
         guard_immutability(
             contract_hash=presented_plan.contract_hash,

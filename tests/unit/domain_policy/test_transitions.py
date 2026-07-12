@@ -9,6 +9,7 @@ from saena_domain.policy.errors import (
     ConflictingDecisionError,
     ContractHashViolationError,
     ExecutionBlockedError,
+    InconsistentPlanSnapshotError,
     InvalidTransitionError,
 )
 from saena_domain.policy.states import PlanState
@@ -495,6 +496,41 @@ def test_transition_skips_immutability_check_when_snapshots_omitted() -> None:
         decided_at=DECIDED_AT,
     )
     assert outcome.state == PlanState.WAITING_APPROVAL
+
+
+def test_transition_raises_on_stored_plan_only_partial_snapshot() -> None:
+    # Critic MUST-FIX 1 re-verify: supplying exactly ONE of
+    # stored_plan/presented_plan must fail closed, not silently skip
+    # guard_immutability.
+    stored = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-original")
+    with pytest.raises(InconsistentPlanSnapshotError):
+        transition(
+            PlanState.WAITING_APPROVAL,
+            contract_hash=CONTRACT_HASH,
+            proposer_actor_id=PROPOSER,
+            approvals=(ApproverRecord(APPROVER_1, "approved"),),
+            high_risk=False,
+            decided_at=DECIDED_AT,
+            incoming_decision=_decision(APPROVER_1, "approved"),
+            stored_plan=stored,
+            presented_plan=None,
+        )
+
+
+def test_transition_raises_on_presented_plan_only_partial_snapshot() -> None:
+    presented = PlanSnapshot(contract_hash=CONTRACT_HASH, content_fingerprint="fp-presented")
+    with pytest.raises(InconsistentPlanSnapshotError):
+        transition(
+            PlanState.WAITING_APPROVAL,
+            contract_hash=CONTRACT_HASH,
+            proposer_actor_id=PROPOSER,
+            approvals=(ApproverRecord(APPROVER_1, "approved"),),
+            high_risk=False,
+            decided_at=DECIDED_AT,
+            incoming_decision=_decision(APPROVER_1, "approved"),
+            stored_plan=None,
+            presented_plan=presented,
+        )
 
 
 # --- MUST-FIX 2: actor_id canonicalization ----------------------------------
