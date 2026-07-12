@@ -112,12 +112,25 @@ tenants = Table(
     PrimaryKeyConstraint("tenant_id", name="pk_tenants"),
 )
 
-# --- plans / plan_decisions ------------------------------------------------------------
+# --- plans / plan_states / plan_decisions ------------------------------------------------
 #
-# `PostgresPlanRepository` — ChangePlan snapshot + PlanState store
-# (`plans`), plus idempotent ApprovalDecision log (`plan_decisions`), both
-# keyed by `(tenant_id, contract_hash[, approver_actor_id])` per
-# `PlanRepository`'s port docstring.
+# `PostgresPlanRepository` — ChangePlan snapshot store (`plans`), a
+# SEPARATE PlanState store (`plan_states`), plus idempotent ApprovalDecision
+# log (`plan_decisions`), all keyed by
+# `(tenant_id, contract_hash[, approver_actor_id])` per `PlanRepository`'s
+# port docstring.
+#
+# `plan_states` is intentionally a DISTINCT table from `plans` (critic
+# MUST-FIX, w2-13 review) — `InMemoryPlanRepository` keeps `_plans` and
+# `_states` as two INDEPENDENT dicts (see `memory.py`), so `set_state`
+# writing a PlanState for a `contract_hash` that has no `put_plan` row yet
+# must NOT fabricate a `plans` row. An earlier version of this schema put
+# `state` as a nullable column directly on `plans` and had `set_state`
+# upsert into `plans` — that silently created a `plans` row with
+# `content_fingerprint=""` on a state-only write, so a subsequent
+# `get_plan` returned a FABRICATED `PlanSnapshot` instead of raising
+# `NotFoundError` like the reference. A dedicated table with its own PK
+# structurally prevents that: `set_state` can never touch `plans` at all.
 
 plans = Table(
     "plans",
@@ -125,8 +138,16 @@ plans = Table(
     Column("tenant_id", String(32), nullable=False),
     Column("contract_hash", String(256), nullable=False),
     Column("content_fingerprint", String(256), nullable=False),
-    Column("state", String(32), nullable=True),
     PrimaryKeyConstraint("tenant_id", "contract_hash", name="pk_plans"),
+)
+
+plan_states = Table(
+    "plan_states",
+    metadata,
+    Column("tenant_id", String(32), nullable=False),
+    Column("contract_hash", String(256), nullable=False),
+    Column("state", String(32), nullable=False),
+    PrimaryKeyConstraint("tenant_id", "contract_hash", name="pk_plan_states"),
 )
 
 plan_decisions = Table(
@@ -279,6 +300,7 @@ __all__ = [
     "metadata",
     "outbox",
     "plan_decisions",
+    "plan_states",
     "plans",
     "tenants",
 ]

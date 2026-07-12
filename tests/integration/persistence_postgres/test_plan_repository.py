@@ -105,6 +105,47 @@ def test_get_state_before_set_raises_not_found(engine: AsyncEngine) -> None:
     run_async(scenario())
 
 
+def test_get_state_cross_tenant_raises_isolation_independent_of_plan_store(
+    engine: AsyncEngine,
+) -> None:
+    """`plan_states` isolation is checked against `plan_states` itself, not
+    `plans` — a `contract_hash` that only has STATE recorded (no `put_plan`)
+    is still correctly cross-tenant isolated."""
+
+    async def scenario() -> None:
+        repo = PostgresPlanRepository(engine)
+        await repo.set_state(TENANT_A, "sha256:state-only-isolated", PlanState.PROPOSED)
+
+        with pytest.raises(TenantIsolationError):
+            await repo.get_state(TENANT_B, "sha256:state-only-isolated")
+
+    run_async(scenario())
+
+
+def test_set_state_without_prior_put_plan_does_not_fabricate_plan(engine: AsyncEngine) -> None:
+    """Critic MUST-FIX (w2-13 review): `set_state` writes to a DEDICATED
+    `plan_states` table, never to `plans` — mirrors
+    `InMemoryPlanRepository`'s two independent dicts
+    (`tests/unit/domain_persistence/test_plan_repository.py::
+    test_set_then_get_state_round_trips`, which calls `set_state` on a
+    `contract_hash` with NO prior `put_plan`). `set_state` alone must NOT
+    create a `plans` row: `get_plan` still raises `NotFoundError`, while
+    `get_state` correctly returns the value that was set."""
+
+    async def scenario() -> None:
+        repo = PostgresPlanRepository(engine)
+
+        await repo.set_state(TENANT_A, "sha256:state-only", PlanState.PROPOSED)
+
+        state = await repo.get_state(TENANT_A, "sha256:state-only")
+        assert state == PlanState.PROPOSED
+
+        with pytest.raises(NotFoundError):
+            await repo.get_plan(TENANT_A, "sha256:state-only")
+
+    run_async(scenario())
+
+
 def test_record_decision_new_key_stores_and_returns_unchanged(engine: AsyncEngine) -> None:
     async def scenario() -> None:
         repo = PostgresPlanRepository(engine)

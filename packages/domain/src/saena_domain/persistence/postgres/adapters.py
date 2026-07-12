@@ -72,6 +72,7 @@ from saena_domain.persistence.postgres.tables import (
     idempotency_keys,
     outbox,
     plan_decisions,
+    plan_states,
     plans,
     tenants,
 )
@@ -363,13 +364,14 @@ class PostgresPlanRepository:
         self, tenant_id: TenantId, contract_hash: str, *, connection: AsyncConnection | None = None
     ) -> PlanState:
         async def _do(conn: AsyncConnection) -> PlanState:
-            await self._assert_plan_owned(tenant_id, contract_hash, conn)
-            stmt = select(plans.c.state).where(
-                plans.c.tenant_id == tenant_id.value, plans.c.contract_hash == contract_hash
+            await self._assert_state_owned(tenant_id, contract_hash, conn)
+            stmt = select(plan_states.c.state).where(
+                plan_states.c.tenant_id == tenant_id.value,
+                plan_states.c.contract_hash == contract_hash,
             )
             result = await conn.execute(stmt)
             row = result.first()
-            if row is None or row[0] is None:
+            if row is None:
                 raise NotFoundError(
                     f"no PlanState stored for contract_hash {contract_hash!r}",
                     context={"tenant_id": tenant_id.value, "contract_hash": contract_hash},
@@ -386,18 +388,22 @@ class PostgresPlanRepository:
         *,
         connection: AsyncConnection | None = None,
     ) -> None:
+        """Set `state` in the DEDICATED `plan_states` table — never touches
+        `plans` (critic MUST-FIX, w2-13 review; see `tables.py`'s own
+        `plan_states` docstring for why `plans`/`plan_states` must stay two
+        independent tables, mirroring `InMemoryPlanRepository`'s two
+        independent dicts). A `set_state` call for a `contract_hash` that
+        has no `put_plan` row yet does NOT fabricate a `plans` row — a
+        subsequent `get_plan` still correctly raises `NotFoundError`.
+        """
+
         async def _do(conn: AsyncConnection) -> None:
-            await self._assert_plan_owned(tenant_id, contract_hash, conn)
+            await self._assert_state_owned(tenant_id, contract_hash, conn)
             stmt = (
-                pg_insert(plans)
-                .values(
-                    tenant_id=tenant_id.value,
-                    contract_hash=contract_hash,
-                    content_fingerprint="",
-                    state=state.value,
-                )
+                pg_insert(plan_states)
+                .values(tenant_id=tenant_id.value, contract_hash=contract_hash, state=state.value)
                 .on_conflict_do_update(
-                    index_elements=[plans.c.tenant_id, plans.c.contract_hash],
+                    index_elements=[plan_states.c.tenant_id, plan_states.c.contract_hash],
                     set_={"state": state.value},
                 )
             )
@@ -457,6 +463,22 @@ class PostgresPlanRepository:
         self, tenant_id: TenantId, contract_hash: str, conn: AsyncConnection
     ) -> None:
         stmt = select(plans.c.tenant_id).where(plans.c.contract_hash == contract_hash)
+        result = await conn.execute(stmt)
+        for (other_tenant,) in result.all():
+            if other_tenant != tenant_id.value:
+                raise TenantIsolationError(
+                    f"contract_hash {contract_hash!r} belongs to a different tenant",
+                    context={"requested_tenant_id": tenant_id.value},
+                )
+
+    async def _assert_state_owned(
+        self, tenant_id: TenantId, contract_hash: str, conn: AsyncConnection
+    ) -> None:
+        """Isolation check against `plan_states` — NOT `plans` (mirrors
+        `InMemoryPlanRepository._assert_owned(tenant_id, contract_hash,
+        self._states)`, checked against the STATE index, independently of
+        the plan-snapshot index)."""
+        stmt = select(plan_states.c.tenant_id).where(plan_states.c.contract_hash == contract_hash)
         result = await conn.execute(stmt)
         for (other_tenant,) in result.all():
             if other_tenant != tenant_id.value:

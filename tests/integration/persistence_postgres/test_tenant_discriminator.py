@@ -14,8 +14,10 @@ import pytest
 from postgres_factories import run_async
 from saena_domain.persistence.postgres.tables import (
     artifact_manifests,
+    decision_records,
     idempotency_keys,
     plan_decisions,
+    plan_states,
     plans,
     tenants,
 )
@@ -32,12 +34,32 @@ pytestmark = pytest.mark.integration
 # likewise nullable for system/aggregate-context envelopes. Both still
 # enforce a NOT NULL `scope_key`/`event_id` PK component instead — see
 # `test_audit_ledger.py`/`test_outbox.py` for those tables' own coverage.
+#
+# Every OTHER tenant-scoped table this patch unit owns IS listed below —
+# `decision_records` (policy-gate's own idempotent decision log,
+# `DecisionRecordPort`) and `plan_states` (the dedicated PlanState table,
+# critic MUST-FIX w2-13 review — see `tables.py`'s own `plan_states`
+# docstring) were both previously missing from this list, making the
+# "every tenant-scoped table" claim in this module's own docstring not
+# actually exhaustive (SHOULD-FIX 1, w2-13 critic review).
 
 _TENANT_SCOPED_TABLES_MINIMAL_ROWS = [
     (tenants, {"status": "active", "payload": {}}),
     (plans, {"contract_hash": "sha256:x", "content_fingerprint": "fp"}),
+    (plan_states, {"contract_hash": "sha256:x", "state": "proposed"}),
     (
         plan_decisions,
+        {
+            "contract_hash": "sha256:x",
+            "approver_actor_id": "approver-1",
+            "decision": "approved",
+            "proposer_actor_id": "proposer-1",
+            "high_risk": False,
+            "decided_at": "2026-07-13T00:00:00Z",
+        },
+    ),
+    (
+        decision_records,
         {
             "contract_hash": "sha256:x",
             "approver_actor_id": "approver-1",
