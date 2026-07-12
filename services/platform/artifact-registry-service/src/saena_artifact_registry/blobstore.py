@@ -34,8 +34,15 @@ from typing import Any, BinaryIO, Protocol, runtime_checkable
 
 from saena_artifact_registry.errors import BlobGatewayDeniedError, OpaqueBlobRefError
 
+#: ADR-0014 tenant slug shape — lowercase alnum + internal hyphens only, no
+#: `/`, `.`, or any other separator. Reused by `_BLOB_REF_PATTERN` (opaque
+#: reference parsing) AND by `MinioBlobStore._object_name` (path-traversal
+#: guard, critic SHOULD-FIX 2, w2-16 review) — a single source of truth for
+#: "what a valid tenant_id looks like" in this module.
+_TENANT_ID_SEGMENT = r"[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])"
+_TENANT_ID_PATTERN = re.compile(rf"^{_TENANT_ID_SEGMENT}$")
 _BLOB_REF_PATTERN = re.compile(
-    r"^blob:(?P<tenant_id>[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])):(?P<sha256_hex>[0-9a-f]{64})$"
+    rf"^blob:(?P<tenant_id>{_TENANT_ID_SEGMENT}):(?P<sha256_hex>[0-9a-f]{{64}})$"
 )
 
 
@@ -215,6 +222,25 @@ class MinioBlobStore:
 
     @staticmethod
     def _object_name(tenant_id: str, sha256_hex: str) -> str:
+        """Build the ADR-0007 tenant-path-prefixed object key.
+
+        Independently validates `tenant_id` against the ADR-0014 slug shape
+        BEFORE it is interpolated into an object key — never trusts the
+        HTTP layer's own validation alone (critic SHOULD-FIX 2, w2-16
+        review): a `tenant_id` containing `/` or `..` could otherwise let a
+        caller escape the intended `<tenant_id>/<sha256>` prefix and write
+        to or read from an arbitrary key in the bucket (path traversal).
+        Raises `OpaqueBlobRefError` (400) on a malformed `tenant_id` — same
+        error type `parse_blob_ref` raises for a malformed opaque
+        reference, since both are "this identifier does not have the shape
+        this module requires" failures.
+        """
+        if not _TENANT_ID_PATTERN.match(tenant_id):
+            raise OpaqueBlobRefError(
+                f"tenant_id {tenant_id!r} does not match the required ADR-0014 slug "
+                "shape — refusing to build an object storage key from it",
+                context={"tenant_id": tenant_id},
+            )
         return f"{tenant_id}/{sha256_hex}"
 
     def put_blob(self, tenant_id: str, data: bytes) -> BlobRef:

@@ -16,6 +16,7 @@ from saena_artifact_registry.blobstore import (
     MinioClientConfig,
     compute_sha256,
 )
+from saena_artifact_registry.errors import OpaqueBlobRefError
 
 
 @dataclass
@@ -195,3 +196,57 @@ def test_minio_adapter_never_logs_credentials(caplog: pytest.LogCaptureFixture) 
     assert "print(" not in source
     assert "access_key" not in source
     assert "secret_key" not in source
+
+
+@pytest.mark.parametrize(
+    "malicious_tenant_id",
+    [
+        "../other",
+        "../../etc/passwd",
+        "acme-co/../globex-co",
+        "acme-co/nested",
+        "..",
+        "a/b",
+    ],
+)
+def test_put_blob_rejects_path_traversal_tenant_id(malicious_tenant_id: str) -> None:
+    """Critic SHOULD-FIX 2 (w2-16 review): the adapter must be
+    independently safe even if the HTTP layer's own `X-Saena-Tenant-Id`
+    validation were ever bypassed or misconfigured — `tenant_id` containing
+    `/` or `..` must never reach `put_object`'s object key."""
+    fake = _FakeMinioClient(bucket_already_exists=True)
+    store = MinioBlobStore(fake, _config())
+
+    with pytest.raises(OpaqueBlobRefError):
+        store.put_blob(malicious_tenant_id, b"data")
+
+    assert fake.put_calls == []
+
+
+@pytest.mark.parametrize(
+    "malicious_tenant_id",
+    [
+        "../other",
+        "../../etc/passwd",
+        "acme-co/../globex-co",
+    ],
+)
+def test_get_blob_rejects_path_traversal_tenant_id(malicious_tenant_id: str) -> None:
+    fake = _FakeMinioClient(bucket_already_exists=True)
+    store = MinioBlobStore(fake, _config())
+    forged_ref = BlobRef(tenant_id=malicious_tenant_id, sha256_hex="a" * 64)
+
+    with pytest.raises(OpaqueBlobRefError):
+        store.get_blob(malicious_tenant_id, forged_ref)
+
+
+def test_put_blob_accepts_valid_tenant_id_after_guard_added() -> None:
+    """Regression guard: the path-traversal check must not reject legitimate
+    ADR-0014-shaped tenant_ids."""
+    fake = _FakeMinioClient(bucket_already_exists=True)
+    store = MinioBlobStore(fake, _config())
+
+    ref = store.put_blob("acme-co", b"legit data")
+
+    assert ref.tenant_id == "acme-co"
+    assert ("saena-artifacts", f"acme-co/{ref.sha256_hex}") in fake.objects

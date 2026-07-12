@@ -35,6 +35,7 @@ import base64
 from typing import Annotated, Any
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field
 from saena_domain.identity import TenantId as DomainTenantId
 from saena_domain.identity.errors import InvalidTenantIdError
@@ -55,7 +56,11 @@ from saena_artifact_registry.errors import (
     BlobGatewayDeniedError,
     DuplicateArtifactConflictError,
 )
-from saena_artifact_registry.problem import artifact_registry_error_handler
+from saena_artifact_registry.problem import (
+    artifact_registry_error_handler,
+    request_validation_error_handler,
+    unhandled_exception_handler,
+)
 from saena_artifact_registry.uri_validation import validate_uri_fields
 
 _logger = get_logger("saena_artifact_registry")
@@ -157,6 +162,14 @@ def create_app(manifests: ArtifactManifestPort, blobs: BlobStore) -> FastAPI:
         return await call_next(request)
 
     app.add_exception_handler(ArtifactRegistryError, artifact_registry_error_handler)
+    # Registered INSTEAD of FastAPI's default 422 handler (which echoes the
+    # raw request body — including blob_base64 customer-source diff content
+    # — back to the caller, critic MUST-FIX). Overriding
+    # RequestValidationError here means that default is never reached.
+    app.add_exception_handler(RequestValidationError, request_validation_error_handler)
+    # Generic fallback (critic SHOULD-FIX 1): any exception not already
+    # mapped above -> fixed-detail RFC 9457 500, never a stack trace.
+    app.add_exception_handler(Exception, unhandled_exception_handler)
 
     @app.post("/v1/artifacts", status_code=201)
     async def register_artifact(request: Request, body: RegisterArtifactRequest) -> Response:
