@@ -42,12 +42,29 @@ no route/dependency builds a response body of its own for an error case.
 FastAPI's own `RequestValidationError` (422 on request-model validation
 failure) is mapped through the same handler path so every error response
 this service ever emits, including framework-generated ones, has the same
-shape.
+shape — WITHOUT echoing the raw offending value back to the caller (see
+`_validation_error_handler`: `RequestValidationError.errors()` includes an
+`"input"` key carrying the actual submitted value, which may be
+secret-shaped; only `loc`/`type`/`msg` are ever included in the response
+body/logs).
+
+A catch-all `Exception` handler (`_unexpected_error_handler`) is also
+registered so a genuine bug (an `AttributeError`, an unexpected error from
+`RunStore`/`authorize()`/anything else not already wrapped in a
+`ServiceError`) still produces a `problem+json` body via
+`saena_forge_console.errors.internal_error` (ADR-0015 `internal` category)
+instead of falling through to Starlette's default plaintext 500 — this is
+what keeps "single place error bodies get built" true even for bugs this
+service's own code did not anticipate. Per ADR-0015 Constraints (stack
+traces / raw content never enter an audit-adjacent artifact): the response
+body and the log line both carry a FIXED detail string, never
+`str(exc))`/`repr(exc)`/a traceback — only the exception's TYPE NAME is
+logged (safe: a Python class name is not user-controllable content).
 """
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -56,7 +73,12 @@ from fastapi.responses import Response
 from saena_observability import bind_telemetry_context, get_logger
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from saena_forge_console.errors import ServiceError, to_problem_detail, validation_error
+from saena_forge_console.errors import (
+    ServiceError,
+    internal_error,
+    to_problem_detail,
+    validation_error,
+)
 from saena_forge_console.lineage import LineagePort, StubLineagePort
 from saena_forge_console.routes import router
 from saena_forge_console.run_store import RunStore
@@ -73,6 +95,25 @@ async def _telemetry_context_middleware(
 ) -> Response:
     with bind_telemetry_context("system"):
         return await call_next(request)
+
+
+def _sanitize_validation_errors(raw_errors: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Strip the raw offending VALUE out of `RequestValidationError.errors()`.
+
+    Pydantic/FastAPI's own `.errors()` includes an `"input"` key (the actual
+    submitted value that failed validation) and may include a `"ctx"` key
+    (which can itself embed the offending value, e.g. `ctx.error` wrapping a
+    `ValueError` built from the input). Both are dropped here — only
+    `loc`/`type`/`msg` (a location path, the validator's type name, and a
+    canned human-readable message; none of which round-trip caller-supplied
+    content) survive into the problem+json body, so a secret-shaped or
+    otherwise sensitive field value a caller submits can never echo back in
+    this service's own error response (ADR-0015 Constraints:70 — "PII/secret
+    원문 포함 금지").
+    """
+    return [
+        {key: entry[key] for key in ("loc", "type", "msg") if key in entry} for entry in raw_errors
+    ]
 
 
 def _problem_response(request: Request, error: ServiceError) -> Response:
@@ -148,7 +189,37 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error_handler(request: Request, exc: RequestValidationError) -> Response:
-        error = validation_error("schema_mismatch", detail=str(exc.errors()))
+        # Fixed detail string in the RESPONSE BODY -- never str(exc)/
+        # exc.errors() verbatim, since the raw `.errors()` list carries an
+        # "input" key (the actual offending value, possibly secret-shaped)
+        # and may carry a "ctx" key that can itself embed that value.
+        # Sanitized field-location context (loc/type/msg only -- see
+        # `_sanitize_validation_errors`) is logged for operator
+        # diagnosability, never included in the client-facing body.
+        sanitized = _sanitize_validation_errors(exc.errors())
+        _logger.info("request validation failed: fields=%s", sanitized)
+        error = validation_error(
+            "schema_mismatch",
+            detail="request body failed schema validation",
+        )
+        return _problem_response(request, error)
+
+    @app.exception_handler(Exception)
+    async def _unexpected_error_handler(request: Request, exc: Exception) -> Response:
+        # Catch-all: keeps "single place error bodies get built" true even
+        # for a bug this service's own code did not anticipate (an
+        # AttributeError, an unexpected error surfacing from RunStore/
+        # authorize()/anything else not already a ServiceError). NEVER
+        # includes str(exc)/repr(exc)/a traceback in the response body or
+        # the log line -- only the exception's TYPE NAME is logged (a
+        # Python class name is not user-controllable content, unlike the
+        # exception's own message, which could echo attacker-supplied
+        # input). ADR-0015 Constraints: stack traces / raw content never
+        # enter an audit-adjacent artifact.
+        _logger.warning("unexpected error: exception_type=%s", type(exc).__name__)
+        error = internal_error(
+            "unexpected", detail="an unexpected error occurred while handling this request"
+        )
         return _problem_response(request, error)
 
     # Starlette runs `add_middleware`-registered middleware in REVERSE
