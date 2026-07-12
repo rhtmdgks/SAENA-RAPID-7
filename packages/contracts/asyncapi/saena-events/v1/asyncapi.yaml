@@ -16,7 +16,12 @@ info:
     allOf-overlay pattern) that pins event_type/context_type via const and
     substitutes payload with the event's own payload schema (or leaves the
     envelope's open payload default for the 5 envelope-only deferred
-    channels below).
+    channels below). Every message's payload is a Multi Format Schema Object
+    (AsyncAPI 3.0.0 spec §Message Object payload field references the Multi
+    Format Schema Object, NOT a bare schemaFormat sibling key on the Message
+    Object itself — REWORK fixed, critic M2) — payload.schemaFormat +
+    payload.schema, schemaFormat value unchanged
+    (application/schema+json;version=draft-2020-12).
 defaultContentType: application/json
 channels:
   repo.intaken.v1:
@@ -28,17 +33,18 @@ channels:
         title: repo.intaken.v1
         summary: Repository intake snapshot captured (repository-intake-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: repo.intaken.v1
-                context_type:
-                  const: tenant
-                payload:
-                  $ref: "../../../json-schema/event/repo-intaken/v1/repo-intaken.schema.json"
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: repo.intaken.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/repo-intaken/v1/repo-intaken.schema.json"
 
   site.inventory.completed.v1:
     address: site.inventory.completed.v1
@@ -49,38 +55,42 @@ channels:
         title: site.inventory.completed.v1
         summary: Site inventory pass completed (site-discovery-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: site.inventory.completed.v1
-                context_type:
-                  const: tenant
-                payload:
-                  $ref: "../../../json-schema/event/site-inventory-completed/v1/site-inventory-completed.schema.json"
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: site.inventory.completed.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/site-inventory-completed/v1/site-inventory-completed.schema.json"
 
   demand.graph.versioned.v1:
     address: demand.graph.versioned.v1
     description: >-
       payload contract P1 — envelope-only until demand-graph payload contract
-      lands.
+      lands. context 배정 tenant = 잠정 — 계획 §7 OPEN(Steward 확인) 잔존,
+      3-context 표(ADR-0006 rev.2 / ADR-0013) 비등재 기반 추정 (침묵 종결
+      아님 — 확인 시 재개정 대상).
     messages:
       demandGraphVersioned:
         name: DemandGraphVersioned
         title: demand.graph.versioned.v1
         summary: Demand graph version published (demand-graph-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: demand.graph.versioned.v1
-                context_type:
-                  const: tenant
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: demand.graph.versioned.v1
+                  context_type:
+                    const: tenant
 
   observation.captured.v1:
     address: observation.captured.v1
@@ -94,15 +104,16 @@ channels:
         title: observation.captured.v1
         summary: Observation captured (chatgpt-observer-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: observation.captured.v1
-                context_type:
-                  const: tenant
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: observation.captured.v1
+                  context_type:
+                    const: tenant
 
   citation.normalized.v1:
     address: citation.normalized.v1
@@ -116,15 +127,16 @@ channels:
         title: citation.normalized.v1
         summary: Citation normalized (citation-intelligence-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: citation.normalized.v1
-                context_type:
-                  const: tenant
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: citation.normalized.v1
+                  context_type:
+                    const: tenant
 
   plan.contract.proposed.v1:
     address: plan.contract.proposed.v1
@@ -135,17 +147,18 @@ channels:
         title: plan.contract.proposed.v1
         summary: Plan contract proposed (plan-contract-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: plan.contract.proposed.v1
-                context_type:
-                  const: tenant
-                payload:
-                  $ref: "../../../json-schema/event/plan-contract-proposed/v1/plan-contract-proposed.schema.json"
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: plan.contract.proposed.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/plan-contract-proposed/v1/plan-contract-proposed.schema.json"
 
   plan.contract.approved.v1:
     address: plan.contract.approved.v1
@@ -159,17 +172,18 @@ channels:
         title: plan.contract.approved.v1
         summary: Plan contract decision notified (plan-contract-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: plan.contract.approved.v1
-                context_type:
-                  const: tenant
-                payload:
-                  $ref: "../../../json-schema/event/plan-contract-approved/v1/plan-contract-approved.schema.json"
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: plan.contract.approved.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/plan-contract-approved/v1/plan-contract-approved.schema.json"
 
   patch.unit.completed.v1:
     address: patch.unit.completed.v1
@@ -180,17 +194,18 @@ channels:
         title: patch.unit.completed.v1
         summary: Patch unit completed (agent-runner-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: patch.unit.completed.v1
-                context_type:
-                  const: tenant
-                payload:
-                  $ref: "../../../json-schema/event/patch-unit-completed/v1/patch-unit-completed.schema.json"
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: patch.unit.completed.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/patch-unit-completed/v1/patch-unit-completed.schema.json"
 
   quality.gate.passed.v1:
     address: quality.gate.passed.v1
@@ -203,20 +218,21 @@ channels:
         title: quality.gate.passed.v1
         summary: Quality gate passed (quality-eval-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: quality.gate.passed.v1
-                context_type:
-                  const: tenant
-                payload:
-                  allOf:
-                    - $ref: "../../../json-schema/event/quality-gate-result/v1/quality-gate-result.schema.json"
-                    - not:
-                        required: ["failures"]
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: quality.gate.passed.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    allOf:
+                      - $ref: "../../../json-schema/event/quality-gate-result/v1/quality-gate-result.schema.json"
+                      - not:
+                          required: ["failures"]
 
   quality.gate.failed.v1:
     address: quality.gate.failed.v1
@@ -229,19 +245,20 @@ channels:
         title: quality.gate.failed.v1
         summary: Quality gate failed (quality-eval-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: quality.gate.failed.v1
-                context_type:
-                  const: tenant
-                payload:
-                  allOf:
-                    - $ref: "../../../json-schema/event/quality-gate-result/v1/quality-gate-result.schema.json"
-                    - required: ["failures"]
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: quality.gate.failed.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    allOf:
+                      - $ref: "../../../json-schema/event/quality-gate-result/v1/quality-gate-result.schema.json"
+                      - required: ["failures"]
 
   experiment.outcome.observed.v1:
     address: experiment.outcome.observed.v1
@@ -255,15 +272,16 @@ channels:
         title: experiment.outcome.observed.v1
         summary: Experiment outcome observed (experiment-attribution-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: experiment.outcome.observed.v1
-                context_type:
-                  const: tenant
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: experiment.outcome.observed.v1
+                  context_type:
+                    const: tenant
 
   strategy.card.eligible.v1:
     address: strategy.card.eligible.v1
@@ -277,15 +295,16 @@ channels:
         title: strategy.card.eligible.v1
         summary: Strategy card eligible (strategy-skill-bank-service).
         contentType: application/json
-        schemaFormat: "application/schema+json;version=draft-2020-12"
         payload:
-          allOf:
-            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
-            - properties:
-                event_type:
-                  const: strategy.card.eligible.v1
-                context_type:
-                  const: aggregate
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: strategy.card.eligible.v1
+                  context_type:
+                    const: aggregate
 
 operations:
   sendRepoIntaken:
