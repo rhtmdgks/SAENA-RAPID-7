@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/deploy/saena-forge/values.schema.json",
+  "title": "saena-forge Helm values",
+  "description": "Enforces v1 engine-scope closed enum (CLAUDE.md Engine scope; k3s spec §8.1 condition 2 — 'engine flags include any Google AI service in v1' MUST fail preflight/install), digest-pinned images (no floating tags), and secret-REFERENCE-only credential wiring (no plaintext secret values — ADR-0020).",
+  "type": "object",
+  "required": ["global", "networkPolicy", "services"],
+  "properties": {
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+
+    "global": {
+      "type": "object",
+      "required": ["engineScope", "policyBundle", "skillBundle", "network"],
+      "properties": {
+        "environment": { "type": "string" },
+        "imageRegistry": { "type": "string" },
+        "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "engineScope": { "$ref": "#/$defs/engineScope" },
+        "policyBundle": { "$ref": "#/$defs/versionedBundle" },
+        "skillBundle": { "$ref": "#/$defs/versionedBundle" },
+        "network": {
+          "type": "object",
+          "required": ["defaultDeny"],
+          "properties": {
+            "defaultDeny": { "type": "boolean", "const": true }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "namespaces": {
+      "type": "object",
+      "properties": {
+        "system": { "type": "string" },
+        "data": { "type": "string" },
+        "observability": { "type": "string" },
+        "tenants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "ADR-0014 immutable DNS-safe slug, <=32 chars.",
+                "pattern": "^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])?$"
+              },
+              "isolationProfile": { "type": "string", "enum": ["internal-k3s", "saas-shared"] }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "networkPolicy": {
+      "type": "object",
+      "required": ["defaultDeny"],
+      "properties": {
+        "defaultDeny": { "type": "boolean", "const": true }
+      },
+      "additionalProperties": true
+    },
+
+    "postgres": { "$ref": "#/$defs/externalDataDependency" },
+    "temporal": {
+      "allOf": [{ "$ref": "#/$defs/noPlaintextSecretFields" }],
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "externalDatabase": { "type": "boolean" },
+        "host": { "type": "string" },
+        "port": { "type": "integer" },
+        "namespace": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "objectStorage": { "$ref": "#/$defs/externalDataDependency" },
+    "eventBus": {
+      "allOf": [{ "$ref": "#/$defs/noPlaintextSecretFields" }],
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "brokers": { "type": "array", "items": { "type": "string" } },
+        "credentialsSecretRef": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+
+    "externalSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "valueFrom"],
+        "properties": {
+          "name": { "type": "string" },
+          "source": { "type": "string" },
+          "valueFrom": {
+            "type": "string",
+            "enum": ["SecretStore", "ClusterSecretStore", "VaultSecret"],
+            "description": "MUST NOT be 'ConfigMap' — plaintext ConfigMap-backed secret refs are the exact k3s spec §8.1 condition-3 fail case."
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+
+    "observability": {
+      "type": "object",
+      "properties": {
+        "openTelemetry": { "type": "boolean" },
+        "prometheus": { "type": "boolean" },
+        "loki": { "type": "boolean" },
+        "tempo": { "type": "boolean" },
+        "grafana": {
+          "type": "object",
+          "properties": {
+            "dashboardSidecarLabel": { "type": "string" },
+            "dashboardSidecarLabelValue": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "otelCollectorEndpoint": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+
+    "agentRunner": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "job": {
+          "type": "object",
+          "properties": {
+            "serviceAccount": { "type": "string" },
+            "activeDeadlineSeconds": { "type": "integer", "minimum": 1 },
+            "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+            "rbac": {
+              "type": "object",
+              "properties": {
+                "clusterAdmin": { "type": "boolean", "const": false },
+                "productionDeploy": { "type": "boolean", "const": false },
+                "rules": { "type": "array" }
+              },
+              "additionalProperties": true
+            },
+            "securityContext": { "$ref": "#/$defs/securityContext" }
+          },
+          "additionalProperties": true
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "maxConcurrentRunsPerTenant": { "type": "integer", "minimum": 1 },
+            "maxCostUsdPerRun": { "type": "number", "minimum": 0 },
+            "maxArtifactsMiBPerRun": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "migrations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "strategy", "reversible"],
+        "properties": {
+          "id": { "type": "string" },
+          "strategy": { "type": "string" },
+          "reversible": { "type": "boolean" },
+          "reviewedBy": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    },
+
+    "featureFlags": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    },
+
+    "serviceDefaults": { "$ref": "#/$defs/serviceSpec" },
+
+    "services": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/serviceSpec" }
+    },
+
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "digest", "signature"],
+        "properties": {
+          "name": { "type": "string" },
+          "digest": { "$ref": "#/$defs/imageDigest" },
+          "signature": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true,
+
+  "$defs": {
+    "imageDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$",
+      "description": "Content-addressed digest pin only — floating tags (':latest', ':v1') never match this pattern (ADR-0021 pinning discipline / k3s spec §6.3)."
+    },
+
+    "versionedBundle": {
+      "type": "object",
+      "required": ["version", "digest"],
+      "properties": {
+        "version": { "type": "string" },
+        "digest": { "$ref": "#/$defs/imageDigest" }
+      },
+      "additionalProperties": true
+    },
+
+    "engineScope": {
+      "type": "object",
+      "description": "v1 closed enum — `chatgptSearch` is the only key permitted to be `true`. The well-known non-v1 engine keys (`googleAiOverviews`, `googleAiMode`, `gemini`) may be present ONLY as documented-disabled markers (`false`) — this mirrors forgectl's `engine_flags` check (`tools/forgectl/src/saena_forgectl/checks/engine_flags.py` `_KNOWN_FLAG_KEYS`), which accepts these keys present-and-false and fails only on enablement or on a wholly unrecognized key. Any of the three named keys set `true`, OR any key outside this closed set (recognized-or-not), is REJECTED at the schema level — 'helm install/template with a Google flag on fails at schema validation'.",
+      "properties": {
+        "chatgptSearch": { "type": "boolean" },
+        "googleAiOverviews": { "type": "boolean", "const": false },
+        "googleAiMode": { "type": "boolean", "const": false },
+        "gemini": { "type": "boolean", "const": false }
+      },
+      "additionalProperties": false
+    },
+
+    "securityContext": {
+      "type": "object",
+      "properties": {
+        "runAsNonRoot": { "type": "boolean", "const": true },
+        "runAsUser": { "type": "integer", "minimum": 1 },
+        "readOnlyRootFilesystem": { "type": "boolean", "const": true },
+        "allowPrivilegeEscalation": { "type": "boolean", "const": false },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "array",
+              "contains": { "const": "ALL" }
+            }
+          }
+        },
+        "seccompProfile": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "const": "RuntimeDefault" }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "resourceSpec": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string" },
+            "memory": { "type": "string" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string" },
+            "memory": { "type": "string" }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "serviceImage": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string" },
+        "digest": { "$ref": "#/$defs/imageDigest" },
+        "signature": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+
+    "serviceSpec": {
+      "allOf": [{ "$ref": "#/$defs/noPlaintextSecretFields" }],
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "nameSuffix": { "type": "string" },
+        "namespace": { "type": "string" },
+        "domain": { "type": "string" },
+        "image": { "$ref": "#/$defs/serviceImage" },
+        "replicaCount": { "type": "integer", "minimum": 0 },
+        "resources": { "$ref": "#/$defs/resourceSpec" },
+        "securityContext": { "$ref": "#/$defs/securityContext" },
+        "podSecurityContext": { "type": "object" },
+        "livenessProbe": { "type": "object" },
+        "readinessProbe": { "type": "object" },
+        "podDisruptionBudget": {
+          "type": "object",
+          "properties": {
+            "minAvailable": { "type": ["integer", "string"] }
+          }
+        },
+        "port": { "type": "integer" },
+        "serviceAccount": {
+          "type": "object",
+          "properties": {
+            "create": { "type": "boolean" },
+            "automountServiceAccountToken": { "type": "boolean" }
+          }
+        },
+        "rbac": {
+          "type": "object",
+          "properties": {
+            "rules": { "type": "array" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "externalDataDependency": {
+      "allOf": [{ "$ref": "#/$defs/noPlaintextSecretFields" }],
+      "type": "object",
+      "properties": {
+        "external": { "type": "boolean" },
+        "host": { "type": "string" },
+        "port": { "type": "integer" },
+        "database": { "type": "string" },
+        "type": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "useTLS": { "type": "boolean" },
+        "bucket": { "type": "string" },
+        "credentialsSecretRef": {
+          "type": "string",
+          "description": "Reference-only credential wiring — the actual secret VALUE never appears in this values file (ADR-0020)."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "noPlaintextSecretFields": {
+      "description": "Denylist of key SHAPES that indicate an inline secret VALUE rather than a *SecretRef/*SecretName reference. Applied via `patternProperties` directly (not wrapped in `not` — mapping a pattern to schema `false` already means 'no key may match this pattern', which is the correct 'reject if present' semantics without needing De Morgan gymnastics). `*SecretRef`/`*SecretName`-suffixed keys (e.g. `credentialsSecretRef`) never match these patterns, since none of them end the match at a bare denylist word. Case variants are listed explicitly (ECMA-262 'regex' format, the JSON Schema string-format for `pattern`, does not support inline `(?i)` flags) covering lowercase, UPPERCASE, and the camelCase/PascalCase forms this repo's Helm values use. Merge this object's `patternProperties` into a schema via `allOf`.",
+      "patternProperties": {
+        "^(password|Password|PASSWORD)$": false,
+        "^(passwd|Passwd|PASSWD)$": false,
+        "^(secret|Secret|SECRET)$": false,
+        "^(token|Token|TOKEN)$": false,
+        "^(apiKey|apikey|ApiKey|APIKEY|api_key|API_KEY)$": false,
+        "^(privateKey|privatekey|PrivateKey|PRIVATEKEY|private_key|PRIVATE_KEY)$": false
+      }
+    }
+  }
+}

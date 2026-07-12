@@ -1,0 +1,65 @@
+{
+  "title": "SAENA FORGE — Quality",
+  "uid": "saena-forge-quality",
+  "tags": ["saena-forge", "quality"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "editable": false,
+  "time": { "from": "now-24h", "to": "now" },
+  "description": "k3s spec §9.2 dashboard 3: build/test/link/schema/a11y failures by framework and skill.",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Quality-gate failures by framework (build/test/link/schema/a11y)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_quality_gate_failure_total[15m])) by (framework)",
+          "legendFormat": "{{framework}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Quality-gate failures by skill",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_quality_gate_failure_total[15m])) by (skill)",
+          "legendFormat": "{{skill}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Failure rate by patch unit (table)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(50, sum(increase(saena_quality_gate_failure_total[24h])) by (saena_patch_unit_id, framework, skill))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Total gate failures, 24h",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(saena_quality_gate_failure_total[24h]))"
+        }
+      ]
+    }
+  ]
+}

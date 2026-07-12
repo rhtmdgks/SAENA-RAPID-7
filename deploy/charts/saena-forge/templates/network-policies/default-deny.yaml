@@ -1,0 +1,40 @@
+{{- /*
+Default-deny NetworkPolicy per namespace (k3s spec §6.2 networkPolicy.defaultDeny,
+§8.1 preflight condition 4: "default-deny NetworkPolicy is absent" MUST fail
+install). Ingress+egress both denied by default; explicit allow rules for
+known service->dependency flows are separate NetworkPolicy objects
+(allow-known-flows.yaml) that layer permitted traffic back in per ADR-0004
+pool separation (control/data/runner/browser).
+*/ -}}
+{{- if .Values.networkPolicy.defaultDeny }}
+{{- range list .Values.namespaces.system .Values.namespaces.data .Values.namespaces.observability }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ . }}
+  labels:
+    {{- include "saena-forge.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+{{- end }}
+{{- range $.Values.namespaces.tenants }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ include "saena-forge.tenantNamespace" .id }}
+  labels:
+    {{- include "saena-forge.labels" $ | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+{{- end }}
+{{- end }}

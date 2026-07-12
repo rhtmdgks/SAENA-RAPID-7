@@ -1,0 +1,67 @@
+{
+  "title": "SAENA FORGE — Drift",
+  "uid": "saena-forge-drift",
+  "tags": ["saena-forge", "drift"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "editable": false,
+  "time": { "from": "now-7d", "to": "now" },
+  "description": "k3s spec §9.2 dashboard 6: model/provider/observation-adapter change, citation-parse mismatch, strategy-card decay.",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Model/provider/observation-adapter changes",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(saena_drift_adapter_change_total[1d])) by (adapter, saena_engine_id)",
+          "legendFormat": "{{adapter}} ({{saena_engine_id}})"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Citation-parse mismatches",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_drift_citation_parse_mismatch_total[1h])) by (saena_engine_id)",
+          "legendFormat": "{{saena_engine_id}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Strategy-card decay ratio (strategy-skill-bank-service, k3s spec §9.2)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(saena_drift_strategy_card_decay_ratio) by (saena_aggregate_scope_id)",
+          "legendFormat": "{{saena_aggregate_scope_id}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Adapter-change events, last 30 days (table)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(50, sum(increase(saena_drift_adapter_change_total[30d])) by (adapter, saena_engine_id, saena_contract_hash))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

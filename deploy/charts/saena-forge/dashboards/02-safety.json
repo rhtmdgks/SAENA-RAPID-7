@@ -1,0 +1,77 @@
+{
+  "title": "SAENA FORGE — Safety",
+  "uid": "saena-forge-safety",
+  "tags": ["saena-forge", "safety"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "editable": false,
+  "time": { "from": "now-24h", "to": "now" },
+  "description": "k3s spec §9.2 dashboard 2: denied commands, out-of-scope file-write attempts, secret scans, injection flags (security-model.md Four Gates).",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Denied commands by gate (Input/Plan/Execution/Release)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_safety_denied_command_total[5m])) by (gate, saena_tenant_id)",
+          "legendFormat": "{{gate}} ({{saena_tenant_id}})"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Out-of-scope file-write attempts",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_safety_out_of_scope_write_total[5m])) by (saena_patch_unit_id)",
+          "legendFormat": "{{saena_patch_unit_id}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Secret scan findings (fingerprint+rule-id only, never the secret value — ADR-0020)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_safety_secret_scan_finding_total[5m])) by (rule_id)",
+          "legendFormat": "{{rule_id}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Prompt-injection flags (k3s spec §10 failure-mode: quarantine, no command execution)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_safety_injection_flag_total[5m])) by (saena_run_id)",
+          "legendFormat": "{{saena_run_id}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Policy-gate fail-closed events (security-model.md: gate 장애 시 승인·실행 불가)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(saena_safety_denied_command_total{gate=\"policy_gate_unavailable\"}[1h]))"
+        }
+      ]
+    }
+  ]
+}

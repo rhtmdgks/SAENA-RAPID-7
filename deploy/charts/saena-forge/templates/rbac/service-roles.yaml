@@ -1,0 +1,43 @@
+{{- /*
+Namespace-scoped Role + RoleBinding per service — deliberately NOT a
+ClusterRole (security-model.md: "Least privilege RBAC ... allowlist가 본체";
+k3s spec §8.1 condition 5: "runner service account has cluster-admin or
+production deploy permission" MUST fail preflight/install). Each rule list
+comes from `services.<key>.rbac.rules` in values.yaml — no wildcard
+apiGroups/resources/verbs are declared by this chart's defaults.
+*/ -}}
+{{- range $key, $svc := .Values.services }}
+{{- if $svc.enabled }}
+{{- if $svc.rbac }}
+{{- $saName := include "saena-forge.serviceAccountName" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $fullname := include "saena-forge.serviceFullname" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $labels := include "saena-forge.serviceLabels" (dict "root" $ "service" $svc.nameSuffix) }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fullname }}-role
+  namespace: {{ $svc.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+rules:
+  {{- $svc.rbac.rules | toYaml | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fullname }}-rolebinding
+  namespace: {{ $svc.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $saName }}
+    namespace: {{ $svc.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $fullname }}-role
+{{- end }}
+{{- end }}
+{{- end }}

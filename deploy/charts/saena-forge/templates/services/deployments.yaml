@@ -1,0 +1,83 @@
+{{- /*
+Deployment for each of the 8 independently-deployed services
+(service-catalog.md "Independent Deployment" rendering class: forge-console-api,
+plan-contract, policy-gate, agent-orchestrator, audit-ledger, tenant-control,
+artifact-registry, engine-adapter-gateway). Every field is parameterized from
+`.Values.services.<key>` merged over `.Values.serviceDefaults`.
+*/ -}}
+{{- range $key, $svc := .Values.services }}
+{{- if $svc.enabled }}
+{{- $replicaCount := $svc.replicaCount | default $.Values.serviceDefaults.replicaCount }}
+{{- $resources := $svc.resources | default $.Values.serviceDefaults.resources }}
+{{- $securityContext := $svc.securityContext | default $.Values.serviceDefaults.securityContext }}
+{{- $podSecurityContext := $svc.podSecurityContext | default $.Values.serviceDefaults.podSecurityContext }}
+{{- $livenessProbe := $svc.livenessProbe | default $.Values.serviceDefaults.livenessProbe }}
+{{- $readinessProbe := $svc.readinessProbe | default $.Values.serviceDefaults.readinessProbe }}
+{{- $port := $svc.port | default $.Values.serviceDefaults.port }}
+{{- $sa := $svc.serviceAccount | default dict }}
+{{- $automount := $sa.automountServiceAccountToken }}
+{{- if not (hasKey $sa "automountServiceAccountToken") }}{{- $automount = $.Values.serviceDefaults.serviceAccount.automountServiceAccountToken }}{{- end }}
+{{- $fullname := include "saena-forge.serviceFullname" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $selectorLabels := include "saena-forge.serviceSelectorLabels" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $labels := include "saena-forge.serviceLabels" (dict "root" $ "service" $svc.nameSuffix) }}
+{{- $saName := include "saena-forge.serviceAccountName" (dict "root" $ "service" $svc.nameSuffix) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $svc.namespace }}
+  labels:
+    {{- $labels | nindent 4 }}
+    saena.io/domain: {{ $svc.domain }}
+spec:
+  replicas: {{ $replicaCount }}
+  selector:
+    matchLabels:
+      {{- $selectorLabels | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- $labels | nindent 8 }}
+        saena.io/domain: {{ $svc.domain }}
+      annotations:
+        checksum/infra-config: {{ include (print $.Template.BasePath "/config/infra-connection-configmap.yaml") $ | sha256sum }}
+    spec:
+      serviceAccountName: {{ $saName }}
+      automountServiceAccountToken: {{ $automount }}
+      securityContext:
+        {{- $podSecurityContext | toYaml | nindent 8 }}
+      containers:
+        - name: {{ $svc.nameSuffix }}
+          image: "{{ $.Values.global.imageRegistry }}/{{ $svc.image.repository }}@{{ $svc.image.digest }}"
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          securityContext:
+            {{- $securityContext | toYaml | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ $port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "saena-forge.fullname" $ }}-infra-connection
+          env:
+            - name: SAENA_TENANT_ID
+              value: ""
+            - name: SAENA_SERVICE_NAME
+              value: {{ $svc.nameSuffix | quote }}
+            - name: SAENA_ENGINE_SCOPE_CHATGPT_SEARCH
+              value: {{ $.Values.global.engineScope.chatgptSearch | quote }}
+            - name: POSTGRES_CREDENTIALS_SECRET_REF
+              value: {{ $.Values.postgres.credentialsSecretRef | quote }}
+            - name: OBJECT_STORAGE_CREDENTIALS_SECRET_REF
+              value: {{ $.Values.objectStorage.credentialsSecretRef | quote }}
+            - name: EVENT_BUS_CREDENTIALS_SECRET_REF
+              value: {{ $.Values.eventBus.credentialsSecretRef | quote }}
+          resources:
+            {{- $resources | toYaml | nindent 12 }}
+          livenessProbe:
+            {{- $livenessProbe | toYaml | nindent 12 }}
+          readinessProbe:
+            {{- $readinessProbe | toYaml | nindent 12 }}
+{{- end }}
+{{- end }}
