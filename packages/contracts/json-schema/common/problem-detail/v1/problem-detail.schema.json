@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/common/problem-detail/v1/problem-detail.schema.json",
+  "title": "Problem detail",
+  "description": "Synchronous API error response shape — RFC 9457 application/problem+json standard fields plus SAENA extensions, per ADR-0015.",
+  "$comment": "compat_class: closed. Authority: approved plan §2 row 4; ADR-0015 (docs/decisions/ADR-0015-canonical-error-model.md) '동기 API 에러 포맷' table — 5 RFC 9457 standard fields (type, title, status, detail, instance) + 4 SAENA extensions (error_code, retryable, trace_id, tenant_id/run_id optional). tenant_id/run_id are $ref'd from common/identifiers/v1 rather than redeclared, per single-authority identifier convention (ADR-0011/ADR-0014).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "title", "status", "error_code", "retryable", "trace_id"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "format": "uri",
+      "$comment": "https://schemas.the-saena.ai/errors/<category>/<code> — non-resolvable identifier namespace, same convention as contract $id (ADR-0011, ADR-0015)."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "RFC 9457 standard field — human-readable summary."
+    },
+    "status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "$comment": "RFC 9457 standard field — HTTP status code."
+    },
+    "detail": {
+      "type": "string",
+      "$comment": "RFC 9457 standard field — concrete explanation. PII/secret forbidden by ADR-0015 policy, not schema-enforceable."
+    },
+    "instance": {
+      "type": "string",
+      "$comment": "RFC 9457 standard field — request instance identifier URI/ref."
+    },
+    "error_code": {
+      "type": "string",
+      "pattern": "^saena\\.[a-z_]+\\.[a-z_]+$",
+      "$comment": "saena.<category>.<reason> — same pattern as common/error-detail/v1, per ADR-0015 taxonomy."
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "$comment": "32-hex W3C trace context format — identical to envelope trace_id (ADR-0013), the 3-way correlation key per ADR-0015."
+    },
+    "tenant_id": {
+      "$ref": "../../identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Optional, when applicable (ADR-0015). Relative path resolves packages/contracts/json-schema/common/problem-detail/v1/ -> ../../identifiers/v1/identifiers.schema.json = packages/contracts/json-schema/common/identifiers/v1/identifiers.schema.json."
+    },
+    "run_id": {
+      "$ref": "../../identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "Optional, when applicable (ADR-0015)."
+    }
+  }
+}

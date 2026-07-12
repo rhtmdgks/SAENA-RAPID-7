@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/common/engine-id/v1/engine-id.schema.json",
+  "title": "Engine ID",
+  "description": "Closed enum of supported AEO engines. v1 = ChatGPT Search only, per CLAUDE.md Engine scope and ADR-0013:58.",
+  "$comment": "compat_class: closed. Authority: approved plan §2 row 2; ruling R1 (docs/.../virtual-cooking-map.md §1.1) — engine_id is a single standalone file, NOT duplicated inside common/identifiers. ADR-0013:58 (docs/decisions/ADR-0013-event-envelope-v1.md) is the field-level authority; CLAUDE.md 'Engine scope (v1)' is the operating-principle authority (Google AI Overviews / Google AI Mode / Gemini disabled — optimize/observe/claim forbidden). Extension (adding another engine value) requires separate re-approval + a new/revised ADR + a major version bump (ADR-0012 enum-widening-is-major rule). Tolerant-read obligation is DEFERRED here because v1 is a single-value enum (nothing to be tolerant of yet); this is the SECOND recorded deferral (see ADR-0011/ADR-0012 tolerant-read obligation notes and virtual-cooking-map.md R11/R9 discussion) — the obligation transfers forward to the next multi-value enum contract introduced in this catalog.",
+  "type": "string",
+  "enum": ["chatgpt-search"],
+  "$defs": {
+    "engine_required_payload": {
+      "type": "object",
+      "$comment": "Reusable activation fragment for P1 payload families (observation/citation/experiment events) that must carry a required engine_id field. Consumers compose this via allOf/$ref rather than redeclaring engine_id inline.",
+      "required": ["engine_id"],
+      "properties": {
+        "engine_id": {
+          "$ref": "#"
+        }
+      }
+    }
+  }
+}

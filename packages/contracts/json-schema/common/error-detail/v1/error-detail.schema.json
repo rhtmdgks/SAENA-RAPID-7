@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/common/error-detail/v1/error-detail.schema.json",
+  "title": "Error detail",
+  "description": "Minimal error representation embedded in domain event payloads via $ref, per ADR-0015 — there is no separate error-event topic family; failures ride the existing domain event payload.",
+  "$comment": "compat_class: closed. Authority: approved plan §2 row 3; ADR-0015 (docs/decisions/ADR-0015-canonical-error-model.md) 'AuditEvent 에러 기록 범위' / common/v1/error-detail section — minimal 3-field shape (error_code, retryable, summary). Stack traces, raw content, and PII are forbidden in this payload but this is a runtime/review obligation, NOT schema-enforceable (JSON Schema cannot inspect semantic content of a free-text summary string) — see ADR-0015 Constraints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error_code", "retryable", "summary"],
+  "properties": {
+    "error_code": {
+      "type": "string",
+      "pattern": "^saena\\.[a-z_]+\\.[a-z_]+$",
+      "$comment": "saena.<category>.<reason> per ADR-0015 error taxonomy (9 categories: validation, auth, policy_denied, conflict, not_found, rate_limited, upstream_engine, unavailable, internal)."
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "$comment": "Human-readable short summary. Stack traces / raw customer content / PII forbidden by ADR-0015 policy — not schema-enforceable, enforced by runtime + review."
+    }
+  }
+}
