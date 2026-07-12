@@ -10,7 +10,6 @@ dependencies = [
     "saena-domain",
     "saena-observability",
     "saena-schemas",
-    "saena-shared",
 ]
 
 [build-system]
@@ -24,4 +23,3 @@ packages = ["src/saena_engine_gateway"]
 saena-domain = { workspace = true }
 saena-observability = { workspace = true }
 saena-schemas = { workspace = true }
-saena-shared = { workspace = true }
