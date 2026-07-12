@@ -1,0 +1,9 @@
+{
+  "name": "saena-contract-lint",
+  "private": true,
+  "description": "Isolated Node toolchain for contract linting only (ADR-0009/0011 — AsyncAPI CLI is the sole Node exception). Install: npm ci --prefix tools/contract-lint",
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "@asyncapi/cli": "6.0.2"
+  }
+}

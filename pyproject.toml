@@ -68,7 +68,7 @@ testpaths = ["packages", "tests"]
 addopts = "-ra"
 
 [tool.coverage.run]
-source = ["packages"]
+source = ["packages", "tests/contract/harness"]
 # Exclusions must be explicit per ADR-0017 — no implicit patterns.
 # packages/schemas/saena_schemas/* is 100% codegen output (ADR-0011 SSOT
 # split; packages/schemas/README.md) — coverage over generated pydantic
