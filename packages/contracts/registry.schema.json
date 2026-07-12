@@ -49,7 +49,7 @@
         "catalog_name": {
           "type": "string",
           "minLength": 1,
-          "description": "Back-reference to the conceptual contract row in docs/architecture/contract-catalog.md (12 contracts). Distinct from name/file identity: e.g. the RunContext catalog row splits into two registry entries/files (run-context-lifecycle, run-context-experiment) that both carry catalog_name \"RunContext\" (ruling R10, ADR-0011 §RunContext split precedent)."
+          "description": "Back-reference to the conceptual contract row in docs/architecture/contract-catalog.md (12 contracts). Distinct from name/file identity: e.g. the RunContext catalog row splits into two registry entries/files (run-context-lifecycle, run-context-experiment) that both carry catalog_name \"RunContext\" (ruling R10, approved Wave 1 plan §1.1 R10 (RunContext split back-reference))."
         },
         "category": {
           "type": "string",
