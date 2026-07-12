@@ -15,12 +15,9 @@ judgment functions (`check_name_major_unique`, etc.) live in
 `harness.registry` (w1-10, single implementation, tests/contract/README.md
 ownership split); this module only calls them and asserts on their output.
 
-The registry currently has zero entries (W1 bootstrap; w1-15 performs the
-final batch registration once every P0 contract is green -- plan §3
-ownership matrix, w1-15 row "registry.json(status -> active -- w1-01과
-순차)"). This module is written to be parametrize-ready: `iter_entries()`
-drives every per-entry assertion, so the moment entries land the same test
-bodies start exercising real data without modification.
+Registry currently has 26 active entries (Wave 1 first release). This
+module is parametrize-ready: `iter_entries()` drives every per-entry
+assertion against the live registry.
 """
 
 from __future__ import annotations

@@ -12,11 +12,11 @@ For each `packages/contracts/registry.json` entry:
        - leg 2: harness.rules.judge() on the structural diff between the
          previous-tag schema and the current schema.
 
-Registry currently has zero entries (W1 bootstrap, packages/contracts
-schema authoring lands in later units per the plan's dependency DAG).
-This is not a silent no-op: the parametrization degenerates to a single,
-explicit "registry has no entries yet (W1 bootstrap)" skip, and a
-dedicated meta-test asserts that branch is actually exercised.
+Registry currently has 26 active entries (Wave 1 first release). Because
+no prior `contracts/{name}/v*` tags exist yet, every entry takes the
+explicit first-release skip path (pytest.skip per entry — not a silent
+pass). A dedicated meta-test still exercises the empty-registry
+bootstrap-skip branch so an empty registry can never silently green.
 """
 
 from __future__ import annotations

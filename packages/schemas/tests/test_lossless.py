@@ -67,18 +67,11 @@ ENVELOPE_FIXTURES_DIR = REPO_ROOT / "tests" / "contract" / "fixtures" / "envelop
 # recipe's OPEN_CONTRACTS list (same $comment applies: hardcoded until
 # packages/contracts/registry.json carries compat_class per contract, w1-15).
 #
-# This dict only lists contracts that PHYSICALLY EXIST under
-# packages/contracts/json-schema in THIS worktree (w1-12) and are therefore
-# testable here. The justfile recipe's OPEN_CONTRACTS list additionally names
-# all 6 event/* payload contracts (patch-unit-completed, quality-gate-result,
-# plan-contract-proposed, plan-contract-approved, repo-intaken,
-# site-inventory-completed) — none of them exist in this worktree as of
-# 2026-07-12 (w1-08 has not merged yet); the codegen recipe is glob-driven so
-# they auto-join on the next `just codegen` once landed, but they cannot be
-# exercised by THIS test file until then. Do not add them here until they are
-# actually present — `test_open_and_closed_lists_cover_all_generated_object_root_contracts`
-# below only checks lockstep against what was actually generated, not the
-# justfile's full (future-inclusive) list.
+# Includes all Open-class roots that physically exist under
+# packages/contracts/json-schema and are generated into saena_schemas —
+# contexts, verification-result, and the 6 event/* payload contracts.
+# `test_open_and_closed_lists_cover_all_generated_object_root_contracts`
+# below asserts lockstep against what was actually generated.
 OPEN_CONTRACTS: dict[str, str] = {
     "context/workspace_context_v1": "context/workspace-context/v1",
     "context/project_context_v1": "context/project-context/v1",
