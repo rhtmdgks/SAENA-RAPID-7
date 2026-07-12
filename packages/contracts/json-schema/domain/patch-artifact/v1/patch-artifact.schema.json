@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/patch-artifact/v1/patch-artifact.schema.json",
+  "title": "PatchArtifact",
+  "description": "Reference-only record of a completed patch unit's diff artifact. Never carries diff content inline — customer-proprietary highest sensitivity ('diff=소스').",
+  "$comment": "compat_class: closed. Authority: approved plan §2 domain row 4 (docs/... virtual-cooking-map.md §2, §5); docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md §4.2:190-211 PatchUnitCompleted message skeleton (event_id/tenant_id/run_id/patch_unit_id/worktree_commit/manifest_uri/changed_files/quality_gate_ids/occurred_at — this domain contract is the underlying record the event payload derives its fields from, per contract/event relationship in docs/architecture/contract-catalog.md); docs/specs/SAENA_AEO_Algorithm_and_Harness_Design_v1.md §5.3 Proof-Carrying Change Set (evidence_ids = hunk<->evidence linkage: 'claim_id와 evidence_id', §11.1 diff-rationality link via contract_hash); docs/architecture/contract-catalog.md P0 table 'PatchArtifact' row (Sensitivity 'customer-proprietary 최고 (diff=소스)').",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "run_id",
+    "patch_unit_id",
+    "worktree_commit",
+    "base_commit",
+    "artifact_uri",
+    "artifact_hash",
+    "manifest_uri",
+    "changed_files",
+    "quality_gate_ids",
+    "evidence_ids",
+    "contract_hash",
+    "rollback_ref",
+    "created_at"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "k3s §4.2:191 PatchUnitCompleted.tenant_id."
+    },
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "k3s §4.2:192 PatchUnitCompleted.run_id."
+    },
+    "patch_unit_id": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "k3s §4.2:193 PatchUnitCompleted.patch_unit_id — corresponds to ChangePlan.patch_units[].id."
+    },
+    "worktree_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "$comment": "k3s §4.2:194 PatchUnitCompleted.worktree_commit. ADR-0013 appendix examples use short (7-char) sha forms for worktree-scoped commits rather than the full 40-hex git_sha $def used for repo_commit/base_commit — 7-40 hex accepted here (see also ADR-0023 worktree execution conventions)."
+    },
+    "base_commit": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/git_sha",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 4 field list — the immutable repo commit the patch unit branched from (mirrors ChangePlan.repo_commit / SourceSnapshot.repo_commit)."
+    },
+    "artifact_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 4 field list — reference to the diff artifact object, never inline content; uri_ref forbids query/fragment (R9-5, presigned-token smuggling defense)."
+    },
+    "artifact_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 4 field list — integrity hash of the referenced diff artifact."
+    },
+    "manifest_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "k3s §4.2:196 PatchUnitCompleted.manifest_uri."
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "k3s §4.2:197 PatchUnitCompleted.changed_files. Paths only, never content — same customer-proprietary boundary principle as SourceSnapshot (no raw content/listing fields)."
+    },
+    "quality_gate_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "k3s §4.2:198 PatchUnitCompleted.quality_gate_ids."
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 4 field list; Algorithm §5.3 Proof-Carrying Change Set — 'each diff hunk 는 claim_id와 evidence_id ... 와 연결된다'. minItems 1 enforces hunk<->evidence linkage at the artifact level."
+    },
+    "contract_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 4 field list — Algorithm §11.1 diff-rationality link: ties this artifact back to the ChangePlan instance that authorized it (mirrors ApprovalDecision.contract_hash)."
+    },
+    "rollback_ref": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 4 field list — Prompt package §7:370 'done condition' requires a rollback reference per completed patch unit (mirrors ChangePlan.patch_units[].rollback, e.g. 'git-revert:PU-01')."
+    },
+    "created_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 4 field list (parallels k3s §4.2 occurred_at, named created_at at the domain-record layer per §2 field spec)."
+    }
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/change-plan/v1/change-plan.schema.json",
+  "title": "ChangePlan (Action Contract)",
+  "description": "Plan Mode output — the signed, schema-validated Action Contract gating write tools, dependency install, and git commit per Algorithm §5.2. No Action Contract, no write.",
+  "$comment": "compat_class: closed, signed: true. Authority: approved plan §2 domain row 1 (docs/... virtual-cooking-map.md §2, §5); docs/specs/SAENA_AEO_Algorithm_and_Harness_Design_v1.md §5.2:249-278 (field skeleton); §5.4 Plan Gate. contract_hash is intentionally NOT a member of this schema — it is a self-reference that would have to be computed over its own containing document (self-reference avoidance); it is carried instead by ApprovalDecision.contract_hash and PatchArtifact.contract_hash, and referenced by the plan.contract.* events (k3s §4.2 ActionContractProposed.contract_hash). Canonicalization method (JCS) that would produce that hash is an explicitly pre-W2A ADR (docs/... virtual-cooking-map.md §7 W1 밖 승계 OPEN, 'JCS 정준화 ADR'). tenant_id/engine_scope/approval_required/no_deploy/no_push/evidence_ledger_hash/scope_limits/diff_budget/rejected_alternatives are field-level additions beyond the Algorithm §5.2 skeleton, confirmed by 사용자 결정 (docs/... virtual-cooking-map.md §1.2 items 3-4, H-3/H-7).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "tenant_id",
+    "repo_commit",
+    "approved_scope",
+    "engine_scope",
+    "hypotheses",
+    "patch_units",
+    "approval_required",
+    "no_deploy",
+    "no_push",
+    "evidence_ledger_hash",
+    "scope_limits",
+    "diff_budget",
+    "rejected_alternatives"
+  ],
+  "properties": {
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "Algorithm §5.2:253 'run_id' verbatim. Relative path resolves packages/contracts/json-schema/domain/change-plan/v1/ -> ../../../common/identifiers/v1/identifiers.schema.json = packages/contracts/json-schema/common/identifiers/v1/identifiers.schema.json."
+    },
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Algorithm §5.2:254 'customer_id' — renamed to tenant_id per Lead 룰링 R7 (docs/... virtual-cooking-map.md §1.1), authority ADR-0024 (W1 contract deviations, customer_id 개명). Uses the shared core-identifier tenant_id $def rather than a locally redeclared field, per single-authority identifier convention (ADR-0011/ADR-0014) — avoids the duplication ADR-0014 forbids."
+    },
+    "repo_commit": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/git_sha",
+      "$comment": "Algorithm §5.2:255 'repo_commit' — 'immutable SHA'. Uses git_sha (40-hex) $def, matching PatchArtifact.base_commit."
+    },
+    "approved_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "Algorithm §5.2:256 'approved_scope' — array of glob-like scope strings (e.g. 'apps/web/docs/*'). Glob-breadth validation itself is not schema-expressible; see scope_limits.max_globs $comment below."
+    },
+    "engine_scope": {
+      "type": "array",
+      "items": {
+        "$ref": "../../../common/engine-id/v1/engine-id.schema.json"
+      },
+      "minItems": 1,
+      "$comment": "Algorithm §5.2:257 'engine_scope' — array of engine-id root values. v1 closed enum ['chatgpt-search'] per common/engine-id/v1 and CLAUDE.md Engine scope (Google/Gemini disabled)."
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "$comment": "Algorithm §5.2:258-266 'hypotheses' array skeleton.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "query_cluster_ids",
+          "evidence_ids",
+          "predicted_layers",
+          "expected_effect_distribution",
+          "risk"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "$comment": "Algorithm §5.2:260 'id' e.g. 'H-01'."
+          },
+          "query_cluster_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "$comment": "Algorithm §5.2:261 'query_cluster_ids'."
+          },
+          "evidence_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "$comment": "Algorithm §5.2:262 'evidence_ids'. minItems 1 enforces Prompt package §5 'every material claim must be evidence-linked' at the hypothesis level."
+          },
+          "predicted_layers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["discovery", "citation", "absorption", "prominence", "referral"]
+            },
+            "minItems": 1,
+            "$comment": "Algorithm §5.2:263 'predicted_layers' — the 5 AEO outcome layers (Prompt package layer taxonomy)."
+          },
+          "expected_effect_distribution": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "number"
+            },
+            "$comment": "Algorithm §5.2:264 'expected_effect_distribution' e.g. {\"p_7d\": 0.42} — open key set (horizon labels), numeric values only."
+          },
+          "risk": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "$comment": "Algorithm §5.2:265 'risk'."
+          }
+        }
+      }
+    },
+    "patch_units": {
+      "type": "array",
+      "minItems": 1,
+      "$comment": "Algorithm §5.2:268-276 'patch_units' array skeleton — 1 unit = 1 rollback boundary.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "files", "allowed_transformations", "tests", "rollback"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "$comment": "Algorithm §5.2:270 'id' e.g. 'PU-01'."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "$comment": "Algorithm §5.2:271 'files'."
+          },
+          "allowed_transformations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "$comment": "Algorithm §5.2:272 'allowed_transformations' — Execution Gate allowlisted operation set for this patch unit (§5.4 Execution Gate)."
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "$comment": "Algorithm §5.2:273 'tests' — patch-unit-specific test identifiers (test-first principle, CLAUDE.md operating principle 8)."
+          },
+          "rollback": {
+            "type": "string",
+            "minLength": 1,
+            "$comment": "Algorithm §5.2:274 'rollback' e.g. 'git-revert:PU-01'."
+          }
+        }
+      }
+    },
+    "approval_required": {
+      "const": true,
+      "$comment": "Algorithm §5.2:277 'approval_required' — always true; no Action Contract instance may declare itself pre-approved (Plan Gate, §5.4)."
+    },
+    "no_deploy": {
+      "const": true,
+      "$comment": "CLAUDE.md operating principle 10 ('배포·push·merge 금지') encoded as a structural invariant; also security-model.md 'deployment credentials never in FORGE'."
+    },
+    "no_push": {
+      "const": true,
+      "$comment": "CLAUDE.md operating principle 10 ('배포·push·merge 금지') encoded as a structural invariant."
+    },
+    "evidence_ledger_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "H-3 (security-model.md '근거 고정 (H-3)': 'Action Contract에 evidence_ledger_hash + scope glob 상한 + diff 예산'). 사용자 확정 required (docs/... virtual-cooking-map.md §1.2 item 3). Anchors the evidence set referenced by hypotheses[].evidence_ids to an immutable ledger snapshot."
+    },
+    "scope_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_globs"],
+      "properties": {
+        "max_globs": {
+          "type": "integer",
+          "minimum": 1,
+          "$comment": "H-3 scope glob 상한 (security-model.md). Glob-breadth (how permissive a single glob pattern is, e.g. '**/*') is not itself schema-expressible — that policy check is enforced at the W2A policy-gate, not here; this field only caps the COUNT of approved_scope entries."
+        }
+      },
+      "$comment": "H-3 (security-model.md, docs/... virtual-cooking-map.md §1.2 item 3, 사용자 확정 required)."
+    },
+    "diff_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_files", "max_lines"],
+      "properties": {
+        "max_files": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_lines": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "$comment": "H-3 diff 예산 (security-model.md, docs/... virtual-cooking-map.md §1.2 item 3, 사용자 확정 required)."
+    },
+    "rejected_alternatives": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "reason"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "$comment": "docs/... virtual-cooking-map.md §2 domain row 1 field list — records alternatives considered and rejected during Plan Mode, for critic/audit review. minItems 0 permitted (may legitimately be empty when no alternatives were surfaced)."
+    }
+  }
+}
