@@ -73,6 +73,23 @@ serial job (not yet wired — `.github/workflows/**` is Integrator-only,
 ADR-0018; this is a two-lane STRUCTURE decision recorded here, the actual
 CI job wiring remains open work for whoever owns that path next).
 
+### CI two-lane wiring (w2-22)
+
+`.github/workflows/ci.yml` now mirrors this structure mechanically:
+
+- `unit` job's pytest step selects `-m "not integration"` — byte-identical
+  to justfile `test`'s selector. Blocking, deterministic, PR-required.
+- `integration` job (`needs: [unit]`) runs `uv run just test-integration`
+  (`-m integration`) — the real Temporal time-skipping test-server +
+  Postgres/Redpanda testcontainers lane. Also blocking (not
+  `continue-on-error`): a container that fails to start fails the job, it
+  does not skip silently. Separate PR-required check from `unit`.
+- `tests/unit/ci_identity/test_ci_matches_justfile.py` parses both
+  `ci.yml` and `justfile` and asserts the two selectors stay identical and
+  that the `integration` job exists and is not soft-failing — drift between
+  CI and the justfile recipes is now a failing unit-lane test, not a silent
+  divergence (ADR-0018 lockstep enforced mechanically).
+
 Coverage consequence (ADR-0017 ratchet, honestly documented, not silently
 weakened): `packages/domain/src/saena_domain/persistence/postgres/
 adapters.py` (real SQLAlchemy-async Postgres SQL adapters, w2-13) has no
