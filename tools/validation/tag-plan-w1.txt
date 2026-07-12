@@ -3,8 +3,15 @@
 #
 # WHEN (hard gate — all must be true before any git tag):
 #   Wave 1 PR has been merged into main, AND the merged main SHA has been
-#   verified and approved by a human as <VERIFIED_W1_MERGE_SHA>.
+#   verified and approved by a human.
 #   Do NOT create tags from wave1-contracts (or any non-main branch).
+#
+# SET the approved full SHA (human only — replace the placeholder value):
+#   VERIFIED_W1_MERGE_SHA="<approved-full-sha>"
+#
+# VARIABLE CHECKS (abort on any failure):
+#   test -n "$VERIFIED_W1_MERGE_SHA"
+#   test "$(git rev-parse "$VERIFIED_W1_MERGE_SHA")" = "$(git rev-parse HEAD)"
 #
 # PRE-FLIGHT CHECKS (run from repo root; abort on any failure):
 #   a. current branch is main
@@ -15,56 +22,56 @@
 #        git fetch origin
 #        test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 #   d. approved W1 merge SHA == HEAD
-#        test "$(git rev-parse HEAD)" = "<VERIFIED_W1_MERGE_SHA>"
+#        test "$(git rev-parse "$VERIFIED_W1_MERGE_SHA")" = "$(git rev-parse HEAD)"
 #   e. no contracts/* tags exist yet
 #        test -z "$(git tag -l 'contracts/*')"
 #
 # All 26 tags MUST target the same verified merge SHA
-# (<VERIFIED_W1_MERGE_SHA>). Do not hardcode a SHA into this file.
+# ("$VERIFIED_W1_MERGE_SHA"). Do not hardcode a SHA into this file.
 #
 # ---------------------------------------------------------------------------
 # STEP 1 — create tags locally (no push)
 # ---------------------------------------------------------------------------
-git tag contracts/engine-id/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/error-detail/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/identifiers/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/problem-detail/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/actor-context/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/project-context/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/run-context-experiment/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/run-context-lifecycle/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/site-context/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/tenant-context/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/workspace-context/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/approval-decision/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/audit-event/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/change-plan/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/patch-artifact/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/source-snapshot/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/verification-result/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/event-envelope/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/patch-unit-completed/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/plan-contract-approved/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/plan-contract-proposed/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/quality-gate-result/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/repo-intaken/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/site-inventory-completed/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/contract-validation/v1.0.0 <VERIFIED_W1_MERGE_SHA>
-git tag contracts/saena-events/v1.0.0 <VERIFIED_W1_MERGE_SHA>
+git tag contracts/engine-id/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/error-detail/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/identifiers/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/problem-detail/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/actor-context/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/project-context/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/run-context-experiment/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/run-context-lifecycle/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/site-context/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/tenant-context/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/workspace-context/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/approval-decision/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/audit-event/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/change-plan/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/patch-artifact/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/source-snapshot/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/verification-result/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/event-envelope/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/patch-unit-completed/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/plan-contract-approved/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/plan-contract-proposed/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/quality-gate-result/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/repo-intaken/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/site-inventory-completed/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/contract-validation/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
+git tag contracts/saena-events/v1.0.0 "$VERIFIED_W1_MERGE_SHA"
 #
 # ---------------------------------------------------------------------------
 # STEP 2 — verify the full local tag set before any remote push
 # ---------------------------------------------------------------------------
-#   Expected: exactly 26 contracts/* tags, all pointing at <VERIFIED_W1_MERGE_SHA>
+#   Expected: exactly 26 contracts/* tags, all pointing at "$VERIFIED_W1_MERGE_SHA"
 #        git tag -l 'contracts/*' | wc -l          # must be 26
 #        git tag -l 'contracts/*' | while read t; do
-#          test "$(git rev-list -n 1 "$t")" = "<VERIFIED_W1_MERGE_SHA>" || exit 1
+#          test "$(git rev-list -n 1 "$t")" = "$(git rev-parse "$VERIFIED_W1_MERGE_SHA")" || exit 1
 #        done
 #
 # ---------------------------------------------------------------------------
-# STEP 3 — one explicit push of the verified tag set (human only)
+# STEP 3 — one explicit atomic push of the verified tag set (human only)
 # ---------------------------------------------------------------------------
-# git push origin \
+# git push --atomic origin \
 #   contracts/engine-id/v1.0.0 \
 #   contracts/error-detail/v1.0.0 \
 #   contracts/identifiers/v1.0.0 \
