@@ -1,11 +1,26 @@
 """Append-only audit hash-chain: entry model, builder, and verifier.
 
-`AuditEntry` mirrors the `AuditEvent` contract fields (`packages/contracts/
-json-schema/domain/audit-event/v1/audit-event.schema.json`,
-`packages/schemas/saena_schemas/domain/audit_event_v1`) plus the R9-1
-scope/tenant_id/run_id conditional rules from that schema's `allOf` block:
-`scope="tenant"` requires `tenant_id`; `scope="system"` forbids both
-`tenant_id` and `run_id`.
+`AuditEntry` SUBCLASSES the codegen-generated `AuditEvent` model
+(`packages/schemas/saena_schemas/domain/audit_event_v1`, itself generated
+from `packages/contracts/json-schema/domain/audit-event/v1/
+audit-event.schema.json` — the SSOT, ADR-0011) rather than re-declaring its
+fields. This is deliberate: the generated model's `tenant_id`/`run_id`/
+`actor_id` are typed as `TenantId`/`RunId`/`ActorId` root-model wrappers
+(pattern/length constraints from `common/identifiers/v1`, e.g. `tenant_id`'s
+ADR-0014 DNS-safe-slug pattern and `run_id`/`actor_id`'s 1-128 char length
+bound) — hand-copying those as bare `str | None` would silently DROP those
+constraints and drift out of sync on the next codegen regen. Inheriting the
+generated fields verbatim means every constraint the contract schema
+expresses is enforced automatically and stays in lockstep with regen.
+
+`AuditEntry` adds exactly one thing on top of the inherited fields: the R9-1
+scope/tenant_id/run_id conditional rule from the schema's `allOf` block
+(`scope="tenant"` requires `tenant_id`; `scope="system"` forbids both
+`tenant_id` and `run_id`) — a cross-field relationship JSON Schema/codegen
+cannot express, so it is legitimately hand-written here as a
+`model_validator`. `frozen=True` is added on top of the inherited
+`extra="forbid"` (both apply — pydantic merges `model_config` from base and
+subclass).
 
 This module owns pure chain-building/verification logic only.
 `InMemoryAuditChain` is the reference append-only store used by tests and by
@@ -18,45 +33,42 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, RootModel, model_validator
+from saena_schemas.domain.audit_event_v1 import AuditEvent
 
 from saena_domain.audit.guard import guard_actor_fields, guard_payload
 from saena_domain.audit.hashing import GENESIS, compute_entry_hash
 
-_ACTION_PATTERN = r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,3}\.v[0-9]+$"
-_TRACE_ID_PATTERN = r"^[0-9a-f]{32}$"
-_ERROR_CODE_PATTERN = r"^saena\.[a-z_]+\.[a-z_]+$"
-_SHA256_REF_PATTERN = r"^sha256:[0-9a-f]{64}$"
-_TIMESTAMP_PATTERN = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z$"
+
+def _plain_str(value: RootModel[str] | str | None) -> str | None:
+    """Unwrap a generated root-model identifier field (e.g. `Sha256Ref`) to a plain `str`.
+
+    The inherited `AuditEvent` fields `event_hash`/`prev_event_hash` are
+    typed as `Sha256Ref` (a pydantic `RootModel[str]`), NOT plain `str` — see
+    the module docstring's subclassing rationale. `RootModel` instances do
+    not compare equal to a plain string of the same value and `str(...)` on
+    one renders `"root='...'"`, not the wrapped value — so every place this
+    module compares, hashes, or formats an `event_hash`/`prev_event_hash`
+    must first unwrap it through this helper. Passes plain `str`/`None`
+    through unchanged (accepted so call sites do not need to know whether a
+    given value has already been unwrapped).
+    """
+    if isinstance(value, RootModel):
+        return value.root
+    return value
 
 
-class AuditEntry(BaseModel):
-    """One `AuditEvent` chain entry — field set/patterns match the audit-event schema.
+class AuditEntry(AuditEvent):
+    """One `AuditEvent` chain entry — inherits the generated model's fields/types verbatim.
 
-    Field-for-field correspondence with `packages/contracts/json-schema/
-    domain/audit-event/v1/audit-event.schema.json`:
-    `event_hash`/`prev_event_hash` (sha256_ref wire form), `action`
-    (event-name-style pattern), `recorded_at` (Z-terminated UTC timestamp),
-    `scope` (`tenant`|`system`), `trace_id` (32-hex), `payload` (open
-    object, guarded — see `guard.guard_payload`), `tenant_id`/`run_id`
-    (conditionally required/forbidden per `scope`, enforced by
-    `_check_scope_rules` below), `actor_id` (PII-minimized identity, see
-    `guard.guard_actor_fields`), `error_code` (ADR-0015 taxonomy pattern).
+    See module docstring for why this is a subclass rather than a
+    hand-copied field set. The only behavior added here beyond the inherited
+    fields is `_check_scope_rules` (the R9-1 allOf conditional, not
+    expressible by codegen) and `frozen=True` (chain entries are immutable
+    once constructed — append-only ledger semantics).
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    event_hash: str = Field(pattern=_SHA256_REF_PATTERN)
-    prev_event_hash: str | None = Field(default=None, pattern=_SHA256_REF_PATTERN)
-    action: str = Field(pattern=_ACTION_PATTERN)
-    recorded_at: str = Field(pattern=_TIMESTAMP_PATTERN)
-    scope: Literal["tenant", "system"]
-    trace_id: str = Field(pattern=_TRACE_ID_PATTERN)
-    payload: dict[str, Any]
-    tenant_id: str | None = None
-    run_id: str | None = None
-    actor_id: str | None = None
-    error_code: str | None = Field(default=None, pattern=_ERROR_CODE_PATTERN)
+    model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="after")
     def _check_scope_rules(self) -> AuditEntry:
@@ -121,18 +133,29 @@ def build_entry(
 
     event_hash = compute_entry_hash(fields_for_hash, prev_hash)
 
-    return AuditEntry(
-        event_hash=event_hash,
-        prev_event_hash=prev_hash,
-        action=action,
-        recorded_at=recorded_at,
-        scope=scope,
-        trace_id=trace_id,
-        payload=payload,
-        tenant_id=tenant_id,
-        run_id=run_id,
-        actor_id=actor_id,
-        error_code=error_code,
+    # model_validate (rather than the AuditEntry(...) constructor call) is
+    # used here deliberately: the inherited fields' static types are the
+    # generated root-model wrappers (Sha256Ref/TenantId/RunId/ActorId/
+    # TimestampUtc/Scope), but this function's public parameters are plain
+    # `str` for caller ergonomics — pydantic validates/coerces plain strings
+    # into those wrapper types at runtime either way (the constructor and
+    # model_validate share the same validation path), but model_validate's
+    # `obj: Any` signature also satisfies static typing without needing to
+    # hand-construct each wrapper type at every call site.
+    return AuditEntry.model_validate(
+        {
+            "event_hash": event_hash,
+            "prev_event_hash": prev_hash,
+            "action": action,
+            "recorded_at": recorded_at,
+            "scope": scope,
+            "trace_id": trace_id,
+            "payload": payload,
+            "tenant_id": tenant_id,
+            "run_id": run_id,
+            "actor_id": actor_id,
+            "error_code": error_code,
+        }
     )
 
 
@@ -148,14 +171,15 @@ def append_entry(chain: list[AuditEntry], entry: AuditEntry) -> list[AuditEntry]
     fields — both checks guarantee `append_entry` can never silently corrupt
     the chain.
     """
-    expected_prev = chain[-1].event_hash if chain else GENESIS
-    if entry.prev_event_hash != expected_prev:
+    expected_prev = _plain_str(chain[-1].event_hash) if chain else GENESIS
+    actual_prev = _plain_str(entry.prev_event_hash)
+    if actual_prev != expected_prev:
         raise ValueError(
             "entry.prev_event_hash does not match the current chain tail "
-            f"(expected {expected_prev!r}, got {entry.prev_event_hash!r})"
+            f"(expected {expected_prev!r}, got {actual_prev!r})"
         )
-    recomputed = compute_entry_hash(entry.hashable_fields(), entry.prev_event_hash)
-    if recomputed != entry.event_hash:
+    recomputed = compute_entry_hash(entry.hashable_fields(), actual_prev)
+    if recomputed != _plain_str(entry.event_hash):
         raise ValueError("entry.event_hash does not match its own field content")
     return [*chain, entry]
 
@@ -176,12 +200,14 @@ def verify_chain(entries: list[AuditEntry]) -> tuple[bool, int | None]:
     """
     expected_prev: str | None = GENESIS
     for index, entry in enumerate(entries):
-        if entry.prev_event_hash != expected_prev:
+        actual_prev = _plain_str(entry.prev_event_hash)
+        if actual_prev != expected_prev:
             return False, index
-        recomputed = compute_entry_hash(entry.hashable_fields(), entry.prev_event_hash)
-        if recomputed != entry.event_hash:
+        recomputed = compute_entry_hash(entry.hashable_fields(), actual_prev)
+        actual_hash = _plain_str(entry.event_hash)
+        if recomputed != actual_hash:
             return False, index
-        expected_prev = entry.event_hash
+        expected_prev = actual_hash
     return True, None
 
 
@@ -205,8 +231,8 @@ class InMemoryAuditChain:
 
     @property
     def tail_hash(self) -> str | None:
-        """The current chain tail's `event_hash`, or `GENESIS` if empty."""
-        return self._entries[-1].event_hash if self._entries else GENESIS
+        """The current chain tail's `event_hash` (plain str), or `GENESIS` if empty."""
+        return _plain_str(self._entries[-1].event_hash) if self._entries else GENESIS
 
     def append(
         self,

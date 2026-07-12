@@ -13,6 +13,15 @@ offending key PATH only, never the offending VALUE — the whole point of the
 guard is that the value may itself be a secret, so echoing it back in an
 exception message (which may reach logs, tracebacks, or CI output) would
 defeat the guard.
+
+Accepted limitation (documented, not fixed): this module detects forbidden
+data by KEY NAME and by specific VALUE PATTERNS (stack-trace markers,
+exception-frame dumps, email-shaped strings) — it is not a general secret
+scanner. A credential-shaped string embedded in a value under an innocuous
+key (e.g. `{"note": "password=hunter2"}`) is NOT caught. See
+`guard_payload`'s docstring and
+`tests/unit/domain_audit/test_guard.py::test_guard_payload_does_not_catch_secret_shaped_value_text`
+for the pinned regression documenting this gap.
 """
 
 from __future__ import annotations
@@ -132,12 +141,30 @@ def _index_path(parent: str, index: int) -> str:
 # Splits a key into lowercase word tokens across snake_case, kebab-case,
 # space-separated, and camelCase boundaries — e.g. "X-Api-Key" -> ["x", "api",
 # "key"], "dbPasswordHash" -> ["db", "password", "hash"], "patch_unit_id" ->
-# ["patch", "unit", "id"]. Tokenization (rather than raw substring matching)
-# is what lets a multi-word field like `patch_unit_id` pass while a
-# single-token field literally named `patch` (or a token sequence containing
-# it, e.g. `unified_diff`) is still caught — a forbidden pattern must appear
-# as a whole token (or contiguous token run, for multi-token patterns like
-# `api_key`/`full_name`), not as a substring of an unrelated word.
+# ["patch", "unit", "id"], "authToken" -> ["auth", "token"]. Tokenization
+# (rather than raw substring matching) is what lets a multi-word field like
+# `patch_unit_id` pass while a single-token field literally named `patch`
+# (or a token sequence containing it, e.g. `unified_diff`) is still caught —
+# a forbidden pattern must appear as a whole token (or contiguous token run,
+# for multi-token patterns like `api_key`/`full_name`), not as a substring of
+# an unrelated word.
+#
+# Known limitation (acronym-run camelCase): the boundary regex only splits
+# at a lowercase/digit -> UPPERCASE transition, so an ALL-CAPS acronym run
+# merges into ONE token rather than splitting per letter — "APIKey" ->
+# ["apikey"] (matches the `apikey` pattern, so still caught), but "APIToken"
+# -> ["apitoken"] (does NOT match `token` or `api_key` as a distinct token,
+# so it is NOT caught by the credential-key guard). This is a real gap for
+# acronym+word camelCase keys where the acronym is immediately followed by a
+# forbidden single-token word with no separator (verified: `authToken` and
+# `APIKey` ARE caught; `APIToken` is NOT — see
+# `tests/unit/domain_audit/test_guard.py`'s tokenizer-acronym tests). Left
+# undocumented-as-fixed rather than adding acronym-splitting heuristics
+# (which would themselves need a maintained acronym list and could introduce
+# new false splits, e.g. "IDToken" containing "ID") — call keys in this
+# codebase's actual payloads use snake_case (see the AuditEvent contract's
+# own field names), so this camelCase acronym edge case is a documented
+# residual gap rather than a fix-now item.
 _CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 _TOKEN_SPLIT_RE = re.compile(r"[_\-\s]+")
 
@@ -218,8 +245,9 @@ def _guard_key(key: str, path: str) -> None:
 def guard_payload(payload: Any, *, _path: str = "") -> None:
     """Recursively reject forbidden data anywhere in an audit payload.
 
-    Walks mappings and sequences (excluding `str`/`bytes`, which are treated
-    as scalar leaves) and, at every level, rejects:
+    Walks mappings and sequences (`str` is treated as a scalar leaf; `bytes`/
+    `bytearray` are REJECTED outright — see below) and, at every level,
+    rejects:
 
     - credential-ish keys (password, passwd, secret, token, api_key, apikey,
       authorization, private_key, credential, bearer, and case-insensitive
@@ -232,10 +260,32 @@ def guard_payload(payload: Any, *, _path: str = "") -> None:
       value that matches an email address pattern.
     - objects keyed like `error`/`exception` that carry fields beyond the
       error-detail shape (`error_code`, `retryable`, `summary`, `trace_id`).
+    - `bytes`/`bytearray` values anywhere. Audit payloads are JSON-shaped
+      (the `AuditEvent.payload` field is `type: object` in the contract
+      schema) and JSON has no binary type — a `bytes` value has no
+      legitimate reason to appear here, and silently accepting it would be
+      dangerous: `bytes` is a `Sequence[int]`, so without this explicit
+      check it would fall into the sequence-walk branch below and be
+      iterated as a list of ints, silently BYPASSING every string-content
+      check (stack-trace markers, email-pattern detection) that would catch
+      the same content if it arrived as `str`. Fail closed instead: reject
+      the value outright, named by key path only (never the bytes content,
+      consistent with every other rejection in this module).
 
     Raises `ForbiddenAuditDataError` naming the offending key PATH only —
     never the offending value. Does nothing (returns `None`) if `payload`
     contains no forbidden data.
+
+    Known residual gap (accepted limitation, not fixed by this guard): this
+    function inspects KEY names and VALUE shapes/patterns, not arbitrary
+    free-text content. A value string that happens to embed credential-like
+    text under an innocuous key (e.g. `{"note": "password=hunter2"}`) is NOT
+    caught — only the literal categories above (stack traces, exception
+    frames, email-pattern strings) are detected in value content. Full
+    secret-scanning of arbitrary string values is out of scope for this
+    guard (see `test_guard_payload_does_not_catch_secret_shaped_value_text`
+    in `tests/unit/domain_audit/test_guard.py`, which pins this as a
+    documented gap rather than a passing "safe" assertion).
     """
     if isinstance(payload, Mapping):
         error_like_keys = {k for k in payload if _matches_any(str(k), _ERROR_OBJECT_KEY_MARKERS)}
@@ -247,6 +297,13 @@ def guard_payload(payload: Any, *, _path: str = "") -> None:
                 _guard_error_object(value, child_path)
             guard_payload(value, _path=child_path)
         return
+    if isinstance(payload, (bytes, bytearray)):
+        raise ForbiddenAuditDataError(
+            _path or "<root>",
+            "bytes/bytearray values are not permitted in audit payloads "
+            "(payloads are JSON-shaped; binary content is rejected fail-closed "
+            "rather than silently walked as a sequence of ints)",
+        )
     if isinstance(payload, str):
         _guard_string_value(payload, _path)
         return

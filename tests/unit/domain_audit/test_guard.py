@@ -51,6 +51,36 @@ def test_guard_payload_allows_actor_id_key() -> None:
     guard_payload({"actor_id": "user-123"})
 
 
+# --- tokenizer acronym-boundary cases (critic SHOULD-FIX 3) ---------------------------
+
+
+@pytest.mark.parametrize("key", ["authToken", "APIKey", "AuthToken", "apiKey"])
+def test_guard_payload_rejects_credential_keys_camel_case_acronym_forms(key: str) -> None:
+    # authToken -> ["auth", "token"] (token matches); APIKey -> ["apikey"]
+    # (the whole acronym+word run merges into one token because the camel
+    # boundary regex only splits at lowercase/digit -> UPPERCASE, so a
+    # leading ALL-CAPS run stays fused — "apikey" still matches the
+    # `apikey` pattern directly). Both forms are caught.
+    with pytest.raises(ForbiddenAuditDataError):
+        guard_payload({key: SECRET_VALUE})
+
+
+def test_guard_payload_does_not_catch_acronym_immediately_followed_by_word() -> None:
+    """Documents a real tokenizer gap (critic SHOULD-FIX 3) — see guard.py.
+
+    "APIToken" tokenizes to a single fused token ["apitoken"] because the
+    leading ALL-CAPS acronym run ("API") merges with the following word
+    ("Token") with no lowercase/digit->UPPERCASE boundary between them, and
+    "apitoken" does not match any pattern in _CREDENTIAL_KEY_PATTERNS
+    (neither the single token "token" nor the two-token "api_key"). This is
+    a documented, accepted residual gap for camelCase acronym+word keys with
+    no separator — this codebase's actual payload field names are
+    snake_case (see the AuditEvent contract), so it is not fixed with
+    acronym-splitting heuristics here. Pinned as a gap, not asserted safe.
+    """
+    guard_payload({"APIToken": SECRET_VALUE})
+
+
 # --- stack-trace / raw exception dumps ------------------------------------------------
 
 
@@ -104,6 +134,69 @@ def test_guard_payload_rejects_email_pattern_value() -> None:
 
 def test_guard_payload_allows_non_email_string() -> None:
     guard_payload({"note": "not an email at all"})
+
+
+# --- accepted limitation: value-side credential-shaped text is not caught -------------
+
+
+def test_guard_payload_does_not_catch_secret_shaped_value_text() -> None:
+    """Pins a documented, accepted gap — see guard.py module docstring.
+
+    guard_payload inspects KEY names and specific VALUE PATTERNS (stack
+    traces, exception frames, email shapes); it is not a general secret
+    scanner. A credential-shaped string under an innocuous key currently
+    passes. This test documents the CURRENT (accepted) behavior rather than
+    asserting it is "safe" — if this test starts failing because the guard
+    grew broader value scanning, that is an improvement and this test should
+    be updated/removed, not treated as a regression.
+    """
+    # Deliberately does not raise — this is the pinned gap, not a bug fix.
+    guard_payload({"note": "password=hunter2"})
+    guard_payload({"details": "Authorization: Bearer abc123.def456.ghi789"})
+
+
+# --- bytes values fail closed (critic SHOULD-FIX 1) -----------------------------------
+
+
+def test_guard_payload_rejects_bytes_value() -> None:
+    with pytest.raises(ForbiddenAuditDataError) as excinfo:
+        guard_payload({"data": b"binary content"})
+    assert excinfo.value.key_path == "data"
+
+
+def test_guard_payload_rejects_bytearray_value() -> None:
+    with pytest.raises(ForbiddenAuditDataError):
+        guard_payload({"data": bytearray(b"binary content")})
+
+
+def test_guard_payload_rejects_nested_bytes_value() -> None:
+    with pytest.raises(ForbiddenAuditDataError) as excinfo:
+        guard_payload({"items": [{"blob": b"\x00\x01\x02"}]})
+    assert excinfo.value.key_path == "items[0].blob"
+
+
+def test_guard_payload_rejects_bytes_at_root() -> None:
+    with pytest.raises(ForbiddenAuditDataError):
+        guard_payload(b"raw bytes payload")
+
+
+def test_guard_payload_bytes_error_does_not_leak_content() -> None:
+    secret_bytes = b"s3cr3t-binary-content-should-not-appear-in-error"
+    with pytest.raises(ForbiddenAuditDataError) as excinfo:
+        guard_payload({"data": secret_bytes})
+    message = str(excinfo.value)
+    assert "s3cr3t-binary-content-should-not-appear-in-error" not in message
+
+
+def test_guard_payload_rejects_bytes_that_would_otherwise_hide_stack_trace() -> None:
+    # Regression for the bug this fix closes: bytes is a Sequence[int], so
+    # without an explicit bytes check this content would previously be
+    # walked as a sequence of ints and NEVER string-checked for stack-trace
+    # markers — silently bypassing the guard entirely. Now it must be
+    # rejected outright (fail closed) instead.
+    hidden_traceback = b"Traceback (most recent call last):\n  ..."
+    with pytest.raises(ForbiddenAuditDataError):
+        guard_payload({"detail": hidden_traceback})
 
 
 # --- error-detail shape ------------------------------------------------------------
