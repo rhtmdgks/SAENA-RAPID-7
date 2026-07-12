@@ -1,9 +1,9 @@
-# Wave 2 PR body (prepared, NOT submitted — human action required)
+# Wave 2 PR body
 
-> This file is the drafted `gh pr create --body` content for the Wave 2
-> (`wave2-runtime` → `main`) pull request. Per w2-20 task scope: **prepare
-> only, do not push/create/merge.** A human must review this content,
-> initiate the actual PR, and merge it.
+> This file is the `gh pr create --body` content for the Wave 2
+> (`wave2-runtime` → `main`) pull request. Originally prepared under w2-20
+> scope (prepare only); PR creation + merge subsequently explicitly
+> authorized by the human operator (2026-07-13, Wave 3 kickoff session).
 
 ---
 
@@ -18,9 +18,11 @@ PostgreSQL persistence adapters, Redpanda outbox drain + consumer
 idempotency, and a static `forgectl preflight` k3s gate CLI. All W2A/W2B/W2C
 exit conditions named in `docs/architecture/implementation-waves.md` are
 PASS at the code level, backed by directly-executed test evidence (see
-`docs/architecture/wave2-exit-report.md`). Deploy/infra-level items (Helm
-chart, dashboards, production cluster) are honestly BLOCKED(human) — see
-that same report.
+`docs/architecture/wave2-exit-report.md`). The `saena-forge` Helm chart +
+6 dashboards-as-code were subsequently delivered with human approval of the
+`deploy/**` protected path (w2-23). Remaining deploy/infra-level items
+(live dashboard 구동, production cluster, live rollback drills) are honestly
+production-only — see that same report.
 
 This PR (`w2-20`) additionally: (1) root-causes and fixes a flaky
 integration test discovered under full-suite load by splitting test
@@ -56,7 +58,10 @@ produces the Wave 2 exit-condition evidence report and this PR body.
 | w2-18-outbox-bus | outbox drain → Redpanda publish, W2C | `b9c0347` (+ `ec34a0c` critic fix) |
 | w2-19-forgectl | preflight CLI — static config gate | `153fc24` |
 | w2-21-gate-contract | plan-contract↔policy-gate HTTP contract fix | `2d3baba` (+ `37968d8`/`153fc24`-adjacent fixes) |
-| **w2-20-wave2-exit** (this unit) | deterministic gate split, forgectl workspace, exit report + PR prep | *(pending commit — see FINAL REPORT)* |
+| **w2-20-wave2-exit** | deterministic gate split, forgectl workspace, exit report + PR prep | `3126464` |
+| w2-22-ci-two-lane | CI two-lane wiring (unit lane + serial integration lane) | `0524957` |
+| w2-24-followup-fixes | GateCheckRequest required types / GATE_DENIED / `env -S` deny | `264faad` |
+| w2-23-deploy-package | `saena-forge` Helm chart + 6 dashboards (deploy/**, human-approved) | `77452c4` (+ `19f98ff` critic fix — ESO kind enum, egressProxy opt-in) |
 
 ## Exit-condition evidence
 
@@ -67,14 +72,20 @@ Full W2A/W2B/W2C exit-condition-by-exit-condition mapping (test
 Summary: every code-level exit condition PASSES with directly-executed test
 evidence. No claim in that report is made without a citation.
 
-## BLOCKED(human) — deploy/infra, not code
+## Production-only remainder (was BLOCKED(human); chart since delivered)
 
-- `saena-forge` Helm chart (`deploy/**` protected path, no chart authored)
-- 6 observability dashboards (no OTel collector/dashboard backend deployed)
+- ~~`saena-forge` Helm chart~~ — **delivered** (w2-23, human-approved
+  `deploy/**` edit): chart + values.schema.json + RBAC/NetworkPolicy/PDB
+  templates + 6 dashboards-as-code; `helm lint`/`template` clean,
+  kubeconform `-strict` valid, `forgectl preflight` 6/6 PASS, 115 unit-lane
+  tests.
+- 6 observability dashboards **live 구동** (dashboards-as-code delivered;
+  live run needs a real OTel collector + Grafana on a cluster)
 - Real Temporal persistence DB / MinIO / Redpanda **production** deployment
   (this Wave proves wiring against real ephemeral test instances only —
   169/169 integration-lane tests green)
-- Helm rollback drills (depend on the chart + a live cluster, neither exists)
+- Helm rollback drills (chart now exists; the drill still needs a live
+  cluster to roll back on)
 
 Full rationale for each: `docs/architecture/wave2-exit-report.md`
 "BLOCKED(human, out of Wave-2-code-scope)".
@@ -157,9 +168,9 @@ unit's own changes):
 
 ## Footer
 
-**No main merge. No git push. No tag. No release. This PR has NOT been
-created or submitted — a human must review this drafted body, initiate the
-actual `gh pr create`, and perform the merge.** Per CLAUDE.md principle 10
-(배포·push·merge 금지) and the w2-20 task's own explicit scope boundary.
+**No tag. No release. No production deploy.** PR creation and merge were
+explicitly authorized by the human operator (2026-07-13) as the Wave 3
+entry-gate prerequisite; merge proceeds only with all required checks
+green, no admin/bypass/force.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

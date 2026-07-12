@@ -60,26 +60,30 @@ forgectl + control-plane synthetic E2E)
 | consumer idempotency | `tests/unit/domain_bus/test_consumer.py::test_first_delivery_runs_handler_and_marks_seen`, `::test_redelivery_skips_handler`, `::test_async_store_redelivery_still_skips_handler`, `::test_two_different_tenants_have_independent_dedup_scopes`; `tests/integration/bus/test_redpanda_publisher.py::test_dlq_topic_receives_poison_message` | `b9c0347` (w2-18) | PASS |
 | `forgectl preflight` 통과 (Google flag on 시 fail 포함) | `tests/unit/forgectl/test_check_engine_flags.py::TestGoogleFlagFixtureFails::test_gemini_enabled_fails`, `::TestPassingFixture::test_only_chatgpt_search_enabled_passes`; full `preflight` — `tests/unit/forgectl/test_check_*` (6 checks × k3s spec §8.1) | `153fc24` (w2-19-forgectl) | PASS |
 | envelope 회귀 (event-envelope contract conformance on the bus path) | `tests/integration/bus/test_redpanda_publisher.py::test_aggregate_envelope_survives_serialization`; `packages/domain` bus envelope-check unit suite | `b9c0347` (w2-18) | PASS |
-| 대시보드 6종 최소 구동 | — none (no OTel collector/Grafana stack, no cluster) | — | **BLOCKED(human)** — see below |
-| `saena-forge` Helm chart 존재·검증 | — none (`deploy/**` protected path, no chart authored this Wave) | — | **BLOCKED(human)** — see below |
+| 대시보드 6종 최소 구동 | dashboards-as-code delivered + statically validated: `tests/unit/deploy/test_dashboards.py` (6 dashboards × parse/panel-shape/uid checks), Grafana-sidecar ConfigMap render `tests/unit/deploy/test_chart_render.py`; live 구동 (real Grafana against real telemetry) remains a cluster-dependent operational item — see below | `77452c4` (w2-23-deploy-package, post-exit-report human-approved) | PASS (static) / live 구동 = production-only |
+| `saena-forge` Helm chart 존재·검증 | `tests/unit/deploy/` 115 tests (values-schema closed enums incl. v1 engine scope + ESO `secretStoreRef.kind`, chart render structure, kubeconform `-strict` static validation, forgectl-preflight integration proof); `helm lint`/`helm template` clean both `egressProxy` states; `python -m saena_forgectl preflight` all 6 checks PASS | `77452c4` (w2-23-deploy-package; `8d3133f` chart + `19f98ff` critic MUST-FIX — ESO kind enum, egressProxy opt-in) | PASS |
 
 ## BLOCKED(human, out of Wave-2-code-scope)
 
 These are deploy/infra deliverables, not application code, and are honestly
 marked BLOCKED rather than claimed complete:
 
-- **`saena-forge` Helm chart** — `deploy/**` is a CLAUDE.md protected path
-  (single-owner, human-approval-gated); no worktree in Wave 2 authored a
-  chart. `forgectl preflight` (the CLI that WOULD gate a `helm upgrade
-  --install` against such a chart, w2-19) is implemented and tested, but
-  there is no chart for it to gate yet.
-- **6 dashboards (W2C exit line "대시보드 6종 최소 구동")** — requires a
-  running OTel collector + dashboard backend (Grafana or equivalent)
-  against real service telemetry. `packages/observability` (w2-06) provides
-  the tenant-safe logging/trace/redaction RUNTIME that would emit that
-  telemetry, but no collector/dashboard deployment exists — that is a
-  `deploy/**`-owned, cluster-dependent artifact, not code this Wave
-  produces.
+- ~~**`saena-forge` Helm chart**~~ — **RESOLVED post-report** (`77452c4`,
+  w2-23-deploy-package): the chart was authored with explicit human
+  approval of the `deploy/**` protected path (commit `8d3133f`), critic
+  MUST-FIX applied (`19f98ff` — ESO `secretStoreRef.kind` closed enum
+  `SecretStore|ClusterSecretStore` replacing the non-existent `VaultSecret`
+  kind in both `values.schema.json` and forgectl's `_PERMITTED_BACKENDS`,
+  kept in lockstep; `egressProxy.enabled` opt-in for NetworkPolicy rules
+  targeting the out-of-band egress proxy). Validated: `helm lint`/`helm
+  template` clean, kubeconform `-strict` 66/66 valid, `forgectl preflight`
+  6/6 PASS, `tests/unit/deploy/` 115 tests in the `just verify` unit lane.
+- **6 dashboards (W2C exit line "대시보드 6종 최소 구동")** — dashboards-
+  as-code now delivered by w2-23 (`deploy/charts/saena-forge/dashboards/`,
+  Grafana-sidecar ConfigMap, statically validated). What REMAINS
+  production-only: live 구동 against a running OTel collector + Grafana on
+  a real cluster with real service telemetry — a cluster-dependent
+  operational exercise, not code this Wave produces.
 - **Real Temporal persistence DB / MinIO / Redpanda PRODUCTION deployment**
   — this Wave proves the WIRING against real ephemeral test instances
   (Temporal time-skipping test server, `postgres:16-alpine` /
