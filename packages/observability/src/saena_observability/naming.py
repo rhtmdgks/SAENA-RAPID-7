@@ -10,10 +10,15 @@ Both patterns share the same segment-shape rule: lowercase
 `[a-z][a-z0-9_]*` segments joined by `.`, with a `saena.` prefix and at
 least one segment after it (capability/operation, or domain/name). This
 module also rejects names that look like they embed a high-cardinality
-identifier (UUID-shaped or long hex/digit runs) as a defense-in-depth
-check against accidental identifier-in-name mistakes — the ADR-0016 rule is
-"identifiers are attributes, never name segments", and long
-hex/digit/UUID-shaped segments are the most common accidental violation.
+identifier (UUID-shaped, or a long run of purely hex/digit characters) as
+a defense-in-depth check against accidental identifier-in-name mistakes —
+the ADR-0016 rule is "identifiers are attributes, never name segments".
+This heuristic is NOT exhaustive: it only catches UUID-shaped segments and
+segments that are entirely hex/digit characters; it does not catch mixed
+alphanumeric identifiers (e.g. a base32/base36-style id segment containing
+both letters outside `a`-`f` and digits, or a word-prefixed id like
+`run42`) — those pass this validator undetected. Treat this as one
+defense-in-depth signal, not a complete identifier-in-name detector.
 """
 
 from __future__ import annotations

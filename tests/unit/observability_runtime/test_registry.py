@@ -3,6 +3,9 @@ attribute registry and redaction rules (ADR-0016)."""
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
+import pytest
 from saena_observability.registry import (
     AttributeEntry,
     is_allowlisted,
@@ -40,6 +43,29 @@ class TestLoadAttributeRegistry:
         # lru_cache identity check — confirms registry is not re-parsed
         # per call (read-only W0 input, safe to cache).
         assert load_attribute_registry() is load_attribute_registry()
+
+
+class TestAttributeEntryContextsImmutable:
+    """SHOULD-FIX (critic): `load_attribute_registry()` is `lru_cache`d, so
+    every caller shares the same `AttributeEntry` instances — `contexts`
+    must be a read-only view so one caller's in-place edit attempt cannot
+    corrupt the shared cached copy for every other caller."""
+
+    def test_contexts_is_a_mapping_proxy(self) -> None:
+        entry = load_attribute_registry()["saena.tenant_id"]
+        assert isinstance(entry.contexts, MappingProxyType)
+
+    def test_contexts_rejects_item_assignment(self) -> None:
+        entry = load_attribute_registry()["saena.tenant_id"]
+        with pytest.raises(TypeError):
+            entry.contexts["aggregate"] = "required"  # type: ignore[index]
+
+    def test_mutation_attempt_does_not_leak_across_callers(self) -> None:
+        entry_a = load_attribute_registry()["saena.tenant_id"]
+        with pytest.raises(TypeError):
+            entry_a.contexts["aggregate"] = "required"  # type: ignore[index]
+        entry_b = load_attribute_registry()["saena.tenant_id"]
+        assert entry_b.contexts["aggregate"] == "forbidden"
 
 
 class TestLoadRedactionRules:

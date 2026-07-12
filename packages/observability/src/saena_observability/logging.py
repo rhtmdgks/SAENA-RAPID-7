@@ -9,11 +9,30 @@ before being written — non-allowlisted or context-violating keys never
 reach the emitted line, and secret-pattern-matching values are replaced
 with `REDACTED_VALUE`.
 
+`body` (the formatted log message, `record.getMessage()`) is free text —
+it is NOT covered by the allowlist model (there is no "attribute name" for
+a log message), but it CAN contain a secret via string interpolation
+(``logger.info("token=%s", token)`` or an f-string built by the caller).
+`body` is therefore scrubbed through `saena_observability.redaction.
+redact_text`, which applies every VALUE-applicable denylist pattern
+against the message text and replaces only the matched substring — the
+rest of the message is preserved.
+
 Context rules (ADR-0016/ADR-0013): `saena.context="system"` or
 `"aggregate"` records carry no `saena.tenant_id` / `saena.run_id` KEY at
 all (property-level absence — not `null`). This is enforced upstream by
 `bind_telemetry_context`, which refuses to bind a forbidden combination,
 and reinforced here by only emitting keys whose value is not `None`.
+
+Caveat — stdlib `logging`'s `extra=` mapping: `logging.LogRecord.__init__`
+silently drops any `extra` key that collides with a reserved `LogRecord`
+attribute name (`message`, `args`, `levelname`, `msg`, etc. — see stdlib
+`logging` source, `makeRecord`/`LogRecord.__init__`). This module reads
+the `saena_attributes` extra key specifically (a name deliberately chosen
+to avoid any stdlib collision), but callers should be aware that stdlib
+logging's `extra=` mechanism as a whole has this silent-drop behavior for
+any *other* colliding key they might pass — it is a stdlib limitation, not
+something this formatter can detect or warn about after the fact.
 """
 
 from __future__ import annotations
@@ -24,7 +43,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from saena_observability.context import current_telemetry_context
-from saena_observability.redaction import redact_attributes
+from saena_observability.redaction import redact_attributes, redact_text
 from saena_observability.trace import current_span_id, current_trace_id
 
 
@@ -69,7 +88,7 @@ class SaenaJsonFormatter(_stdlib_logging.Formatter):
         payload: dict[str, Any] = {
             "timestamp": _rfc3339_z(datetime.fromtimestamp(record.created, tz=UTC)),
             "severity": record.levelname,
-            "body": record.getMessage(),
+            "body": redact_text(record.getMessage()),
         }
 
         trace_id = current_trace_id()

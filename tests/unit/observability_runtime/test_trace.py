@@ -92,6 +92,24 @@ class TestTraceparentBuildParse:
         with pytest.raises(ValueError, match="invalid .* span_id"):
             parse_traceparent(f"00-{VALID_TRACE_ID}-{'0' * 16}-01")
 
+    def test_parse_rejects_version_ff(self) -> None:
+        # W3C Trace Context spec: version 'ff' is permanently reserved as
+        # invalid and must never appear on the wire.
+        with pytest.raises(ValueError, match="version 'ff' is permanently invalid"):
+            parse_traceparent(f"ff-{VALID_TRACE_ID}-{VALID_SPAN_ID}-01")
+
+    def test_parse_accepts_non_00_non_ff_version(self) -> None:
+        # Forward compatibility: a not-yet-defined version other than the
+        # reserved 'ff' still parses using the same field layout.
+        parsed = parse_traceparent(f"01-{VALID_TRACE_ID}-{VALID_SPAN_ID}-01")
+        assert parsed.version == "01"
+        assert parsed.trace_id == VALID_TRACE_ID
+        assert parsed.span_id == VALID_SPAN_ID
+
+    def test_build_always_emits_version_00(self) -> None:
+        header = build_traceparent(VALID_TRACE_ID, VALID_SPAN_ID)
+        assert header.startswith("00-")
+
     def test_parse_example_from_w3c_spec(self) -> None:
         # Canonical example from the W3C Trace Context specification.
         header = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"

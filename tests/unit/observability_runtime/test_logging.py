@@ -11,14 +11,19 @@ from saena_observability.logging import SaenaJsonFormatter, get_logger
 from saena_observability.redaction import REDACTED_VALUE
 
 
-def _make_record(msg: str = "hello", **extra: object) -> stdlib_logging.LogRecord:
+def _make_record(
+    msg: str = "hello",
+    *,
+    args: tuple[object, ...] | None = None,
+    **extra: object,
+) -> stdlib_logging.LogRecord:
     record = stdlib_logging.LogRecord(
         name="test",
         level=stdlib_logging.INFO,
         pathname=__file__,
         lineno=1,
         msg=msg,
-        args=None,
+        args=args,
         exc_info=None,
     )
     for key, value in extra.items():
@@ -43,6 +48,41 @@ class TestBaseShape:
         # "+00:00" offset form.
         assert payload["timestamp"].endswith("Z")
         assert "+00:00" not in payload["timestamp"]
+
+
+class TestLogBodyRedaction:
+    """MUST-FIX 1 (critic): `logger.info("token=%s", token)` and f-string
+    bodies must never leak a secret through the `body` field — the
+    formatted message is scrubbed via `redact_text` before emission."""
+
+    def test_secret_via_percent_style_interpolation_is_redacted(self) -> None:
+        formatter = SaenaJsonFormatter()
+        record = _make_record("token=%s", args=("abc123secretvalue",))
+        line = formatter.format(record)
+        assert "abc123secretvalue" not in line
+        payload = json.loads(line)
+        assert REDACTED_VALUE in payload["body"]
+
+    def test_secret_via_fstring_body_is_redacted(self) -> None:
+        formatter = SaenaJsonFormatter()
+        secret = "abc123secretvalue"
+        record = _make_record(f"authenticating with token={secret}")
+        line = formatter.format(record)
+        assert secret not in line
+        payload = json.loads(line)
+        assert REDACTED_VALUE in payload["body"]
+
+    def test_clean_message_body_is_untouched(self) -> None:
+        formatter = SaenaJsonFormatter()
+        record = _make_record("run completed successfully")
+        payload = json.loads(formatter.format(record))
+        assert payload["body"] == "run completed successfully"
+
+    def test_password_via_percent_style_interpolation_is_redacted(self) -> None:
+        formatter = SaenaJsonFormatter()
+        record = _make_record("login with password=%s", args=("hunter2secret",))
+        line = formatter.format(record)
+        assert "hunter2secret" not in line
 
 
 class TestTenantContextCarriesTenantId:

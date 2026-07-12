@@ -10,6 +10,7 @@ from saena_observability.redaction import (
     _matches_denylist_key,
     decide_redaction,
     redact_attributes,
+    redact_text,
 )
 from saena_observability.registry import load_redaction_rules
 
@@ -65,9 +66,73 @@ class TestSecretPatternDenylist:
         decision = decide_redaction("saena.contract_hash", "sha256:deadbeef", context="tenant")
         assert decision.action is RedactionAction.ALLOW
 
-    def test_non_string_value_does_not_crash_value_matcher(self) -> None:
+    def test_int_scalar_value_is_allowed(self) -> None:
+        # int is a registry-contracted scalar type (attributes.schema.json
+        # type enum: string|int|double|boolean) — passes through untouched
+        # when it doesn't match any (string-only) denylist value pattern.
         decision = decide_redaction("saena.contract_hash", 12345, context="tenant")
         assert decision.action is RedactionAction.ALLOW
+
+    def test_float_scalar_value_is_allowed(self) -> None:
+        decision = decide_redaction("saena.contract_hash", 3.14, context="tenant")
+        assert decision.action is RedactionAction.ALLOW
+
+    def test_bool_scalar_value_is_allowed(self) -> None:
+        decision = decide_redaction("saena.contract_hash", True, context="tenant")
+        assert decision.action is RedactionAction.ALLOW
+
+    def test_none_value_is_allowed(self) -> None:
+        decision = decide_redaction("saena.contract_hash", None, context="tenant")
+        assert decision.action is RedactionAction.ALLOW
+
+
+class TestFailClosedNonScalarValues:
+    """MUST-FIX 2 (critic): a value that is not a registry-contracted
+    scalar type (str/int/float/bool) or None must never be allowed through
+    — dict/list/nested structures could carry a secret field the denylist
+    regex (which only runs on `str`) never gets a chance to inspect."""
+
+    def test_dict_value_is_redacted_not_allowed(self) -> None:
+        decision = decide_redaction(
+            "saena.contract_hash", {"nested": "secret-token-abc"}, context="tenant"
+        )
+        assert decision.action is RedactionAction.REDACT_VALUE
+        assert "R-NON-SCALAR-VALUE" in decision.reason
+
+    def test_list_value_is_redacted_not_allowed(self) -> None:
+        decision = decide_redaction(
+            "saena.contract_hash", ["item1", "secret-token"], context="tenant"
+        )
+        assert decision.action is RedactionAction.REDACT_VALUE
+        assert "R-NON-SCALAR-VALUE" in decision.reason
+
+    def test_bytes_value_is_redacted_not_allowed(self) -> None:
+        decision = decide_redaction("saena.contract_hash", b"raw-bytes", context="tenant")
+        assert decision.action is RedactionAction.REDACT_VALUE
+        assert "R-NON-SCALAR-VALUE" in decision.reason
+
+    def test_custom_object_value_is_redacted_not_allowed(self) -> None:
+        class _Custom:
+            pass
+
+        decision = decide_redaction("saena.contract_hash", _Custom(), context="tenant")
+        assert decision.action is RedactionAction.REDACT_VALUE
+        assert "R-NON-SCALAR-VALUE" in decision.reason
+
+    def test_dict_value_never_reaches_redact_attributes_output_raw(self) -> None:
+        result = redact_attributes(
+            {"saena.contract_hash": {"leak": "should-not-appear"}}, context="tenant"
+        )
+        assert result == {"saena.contract_hash": REDACTED_VALUE}
+        assert "should-not-appear" not in str(result)
+
+    def test_non_scalar_takes_priority_over_allow_but_not_over_drop(self) -> None:
+        # A non-scalar value on a non-allowlisted attribute is still DROP
+        # (the stronger outcome) — the fail-closed scalar check only
+        # applies once the attribute has already passed the allowlist and
+        # structural-violation gates.
+        decision = decide_redaction("saena.not_registered_at_all", {"x": 1}, context="tenant")
+        assert decision.action is RedactionAction.DROP
 
 
 class TestDenylistKeyMatch:
@@ -98,6 +163,8 @@ class TestDenylistKeyMatch:
         # itself matched a denylist pattern. No currently-registered
         # attribute name is secret-shaped by design, so a hypothetical
         # allowlist entry is patched in for this one test.
+        from types import MappingProxyType
+
         import saena_observability.redaction as redaction_module
         from saena_observability.registry import AttributeEntry
 
@@ -107,7 +174,9 @@ class TestDenylistKeyMatch:
             type="string",
             cardinality="high",
             pii=False,
-            contexts={"tenant": "optional", "system": "optional", "aggregate": "optional"},
+            contexts=MappingProxyType(
+                {"tenant": "optional", "system": "optional", "aggregate": "optional"}
+            ),
             description="test-only fixture attribute",
         )
         monkeypatch.setattr(redaction_module, "load_attribute_registry", lambda: fake_registry)
@@ -117,6 +186,98 @@ class TestDenylistKeyMatch:
         )
         assert decision.action is RedactionAction.REDACT_VALUE
         assert "R-SECRET-TOKEN" in decision.reason
+
+
+class TestRedactText:
+    """MUST-FIX 1 (critic): free-text log bodies must be scrubbed against
+    the VALUE-applicable denylist patterns. `key=value`/`key: value`
+    assignment-shaped secrets (the common `"token=%s" % token` /
+    f-string-interpolated-after-a-colon shape) are covered end to end
+    (keyword + value both redacted); content-shaped patterns (email) match
+    and redact their own span directly. See `redact_text`'s docstring for
+    the documented out-of-scope case (filler-word phrases with no
+    assignment operator, e.g. "token was X")."""
+
+    def test_token_via_percent_interpolation_is_redacted(self) -> None:
+        # Simulates stdlib logging's lazy %-style interpolation shape
+        # (`logger.info("token=%s", secret)`), applied eagerly here since
+        # redact_text operates on an already-formatted message string.
+        body = "token=%s" % ("abc123secret",)  # noqa: UP031
+        result = redact_text(body)
+        assert "abc123secret" not in result
+        assert REDACTED_VALUE in result
+
+    def test_token_via_fstring_is_redacted(self) -> None:
+        secret = "abc123secret"
+        body = f"user auth token={secret}"
+        result = redact_text(body)
+        assert secret not in result
+        assert REDACTED_VALUE in result
+
+    def test_password_in_free_text_is_redacted(self) -> None:
+        result = redact_text("login failed: password incorrect")
+        assert REDACTED_VALUE in result
+
+    def test_email_in_free_text_is_redacted(self) -> None:
+        result = redact_text("contact a@example.com for help")
+        assert "a@example.com" not in result
+        assert REDACTED_VALUE in result
+
+    def test_clean_message_is_untouched(self) -> None:
+        body = "run completed successfully in 4.2s"
+        assert redact_text(body) == body
+
+    def test_only_matched_span_is_replaced_rest_preserved(self) -> None:
+        result = redact_text("prefix-text token=abc123 suffix-text")
+        assert result.startswith("prefix-text ")
+        assert result.endswith(" suffix-text")
+        assert "abc123" not in result
+
+    def test_multiple_matches_are_all_redacted(self) -> None:
+        result = redact_text("token=aaa and password=bbb both leaked")
+        assert "aaa" not in result
+        assert "bbb" not in result
+        assert result.count(REDACTED_VALUE) >= 2
+
+    def test_bare_keyword_with_no_assignment_operator_is_still_redacted_as_keyword(
+        self,
+    ) -> None:
+        # No "=" / ":" present, so the assignment-value expansion cannot
+        # apply — the bare keyword pattern still matches and redacts the
+        # keyword itself (documented scope: the trailing filler-word value
+        # in this shape is not covered, only the keyword is).
+        result = redact_text("token was granted successfully")
+        assert REDACTED_VALUE in result
+        assert "token" not in result.lower()
+
+    def test_key_only_pattern_is_skipped_for_text_scrubbing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A denylist pattern whose applies_to is key-only (no "value") must
+        # be skipped entirely by redact_text — every currently-registered
+        # pattern applies to value too, so this exercises that skip branch
+        # directly against a patched rule set.
+        import re
+
+        import saena_observability.redaction as redaction_module
+        from saena_observability.registry import DenylistPattern, RedactionRules
+
+        key_only_rules = RedactionRules(
+            export_policy="allowlist",
+            denylist_patterns=(
+                DenylistPattern(
+                    id="R-KEY-ONLY-TEST",
+                    pattern=re.compile(r"(?i)keyonlysecret"),
+                    applies_to=("key",),
+                    description="test-only key-only fixture pattern",
+                ),
+            ),
+            violation_rules=(),
+        )
+        monkeypatch.setattr(redaction_module, "load_redaction_rules", lambda: key_only_rules)
+
+        text = "message mentioning keyonlysecret in free text"
+        assert redaction_module.redact_text(text) == text
 
 
 class TestStructuralViolationRuleVAggTenant:

@@ -75,13 +75,30 @@ class TraceParent:
 def parse_traceparent(header_value: str) -> TraceParent:
     """Parse a W3C `traceparent` header: `00-<trace_id>-<span_id>-<flags>`.
 
-    Raises `ValueError` if the header does not match the expected shape or
-    carries an invalid (all-zero) trace_id/span_id, per the W3C Trace
-    Context spec's validity rules.
+    Raises `ValueError` if the header does not match the expected shape,
+    carries an invalid (all-zero) trace_id/span_id, or declares version
+    `ff` — the W3C Trace Context spec reserves `ff` as permanently invalid
+    (it is not "a future version to parse leniently", it must never appear
+    on the wire). Any other two-hex-digit version value (`01`-`fe`) is
+    accepted and parsed using the same `00`-format field layout, per the
+    spec's forward-compatibility rule: future versions may append
+    additional fields, but the four fields this parser reads
+    (version-trace_id-span_id-flags) are defined to remain stable across
+    versions, so this parser's job — extracting those four fields for SAENA
+    3-way correlation — does not change for a not-yet-defined version
+    number; it only changes if a future version alters the leading fields
+    themselves, which would be a spec-breaking change this module does not
+    attempt to predict.
     """
     match = _TRACEPARENT_RE.match(header_value)
     if match is None:
         raise ValueError(f"malformed traceparent header: {header_value!r}")
+    version = match.group("version")
+    if version == "ff":
+        raise ValueError(
+            f"traceparent version 'ff' is permanently invalid (W3C Trace Context "
+            f"spec reserved value): {header_value!r}"
+        )
     trace_id = match.group("trace_id")
     span_id = match.group("span_id")
     if not is_valid_trace_id(trace_id):
@@ -89,7 +106,7 @@ def parse_traceparent(header_value: str) -> TraceParent:
     if not is_valid_span_id(span_id):
         raise ValueError(f"traceparent has invalid (all-zero) span_id: {header_value!r}")
     return TraceParent(
-        version=match.group("version"),
+        version=version,
         trace_id=trace_id,
         span_id=span_id,
         flags=match.group("flags"),
@@ -98,6 +115,12 @@ def parse_traceparent(header_value: str) -> TraceParent:
 
 def build_traceparent(trace_id: str, span_id: str, *, sampled: bool = True) -> str:
     """Build a W3C `traceparent` header value from trace_id/span_id.
+
+    Always emits version `00` (`_TRACEPARENT_VERSION`) — this module does
+    not produce headers for any other version; `00` is the only version
+    SAENA originates. `parse_traceparent` above accepts versions other than
+    `00` on read (forward compatibility with headers this process did not
+    originate), but this builder only ever writes `00`.
 
     Raises `ValueError` if `trace_id`/`span_id` are not valid per
     `is_valid_trace_id` / `is_valid_span_id`.

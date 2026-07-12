@@ -14,6 +14,7 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import yaml
@@ -29,13 +30,20 @@ ContextRule = str  # "required" | "optional" | "forbidden"
 
 @dataclass(frozen=True, slots=True)
 class AttributeEntry:
-    """One `attributes.json` registry entry (ADR-0016 registry schema)."""
+    """One `attributes.json` registry entry (ADR-0016 registry schema).
+
+    `contexts` is a `MappingProxyType` (read-only view), not a plain
+    `dict` — `load_attribute_registry()` is `lru_cache`d, so every caller
+    receives the *same* `AttributeEntry` instances; a plain mutable dict
+    would let one caller's in-place edit corrupt the shared cached copy
+    for every other caller in the process.
+    """
 
     name: str
     type: str
     cardinality: str
     pii: bool
-    contexts: dict[str, ContextRule]
+    contexts: MappingProxyType[str, ContextRule]
     description: str
 
 
@@ -81,7 +89,7 @@ def load_attribute_registry() -> dict[str, AttributeEntry]:
             type=entry["type"],
             cardinality=entry["cardinality"],
             pii=entry["pii"],
-            contexts=dict(entry["contexts"]),
+            contexts=MappingProxyType(dict(entry["contexts"])),
             description=entry["description"],
         )
         for entry in raw
