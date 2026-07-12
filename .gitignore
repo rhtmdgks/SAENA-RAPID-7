@@ -69,3 +69,7 @@ customer-repos/
 
 # Node toolchain isolation (contract lint only)
 tools/contract-lint/node_modules/
+
+# Coverage artifacts (regenerated every test run)
+.coverage
+coverage.xml
