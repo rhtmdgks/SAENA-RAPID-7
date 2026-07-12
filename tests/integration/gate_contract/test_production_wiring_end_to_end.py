@@ -60,7 +60,7 @@ def _decision_body(contract_hash: str, run_id: str, patch_unit_id: str) -> dict[
     }
 
 
-def test_submit_decision_reaches_approved_through_real_http_gate_client(
+def test_real_plan_contract_submit_decision_reaches_approved_via_real_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Full production path, no test-only gate-request translation:
@@ -68,7 +68,9 @@ def test_submit_decision_reaches_approved_through_real_http_gate_client(
     REAL plan-contract app, whose `gate` dependency is the REAL,
     unmodified-signature `HttpPolicyGateClient`, talking to the REAL
     policy-gate app. Proves `app.py`'s `_PlanFacts` now carries everything
-    `GateCheckRequest`/`PlanCheckRequestBody` need end to end."""
+    `GateCheckRequest`/`PlanCheckRequestBody` need end to end, AND that the
+    real HTTP flow still produces the `plan.contract.approved.v1` outbox
+    record (not just the HTTP 200/state-machine side of APPROVED)."""
     monkeypatch.setenv("SAENA_TENANT_ID", TENANT_ID)
 
     policy_gate_app = create_policy_gate_app()
@@ -77,9 +79,10 @@ def test_submit_decision_reaches_approved_through_real_http_gate_client(
         "http://policy-gate", client=policy_gate_client, timeout=5.0
     )
 
+    outbox = InMemoryOutbox()
     plan_contract_app = create_app(
         plans=InMemoryPlanRepository(),
-        outbox=InMemoryOutbox(),
+        outbox=outbox,
         gate=real_gate_client,
         tenant_env_value=TENANT_ID,
     )
@@ -112,6 +115,15 @@ def test_submit_decision_reaches_approved_through_real_http_gate_client(
     assert state_response.status_code == 200
     assert state_response.json()["state"] == "approved"
     assert state_response.json()["decisions"][0]["decision"] == "approved"
+
+    approved_events = [
+        event
+        for event in outbox.list_pending()
+        if event["event_type"] == "plan.contract.approved.v1"
+    ]
+    assert len(approved_events) == 1
+    assert approved_events[0]["payload"] == {"contract_hash": contract_hash, "decision": "approved"}
+    assert "approver_actor_id" not in approved_events[0]["payload"]
 
     plan_contract_client.close()
     policy_gate_client.close()

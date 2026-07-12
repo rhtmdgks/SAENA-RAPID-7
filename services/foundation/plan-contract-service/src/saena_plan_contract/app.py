@@ -677,7 +677,7 @@ def create_app(
             for patch_unit_id in plan_facts["patch_unit_ids"]:
                 issue_lease(
                     patch_unit_id=patch_unit_id,
-                    scope=(),
+                    scope=tuple(plan_facts["approved_scope"]),
                     expiry=incoming.decided_at,
                 )
             approved_envelope = EnvelopeFactory.build_tenant_envelope(

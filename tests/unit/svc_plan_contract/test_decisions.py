@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+import saena_plan_contract.app as plan_contract_app_module
 from fastapi.testclient import TestClient
 from plan_contract_factories import (
     APPROVER_1,
@@ -11,6 +13,7 @@ from plan_contract_factories import (
     high_risk_change_plan,
 )
 from saena_domain.persistence import InMemoryOutbox, InMemoryPlanRepository
+from saena_domain.policy.lease import PatchUnitLease
 from saena_plan_contract import create_app
 from saena_plan_contract.audit_trail import AuditTrailStore
 from saena_plan_contract.gate_client import FakeGateClient
@@ -39,6 +42,44 @@ def test_decision_with_gate_allow_reaches_approved(client, headers, change_plan,
     payload = approved_events[0]["payload"]
     assert payload == {"contract_hash": contract_hash, "decision": "approved"}
     assert "approver_actor_id" not in payload
+
+
+def test_approved_lease_scope_matches_plan_approved_scope(
+    client, headers, change_plan, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression guard (critic MUST-FIX, re-verify of w2-21): `app.py`'s
+    APPROVED branch previously hardcoded `issue_lease(..., scope=(), ...)`
+    — every lease was issued with an EMPTY scope regardless of what the plan
+    actually declared, even though `plan_facts["approved_scope"]` (the same
+    value the gate request now uses, `w2-21`) was already in scope at that
+    call site. `issue_lease`'s return value is not persisted or exposed over
+    HTTP (`app.py`'s own module docstring / `issue_lease`'s own docstring —
+    "pure construction only"), so this monkeypatches `issue_lease` in
+    `app.py`'s own module namespace to capture what it was actually called
+    with — the only way to observe this from outside `app.py`."""
+    calls: list[dict[str, object]] = []
+
+    def _capturing_issue_lease(
+        *, patch_unit_id: str, scope: tuple[str, ...], expiry: str
+    ) -> PatchUnitLease:
+        calls.append({"patch_unit_id": patch_unit_id, "scope": scope, "expiry": expiry})
+        return PatchUnitLease(patch_unit_id=patch_unit_id, scope=scope, expiry=expiry)
+
+    monkeypatch.setattr(plan_contract_app_module, "issue_lease", _capturing_issue_lease)
+
+    contract_hash = _propose(client, headers, change_plan)
+    response = client.post(
+        f"/v1/plans/{contract_hash}/decisions",
+        json=decision_body(contract_hash, run_id=change_plan["run_id"]),
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["state"] == "approved"
+
+    assert len(calls) == 1
+    assert calls[0]["patch_unit_id"] == change_plan["patch_units"][0]["id"]
+    assert calls[0]["scope"] == tuple(change_plan["approved_scope"])
+    assert calls[0]["scope"] != ()
 
 
 def test_gate_denied_before_any_transition(client, headers, change_plan, gate, plans) -> None:
