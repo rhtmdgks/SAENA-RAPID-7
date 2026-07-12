@@ -92,3 +92,64 @@ def test_huge_threshold_far_above_cohort_suppressed() -> None:
     result = KAnonymityGate.evaluate(cohort_size=10, privacy_threshold=1_000_000)
 
     assert result.decision is GateDecision.SUPPRESSED
+
+
+def test_forged_result_with_inconsistent_decision_rejected() -> None:
+    """Critic MUST-FIX regression: a caller must not be able to construct a
+    KAnonymityGateResult directly with a decision that disagrees with its
+    own cohort_size/privacy_threshold (e.g. claiming ALLOWED for a cohort
+    that is actually below threshold) and have it accepted — that would let
+    saena_domain.privacy.status.transition() be laundered into
+    pending_review -> k_anonymized without ever running the real gate.
+    """
+    with pytest.raises(ValueError, match="inconsistent"):
+        KAnonymityGateResult(
+            decision=GateDecision.ALLOWED,
+            cohort_size=1,
+            privacy_threshold=999,
+            reason="forged",
+        )
+
+
+def test_forged_result_suppressed_claimed_as_allowed_boundary_rejected() -> None:
+    """Same forgery shape at the equal-boundary edge: cohort_size ==
+    privacy_threshold recomputes to ALLOWED, so claiming SUPPRESSED here is
+    also an inconsistent (forged) result and must raise.
+    """
+    with pytest.raises(ValueError, match="inconsistent"):
+        KAnonymityGateResult(
+            decision=GateDecision.SUPPRESSED,
+            cohort_size=5,
+            privacy_threshold=5,
+            reason="forged",
+        )
+
+
+def test_forged_result_still_validates_minima() -> None:
+    """A forged construction with an out-of-range value must fail with the
+    same minima error `evaluate` raises, not the inconsistency error —
+    __post_init__ recomputes via the same validated path as evaluate().
+    """
+    with pytest.raises(ValueError, match="cohort_size"):
+        KAnonymityGateResult(
+            decision=GateDecision.SUPPRESSED,
+            cohort_size=0,
+            privacy_threshold=5,
+            reason="forged",
+        )
+
+
+def test_consistent_direct_construction_matching_evaluate_succeeds() -> None:
+    """Direct construction is not banned outright — only inconsistency is
+    rejected. A caller-built result identical to what evaluate() would have
+    produced is indistinguishable from evaluate()'s own output and is
+    accepted (there is no way to detect *how* a valid instance was built,
+    only *whether* it is internally consistent)."""
+    result = KAnonymityGateResult(
+        decision=GateDecision.ALLOWED,
+        cohort_size=5,
+        privacy_threshold=5,
+        reason="cohort_size_meets_threshold",
+    )
+
+    assert result.allowed is True

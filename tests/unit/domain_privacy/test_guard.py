@@ -19,6 +19,7 @@ from saena_domain.privacy.guard import (
     ForbiddenIdentifierPresentError,
     NotPublishableError,
     SuppressedEventError,
+    WrongContextTypeError,
     guard_aggregate_publish,
 )
 from saena_schemas.envelope.event_envelope_v1 import (
@@ -213,3 +214,42 @@ def test_non_str_non_enum_de_identification_status_rejected(
 
     with pytest.raises(TypeError, match="de_identification_status"):
         guard_aggregate_publish(data)
+
+
+def test_missing_context_type_rejected(valid_aggregate_envelope: dict[str, Any]) -> None:
+    data = copy.deepcopy(valid_aggregate_envelope)
+    del data["context_type"]
+
+    with pytest.raises(WrongContextTypeError):
+        guard_aggregate_publish(data)
+
+
+def test_system_context_type_rejected(valid_aggregate_envelope: dict[str, Any]) -> None:
+    data = copy.deepcopy(valid_aggregate_envelope)
+    data["context_type"] = "system"
+
+    with pytest.raises(WrongContextTypeError):
+        guard_aggregate_publish(data)
+
+
+def test_tenant_context_dict_with_aggregate_shaped_keys_rejected() -> None:
+    """Critic SHOULD-FIX regression: a tenant-context dict that also happens
+    to carry aggregate-shaped keys (cohort_size, privacy_threshold,
+    de_identification_status, lineage_audit_ref) must be rejected on
+    context_type alone — this guard's contract is AggregateContext only
+    (ADR-0013), and must not silently process it just because the
+    aggregate-specific keys are present.
+    """
+    tenant_data = _load_fixture("valid", "tenant-patch-unit-completed-v1.json")
+    assert tenant_data["context_type"] == "tenant"
+    lineage_ref = "sha256:8f2e1c9a7b3d5f4e6a8c2b1d9f7e3a5c4b6d8f2e1c9a7b3d5f4e6a8c2b1d9f7e"
+    forged = {
+        **tenant_data,
+        "cohort_size": 12,
+        "privacy_threshold": 5,
+        "de_identification_status": "k_anonymized",
+        "lineage_audit_ref": lineage_ref,
+    }
+
+    with pytest.raises(WrongContextTypeError):
+        guard_aggregate_publish(forged)

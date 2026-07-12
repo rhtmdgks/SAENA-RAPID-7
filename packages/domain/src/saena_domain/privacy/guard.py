@@ -98,6 +98,25 @@ class ForbiddenIdentifierPresentError(PrivacyGuardError):
     """
 
 
+class WrongContextTypeError(PrivacyGuardError):
+    """Raised when ``context_type`` is not ``"aggregate"``.
+
+    Critic SHOULD-FIX (w2-03 post-review): on the dict path,
+    ``guard_aggregate_publish`` previously never checked ``context_type``,
+    so a tenant/system-context dict that happened to also carry
+    aggregate-shaped keys (``cohort_size``, ``privacy_threshold``, etc. —
+    e.g. hand-assembled by a caller, or a malformed producer payload) would
+    be processed as if it were a genuine AggregateContext envelope. This
+    function's entire contract (ADR-0013 AggregateContext gate) only applies
+    to ``context_type: "aggregate"``; anything else is a caller error, not a
+    privacy verdict this gate is positioned to make.
+    """
+
+
+#: ADR-0013: the only context_type this guard is defined for.
+_REQUIRED_CONTEXT_TYPE = "aggregate"
+
+
 def _as_mapping(envelope: AggregateEnvelopeLike) -> dict[str, Any]:
     if isinstance(envelope, AggregateContextEnvelope):
         # The generated model's own `extra="forbid"` config already makes
@@ -135,6 +154,13 @@ def guard_aggregate_publish(envelope: AggregateEnvelopeLike) -> None:
     (missing required keys, wrong types).
     """
     data = _as_mapping(envelope)
+
+    context_type = data.get("context_type")
+    if context_type != _REQUIRED_CONTEXT_TYPE:
+        raise WrongContextTypeError(
+            f"guard_aggregate_publish requires context_type={_REQUIRED_CONTEXT_TYPE!r}, "
+            f"got {context_type!r}"
+        )
 
     for forbidden_key in _FORBIDDEN_KEYS:
         if forbidden_key in data:

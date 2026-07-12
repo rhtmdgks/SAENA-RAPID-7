@@ -29,6 +29,7 @@ from saena_domain.privacy.guard import (
     NotPublishableError,
     PrivacyGuardError,
     SuppressedEventError,
+    WrongContextTypeError,
     guard_aggregate_publish,
 )
 from saena_domain.privacy.status import (
@@ -50,6 +51,7 @@ __all__ = [
     "NotPublishableError",
     "PrivacyGuardError",
     "SuppressedEventError",
+    "WrongContextTypeError",
     "guard_aggregate_publish",
     "transition",
 ]
