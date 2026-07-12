@@ -97,7 +97,7 @@ from saena_plan_contract.errors import (
     SelfApprovalRejectedError,
     ValidationFailedError,
 )
-from saena_plan_contract.gate_client import GateCheckRequest, PolicyGateClient
+from saena_plan_contract.gate_client import DecisionGateCheckRequest, PolicyGateClient
 from saena_plan_contract.schemas import (
     ApprovalDecision,
     ChangeplanActionContract,
@@ -134,17 +134,22 @@ _PRODUCER = "plan-contract-service"
 _EVENT_PROPOSED = "plan.contract.proposed.v1"
 _EVENT_APPROVED = "plan.contract.approved.v1"
 
-# Reason code used for the audit descriptor recorded on a policy-gate deny —
-# saena_domain.policy.AuditReasonCode has no dedicated "gate denied" member
-# (that vocabulary is scoped to saena_domain.policy's OWN transition/quorum
-# reasons); this service maps a gate deny onto the closed enum's closest
-# existing member (QUORUM_PENDING: the plan remains WAITING_APPROVAL, no
-# state change occurred) rather than inventing a parallel free-text reason,
-# preserving "reason is a closed code, not free text" (audit.py docstring).
-# OPEN ITEM: a future saena_domain.policy revision could add a dedicated
-# GATE_DENIED reason code; flagged in the final report rather than editing
-# packages/domain (outside this unit's exclusive-write paths).
-_POLICY_GATE_DENIED_REASON = AuditReasonCode.QUORUM_PENDING
+# Reason code used for the audit descriptor recorded on a policy-gate deny.
+#
+# w2-24 (Wave 2 critic follow-up, audit-truthfulness bug — FIXED here): this
+# previously mapped a gate deny onto AuditReasonCode.QUORUM_PENDING, which
+# conflated "the policy gate denied this decision outright" (ADR-0003 step
+# (1), evaluated and short-circuited BEFORE `saena_domain.policy.transition()`
+# / quorum evaluation ever runs) with "not enough approvers have signed off
+# yet" (QUORUM_PENDING is a `transition()`-internal outcome for a decision
+# the gate already ALLOWED). `saena_domain.policy.AuditReasonCode` now has a
+# dedicated `GATE_DENIED` member (packages/domain/src/saena_domain/policy/
+# audit.py) for exactly this case — see that enum member's own docstring.
+# The genuine insufficient-quorum path (saena_domain.policy.transitions.
+# transition(), high-risk/H-7 first-of-two-approvers case) is UNCHANGED and
+# still produces QUORUM_PENDING; this constant only ever affects the
+# gate-denied branch below, never transition()'s own audit record.
+_POLICY_GATE_DENIED_REASON = AuditReasonCode.GATE_DENIED
 
 
 def _now_iso() -> str:
@@ -544,13 +549,14 @@ def create_app(
         # attempted — this branch is the ADR-0003/W2A exit-demo path.
         #
         # w2-21: populate the H-3 evidence/scope/diff-budget fields
-        # policy-gate's real PlanCheckRequestBody requires (gate_client.py's
-        # HttpPolicyGateClient fails closed via its own pre-flight guard if
-        # any of these were still None — see GateCheckRequest's docstring)
-        # from the facts propose_plan recorded off the validated
-        # ChangeplanActionContract, plus approver_actor_id, already in scope
-        # from the submitted ApprovalDecision.
-        gate_request = GateCheckRequest(
+        # policy-gate's real PlanCheckRequestBody requires from the facts
+        # propose_plan recorded off the validated ChangeplanActionContract,
+        # plus approver_actor_id, already in scope from the submitted
+        # ApprovalDecision. w2-24: this now constructs DecisionGateCheckRequest
+        # (every field below is REQUIRED at the type level — a future edit
+        # here that drops one is a mypy/construction error, not only a
+        # runtime deny via HttpPolicyGateClient's pre-flight guard).
+        gate_request = DecisionGateCheckRequest(
             contract_hash=contract_hash,
             tenant_id=tenant_id.value,
             high_risk=high_risk,

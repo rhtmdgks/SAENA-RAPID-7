@@ -12,8 +12,9 @@ Public API:
     AuditTrailStore        — in-process audit descriptor buffer (`audit_trail.py`)
     compute_contract_hash  — ChangePlan content hash (`contract_hash.py`, OPEN
                               ITEM: interim canonicalization pending the JCS ADR)
-    PolicyGateClient, GateDecision, GateCheckRequest, HttpPolicyGateClient,
-    FakeGateClient          — local Policy Gate client port (`gate_client.py`)
+    PolicyGateClient, GateDecision, GateCheckRequest, DecisionGateCheckRequest,
+    HttpPolicyGateClient, FakeGateClient — local Policy Gate client port
+                              (`gate_client.py`)
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from saena_plan_contract.app import create_app
 from saena_plan_contract.audit_trail import AuditTrailStore
 from saena_plan_contract.contract_hash import compute_contract_hash
 from saena_plan_contract.gate_client import (
+    DecisionGateCheckRequest,
     FakeGateClient,
     GateCheckRequest,
     GateDecision,
@@ -31,6 +33,7 @@ from saena_plan_contract.gate_client import (
 
 __all__ = [
     "AuditTrailStore",
+    "DecisionGateCheckRequest",
     "FakeGateClient",
     "GateCheckRequest",
     "GateDecision",

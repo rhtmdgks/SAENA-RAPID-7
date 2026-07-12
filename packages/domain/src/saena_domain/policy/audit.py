@@ -29,6 +29,15 @@ class AuditReasonCode(StrEnum):
     SUBMITTED_FOR_APPROVAL = "submitted_for_approval"
     APPROVED_SUFFICIENT_QUORUM = "approved_sufficient_quorum"
     QUORUM_PENDING = "quorum_pending"
+    # w2-24 (Wave 2 critic follow-up, audit-truthfulness bug): a policy-gate
+    # DENIAL (ADR-0003 step (1), evaluated BEFORE `transition()`/quorum ever
+    # runs) is a semantically distinct event from "not enough approvers have
+    # signed off yet" (QUORUM_PENDING, a `transition()`-internal outcome).
+    # Services must map a gate deny onto THIS member, never onto
+    # QUORUM_PENDING — conflating the two would make the audit trail claim a
+    # decision was still awaiting quorum when it was actually rejected by the
+    # gate outright.
+    GATE_DENIED = "gate_denied"
     REJECTED_BY_APPROVER = "rejected_by_approver"
     REJECTED_SELF_APPROVAL = "rejected_self_approval"
     REJECTED_DUPLICATE_APPROVER = "rejected_duplicate_approver"

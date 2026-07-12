@@ -421,3 +421,85 @@ def test_classify_command_recursion_depth_cap_fails_closed() -> None:
 def test_classify_command_benign_commands_not_denied(argv: list[str]) -> None:
     result = classify_command(argv)
     assert result.denied is False
+
+
+# --- w2-24: env -S / --split-string default-deny bypass ---------------------
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["env", "-S", "kubectl patch pod x"],
+        ["env", "--split-string=kubectl patch"],
+        ["env", "-Skubectl patch"],
+        ["env", "-S", "kubectl   patch   pod   x"],  # whitespace inside the string
+        ["env", "-S", "git push"],
+    ],
+)
+def test_classify_command_denies_env_split_string_bypass(argv: list[str]) -> None:
+    result = classify_command(argv)
+    assert result.denied is True
+    assert result.binary in {"kubectl", "git"}
+
+
+def test_classify_command_env_split_string_malformed_quoting_fails_closed() -> None:
+    # An unparseable env -S/--split-string argument is DENIED, not silently
+    # skipped — same fail-closed doctrine as sh -c's own malformed-quoting
+    # guard (an uninspectable embedded string must never be treated as
+    # benign).
+    result = classify_command(["env", "-S", 'echo "unterminated'])
+    assert result.denied is True
+    assert "unparseable" in (result.reason or "")
+    assert "env" in (result.reason or "")
+
+
+def test_classify_command_env_split_string_benign_command_not_denied() -> None:
+    # A benign env -S command must NOT be swept up by the deny table itself
+    # — only the deny corpus triggers a denial; the unwrap mechanism alone
+    # is not a blanket refusal.
+    result = classify_command(["env", "-S", "pytest -x"])
+    assert result.denied is False
+    assert result.binary == "pytest"
+
+
+def test_classify_command_env_split_string_glued_short_form_denies() -> None:
+    # -S<glued> with no space between the flag and the string (distinct
+    # parametrized case kept standalone for an explicit binary/subcommand
+    # assertion, not just `denied is True`).
+    result = classify_command(["env", "-Skubectl patch pod x"])
+    assert result.denied is True
+    assert result.binary == "kubectl"
+    assert result.subcommand == "patch"
+
+
+def test_classify_command_env_split_string_long_form_denies() -> None:
+    result = classify_command(["env", "--split-string=kubectl patch pod x"])
+    assert result.denied is True
+    assert result.binary == "kubectl"
+    assert result.subcommand == "patch"
+
+
+def test_classify_command_env_split_string_nested_wrapper_chain_denies() -> None:
+    # env -S can itself unwrap to a further wrapper/shell chain — proves the
+    # recursion actually re-enters _classify_argv rather than terminating.
+    result = classify_command(["env", "-S", "sudo kubectl patch pod x"])
+    assert result.denied is True
+    assert result.binary == "kubectl"
+
+
+def test_classify_command_env_dash_s_without_string_falls_through() -> None:
+    # A bare `env -S` with no trailing string at all (malformed/incomplete
+    # invocation) carries no inspectable embedded command — falls through to
+    # ordinary classification (env itself is not in the deny table), not a
+    # false positive or a crash.
+    result = classify_command(["env", "-S"])
+    assert result.denied is False
+
+
+def test_classify_command_env_split_string_does_not_break_plain_env_wrapper() -> None:
+    # Existing MUST-FIX 1 exec-wrapper regression (plain `env kubectl
+    # patch`, no -S at all) must remain unaffected by the new -S unwrap step.
+    result = classify_command(["env", "kubectl", "patch", "pod", "x"])
+    assert result.denied is True
+    assert result.binary == "kubectl"
+    assert result.subcommand == "patch"

@@ -31,26 +31,36 @@ attacker can use to hide the real command from a naive argv[0] check
      only is case-folded; subcommand tokens elsewhere in this module are
      NEVER lowercased, since `git -c a=b push` semantics do not extend to
      case-insensitive subcommands).
-  2. If that basename is a recognized EXEC WRAPPER (`env`, `sudo`, `xargs`,
+  2. If that basename is `env` AND carries an `-S`/`-S<glued>`/
+     `--split-string=<glued>` STRING argument (w2-24, Wave 2 critic
+     follow-up — `env`'s split-string form parses its STRING argument
+     shell-style, functionally identical to `sh -c "..."`, e.g. `env -S
+     "kubectl patch ..."`, `env --split-string=kubectl patch`), `shlex.split`
+     that string and RECURSE on the result as a fresh command — checked
+     BEFORE step 2 below so the generic wrapper-option skip never treats
+     `-S`'s OWN value as a harmless option-then-argv[0]. `shlex.split` raising
+     (malformed quoting) is FAIL-CLOSED, same doctrine as step 3's `-c`
+     handling below.
+  3. If that basename is a recognized EXEC WRAPPER (`env`, `sudo`, `xargs`,
      `nohup`, `timeout`, `nice`, `ionice`, `stdbuf`, `time`, `doas`,
      `setsid`, ... — MUST-FIX 1), skip the wrapper's own leading
      option/assignment tokens (`env` additionally consumes `NAME=VALUE`
      tokens and `-i`/`-u` per `env`'s own grammar) and RECURSE on the
      remaining argv as a fresh command — `env sudo kubectl patch` unwraps
      `env` then `sudo` then reaches `kubectl patch`.
-  3. If that basename is a recognized SHELL INTERPRETER carrying a `-c`
+  4. If that basename is a recognized SHELL INTERPRETER carrying a `-c`
      STRING argument (`sh -c "kubectl patch ..."`, MUST-FIX 2), `shlex.split`
      the string argument and RECURSE on the result as a fresh command;
      `shlex.split` raising (malformed quoting) is FAIL-CLOSED — treated as
      denied, never silently skipped, since an uninspectable embedded string
      is exactly the failure mode this recursion exists to close.
-  4. Walk the (unwrapped) argv[1:], SKIPPING every recognized option token
+  5. Walk the (unwrapped) argv[1:], SKIPPING every recognized option token
      (`-x`, `--flag`, `--flag=value`, and known short options' OWN
      following value token, e.g. the `foo=bar` in `git -c foo=bar push` or
      the `dir` in `git -C dir push`) to collect every remaining non-option
      token as a subcommand CANDIDATE (not just the first — see
      `iter_candidate_subcommands`).
-  5. A denied (binary, subcommand) pair anywhere this scan finds it is
+  6. A denied (binary, subcommand) pair anywhere this scan finds it is
      denied regardless of how many option tokens precede it, and regardless
      of whitespace form (argv is already a list — a caller that instead
      joins on tabs/multiple spaces before splitting has already lost the
@@ -192,6 +202,46 @@ def _is_env_assignment(token: str) -> bool:
     `GIT_SSH=x git push` — POSIX identifier on the left of `=`, distinct
     from an option token (never starts with `-`)."""
     return bool(_ENV_ASSIGNMENT_PATTERN.match(token))
+
+
+# w2-24 (Wave 2 critic follow-up — "env -S / --split-string default-deny"
+# residual gap): GNU coreutils `env`'s `-S`/`--split-string` option takes a
+# single STRING argument that `env` itself parses shell-style (quote-aware
+# word splitting — functionally identical to `sh -c "..."`'s own embedded
+# command string, MUST-FIX 2's shape, not a plain wrapper trailing-argv).
+# `_unwrap_exec_wrapper`'s generic option-skip loop would otherwise treat
+# `-S`/`--split-string` as an ordinary (non-value-taking) option and skip
+# past it, leaving the STRING argument to be misread as the wrapped
+# command's own argv[0] (one opaque token, e.g. `"kubectl patch pod x"` as a
+# literal binary name) — never unwrapped, never classified against the deny
+# table. This function recognizes all three of `env`'s accepted spellings —
+# `-S STRING` (separate token), `-SSTRING` (glued short form), and
+# `--split-string=STRING` (glued long form) — and returns the STRING
+# argument for `shlex.split`-based recursive classification, exactly like
+# `_unwrap_shell_dash_c` already does for `sh -c`.
+_ENV_SPLIT_STRING_LONG_PREFIX = "--split-string="
+
+
+def _find_env_split_string_arg(argv: list[str]) -> str | None:
+    """Return `env -S`/`-S<glued>`/`--split-string=<glued>`'s STRING
+    argument from `argv[1:]` (the tokens after `env` itself), or `None` if
+    no such option is present. Scans the ENTIRE tail (not just the first
+    token) — same defense-in-depth rationale as `iter_candidate_subcommands`
+    (an unrelated leading option before `-S` must not hide it)."""
+    i = 1
+    while i < len(argv):
+        token = argv[i]
+        if token == "-S":
+            if i + 1 < len(argv):
+                return argv[i + 1]
+            return None
+        if token.startswith("-S") and token != "-S":
+            # Glued short form: `-Skubectl patch` -> `kubectl patch`.
+            return token[len("-S") :]
+        if token.startswith(_ENV_SPLIT_STRING_LONG_PREFIX):
+            return token[len(_ENV_SPLIT_STRING_LONG_PREFIX) :]
+        i += 1
+    return None
 
 
 def _basename(argv0: str) -> str:
@@ -409,6 +459,28 @@ def _classify_argv(argv: list[str], *, depth: int = 0) -> CommandClassification:
 
     binary = _basename(unwrapped[0])
 
+    if binary == "env":
+        split_string = _find_env_split_string_arg(unwrapped)
+        if split_string is not None:
+            # w2-24: `env -S`/`-S<glued>`/`--split-string=<glued>` parses its
+            # STRING argument shell-style, exactly like `sh -c "..."` — must
+            # be unwrapped and recursively classified BEFORE the generic
+            # exec-wrapper option-skip loop below ever sees `-S` (which it
+            # would otherwise treat as a harmless, skippable option token and
+            # misread the STRING itself as the wrapped command's argv[0]).
+            try:
+                split_argv = shlex.split(split_string)
+            except ValueError:
+                # Uninspectable embedded string — fail-closed, same doctrine
+                # as _unwrap_shell_dash_c's own shlex.split failure below.
+                return CommandClassification(
+                    binary=binary,
+                    subcommand="-S",
+                    denied=True,
+                    reason="denied: unparseable env -S/--split-string argument (fail-closed)",
+                )
+            return _classify_argv(split_argv, depth=depth + 1)
+
     wrapped_argv = _unwrap_exec_wrapper(unwrapped, binary)
     if wrapped_argv is not None:
         return _classify_argv(wrapped_argv, depth=depth + 1)
@@ -444,15 +516,16 @@ def classify_command(argv: list[str]) -> CommandClassification:
     """Classify a single argv command list against the deny-bypass table.
 
     Recursively unwraps (in order, at every nesting level): leading
-    `NAME=VALUE` env-prefix tokens (MUST-FIX 3), exec wrappers like
-    `env`/`sudo`/`xargs`/... (MUST-FIX 1), and `shell -c "..."` embedded
-    command strings (MUST-FIX 2) — so `env sudo kubectl patch`, `GIT_SSH=x
-    git push`, and `sh -c "kubectl patch pod x"` are all classified against
-    the exact same `(binary, subcommand)` deny table as a bare `kubectl
-    patch` invocation. `argv[0]`'s basename is additionally normalized
-    case-insensitively with a trailing `.exe` stripped (MUST-FIX 4) —
-    `kubectl.exe`/`KUBECTL.EXE` both classify as `kubectl`; subcommand
-    tokens themselves are never case-folded.
+    `NAME=VALUE` env-prefix tokens (MUST-FIX 3), `env -S`/`--split-string`
+    embedded command strings (w2-24), exec wrappers like `env`/`sudo`/
+    `xargs`/... (MUST-FIX 1), and `shell -c "..."` embedded command strings
+    (MUST-FIX 2) — so `env sudo kubectl patch`, `GIT_SSH=x git push`,
+    `sh -c "kubectl patch pod x"`, and `env -S "kubectl patch pod x"` are all
+    classified against the exact same `(binary, subcommand)` deny table as a
+    bare `kubectl patch` invocation. `argv[0]`'s basename is additionally
+    normalized case-insensitively with a trailing `.exe` stripped
+    (MUST-FIX 4) — `kubectl.exe`/`KUBECTL.EXE` both classify as `kubectl`;
+    subcommand tokens themselves are never case-folded.
 
     Checks EVERY candidate `iter_candidate_subcommands` produces at the
     FINAL unwrapped level (not just the first) against `_DENIED_SUBCOMMANDS`
@@ -465,13 +538,14 @@ def classify_command(argv: list[str]) -> CommandClassification:
     matched being first.
 
     Never raises: an empty argv, an argv with no candidate subcommand, or a
-    `shlex.split` failure while unwrapping a shell `-c` string is
-    classified here (the last case as `denied=True`, fail-closed — see
-    `_classify_argv`) — engine.py's default-deny ALLOWLIST evaluation (a
-    rule must explicitly match to allow) is the actual fail-closed backstop
-    for any OTHER unrecognized shape, not this classifier, which only
-    encodes the SPECIFIC named regression cases plus their wrapper/shell/
-    env-prefix/exe-suffix variants.
+    `shlex.split` failure while unwrapping a shell `-c` string OR an
+    `env -S`/`--split-string` argument is classified here (the last two
+    cases as `denied=True`, fail-closed — see `_classify_argv`) —
+    engine.py's default-deny ALLOWLIST evaluation (a rule must explicitly
+    match to allow) is the actual fail-closed backstop for any OTHER
+    unrecognized shape, not this classifier, which only encodes the
+    SPECIFIC named regression cases plus their wrapper/shell/env-prefix/
+    exe-suffix/split-string variants.
     """
     return _classify_argv(argv)
 
