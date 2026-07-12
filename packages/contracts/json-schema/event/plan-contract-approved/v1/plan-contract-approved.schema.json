@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/plan-contract-approved/v1/plan-contract-approved.schema.json",
+  "title": "plan.contract.approved.v1 payload",
+  "description": "Payload of the plan.contract.approved.v1 event — notification-only projection of an ApprovalDecision. Per ADR-0003, plan-contract-service signals Temporal directly on approval; this event is a downstream notification, not the authority path itself.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: approved plan §2 event row (docs/... virtual-cooking-map.md §2, §5 'event/ 6종', deliverable 4); domain/approval-decision/v1 (contract_hash/decision field shapes). ADR-0024(e)-2 BAN (Security critic MUST-FIX, ruling R9-3): this payload deliberately EXCLUDES approver_actor_id — approver identity is PII-sensitive and MUST NOT be embedded in the event payload; it is discoverable only by dereferencing contract_hash against the domain/approval-decision system-of-record (RBAC-gated, per k3s §4.1 payload PII/secret ban and ADR-0024(e)-2). The full per-approver record (approver_actor_id, patch_unit_decisions, signature, decided_at) lives exclusively in domain/approval-decision/v1 — the ledger/authority artifact for approval decisions is that contract, not this event. NO additionalProperties:false (open class).",
+  "type": "object",
+  "required": [
+    "contract_hash",
+    "decision"
+  ],
+  "properties": {
+    "contract_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "References the ChangePlan instance this decision resolves — same carrier role as domain/approval-decision.contract_hash. Consumers dereference this hash against domain/approval-decision (RBAC-gated) to obtain approver identity, per-patch-unit decisions, and signature — none of which are re-projected here (ADR-0024(e)-2)."
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "rejected"
+      ],
+      "$comment": "Mirrors domain/approval-decision.decision enum verbatim."
+    }
+  }
+}

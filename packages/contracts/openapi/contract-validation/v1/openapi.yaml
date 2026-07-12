@@ -1,0 +1,49 @@
+openapi: 3.1.0
+jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
+info:
+  title: SAENA contract-validation composition document
+  version: "1.0.0"
+  description: >-
+    composition-validation document — NOT a service API. This document exists
+    solely so an OpenAPI 3.1 tool (openapi-spec-validator, and later w1-11/13
+    tooling) can validate the 15 P0 JSON Schema contracts as a single
+    components.schemas composition proof (13 catalog contract files — the
+    RunContext catalog row splits into run-context-lifecycle + run-context-experiment,
+    ruling R10 — plus common/envelope EventEnvelope and common/problem-detail
+    ProblemDetail). No `paths` key is declared: OpenAPI 3.1 permits an
+    operationless, components-only document (verified by local smoke test,
+    see w1-08 commit verification matrix — `paths` omitted entirely, not
+    `paths: {}`). Do not add service endpoints here — see CLAUDE.md protected
+    paths and approved plan §2 "API 문서" row ("경로 0 — 서비스 endpoint 금지 준수").
+components:
+  schemas:
+    TenantContext:
+      $ref: "../../../json-schema/context/tenant-context/v1/tenant-context.schema.json"
+    ActorContext:
+      $ref: "../../../json-schema/context/actor-context/v1/actor-context.schema.json"
+    WorkspaceContext:
+      $ref: "../../../json-schema/context/workspace-context/v1/workspace-context.schema.json"
+    ProjectContext:
+      $ref: "../../../json-schema/context/project-context/v1/project-context.schema.json"
+    SiteContext:
+      $ref: "../../../json-schema/context/site-context/v1/site-context.schema.json"
+    RunContextLifecycle:
+      $ref: "../../../json-schema/context/run-context-lifecycle/v1/run-context-lifecycle.schema.json"
+    RunContextExperiment:
+      $ref: "../../../json-schema/context/run-context-experiment/v1/run-context-experiment.schema.json"
+    ChangePlan:
+      $ref: "../../../json-schema/domain/change-plan/v1/change-plan.schema.json"
+    ApprovalDecision:
+      $ref: "../../../json-schema/domain/approval-decision/v1/approval-decision.schema.json"
+    SourceSnapshot:
+      $ref: "../../../json-schema/domain/source-snapshot/v1/source-snapshot.schema.json"
+    PatchArtifact:
+      $ref: "../../../json-schema/domain/patch-artifact/v1/patch-artifact.schema.json"
+    VerificationResult:
+      $ref: "../../../json-schema/domain/verification-result/v1/verification-result.schema.json"
+    AuditEvent:
+      $ref: "../../../json-schema/domain/audit-event/v1/audit-event.schema.json"
+    EventEnvelope:
+      $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+    ProblemDetail:
+      $ref: "../../../json-schema/common/problem-detail/v1/problem-detail.schema.json"

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/plan-contract-proposed/v1/plan-contract-proposed.schema.json",
+  "title": "plan.contract.proposed.v1 payload",
+  "description": "Payload of the plan.contract.proposed.v1 event — notification that a ChangePlan (Action Contract) has been proposed and is awaiting approval. References the ChangePlan instance by uri+hash; does not carry the plan body itself.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: approved plan §2 event row (docs/... virtual-cooking-map.md §2, §5 'event/ 6종', deliverable 3); docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md §4.2 ActionContractProposed message family (contract_hash reference pattern, mirrors domain/change-plan.contract_hash self-reference-avoidance design and domain/approval-decision.contract_hash carrier pattern). contract_uri/contract_hash/base_commit shapes mirror the equivalent common/identifiers $defs used by domain/change-plan (repo_commit -> git_sha) and domain/source-snapshot/patch-artifact (uri_ref, sha256_ref) conventions. evidence_ids/patch_unit_ids mirror domain/change-plan.hypotheses[].evidence_ids and domain/change-plan.patch_units[].id array shapes (free-string arrays, minItems 1 when present). evidence_ledger_hash mirrors domain/change-plan.evidence_ledger_hash (H-3, security-model.md). NO additionalProperties:false (open class).",
+  "type": "object",
+  "required": [
+    "contract_uri",
+    "contract_hash",
+    "base_commit"
+  ],
+  "properties": {
+    "contract_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "Reference to the proposed ChangePlan instance (object storage) — never inline plan content in the event payload, same reference-only convention as artifact_uri/snapshot_uri. uri_ref forbids query/fragment (ADR-0024(f))."
+    },
+    "contract_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Integrity anchor for the referenced ChangePlan instance — same carrier role as domain/approval-decision.contract_hash and domain/patch-artifact.contract_hash (ChangePlan itself omits its own hash by design, self-reference avoidance)."
+    },
+    "base_commit": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/git_sha",
+      "$comment": "The immutable repo commit the plan is proposed against — mirrors domain/change-plan.repo_commit / domain/patch-artifact.base_commit (git_sha, 40-hex)."
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "Mirrors domain/change-plan.hypotheses[].evidence_ids shape — Algorithm §5.3 Proof-Carrying Change Set claim<->evidence linkage, payload-level roll-up across the proposed plan's hypotheses."
+    },
+    "patch_unit_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "$comment": "Mirrors domain/change-plan.patch_units[].id shape — patch unit identifiers included in the proposed plan."
+    },
+    "evidence_ledger_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Mirrors domain/change-plan.evidence_ledger_hash (H-3, security-model.md '근거 고정') — anchors the evidence set snapshot referenced by evidence_ids at proposal time."
+    }
+  }
+}

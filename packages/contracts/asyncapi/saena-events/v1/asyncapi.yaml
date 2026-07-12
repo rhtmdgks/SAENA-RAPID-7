@@ -1,0 +1,385 @@
+asyncapi: 3.0.0
+info:
+  title: SAENA events (v1)
+  version: "1.0.0"
+  description: >-
+    CONFIRMED v1 event catalog — 12 channels (docs/architecture/api-event-contracts.md
+    §"Recommended topics", quality.gate split into passed/failed channels per
+    ADR-0013/domain-verification-result R4). Delivery semantics: at-least-once
+    with idempotent consumers (docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md
+    §4.1; docs/architecture/api-event-contracts.md "Events: versioned topics;
+    at-least-once; idempotent consumers"). No dead-letter-queue channel is
+    declared in this document — DLQ routing is an operational/infra concern
+    (k3s package, W2C) out of scope for the contract-level catalog. Every
+    channel's message payload is an allOf overlay over
+    envelope/event-envelope/v1 (R8, approved plan §1.1 ruling R8 — AsyncAPI
+    allOf-overlay pattern) that pins event_type/context_type via const and
+    substitutes payload with the event's own payload schema (or leaves the
+    envelope's open payload default for the 5 envelope-only deferred
+    channels below).
+defaultContentType: application/json
+channels:
+  repo.intaken.v1:
+    address: repo.intaken.v1
+    description: Repository/source intake snapshot captured.
+    messages:
+      repoIntaken:
+        name: RepoIntaken
+        title: repo.intaken.v1
+        summary: Repository intake snapshot captured (repository-intake-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: repo.intaken.v1
+                context_type:
+                  const: tenant
+                payload:
+                  $ref: "../../../json-schema/event/repo-intaken/v1/repo-intaken.schema.json"
+
+  site.inventory.completed.v1:
+    address: site.inventory.completed.v1
+    description: Site/domain inventory pass completed.
+    messages:
+      siteInventoryCompleted:
+        name: SiteInventoryCompleted
+        title: site.inventory.completed.v1
+        summary: Site inventory pass completed (site-discovery-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: site.inventory.completed.v1
+                context_type:
+                  const: tenant
+                payload:
+                  $ref: "../../../json-schema/event/site-inventory-completed/v1/site-inventory-completed.schema.json"
+
+  demand.graph.versioned.v1:
+    address: demand.graph.versioned.v1
+    description: >-
+      payload contract P1 — envelope-only until demand-graph payload contract
+      lands.
+    messages:
+      demandGraphVersioned:
+        name: DemandGraphVersioned
+        title: demand.graph.versioned.v1
+        summary: Demand graph version published (demand-graph-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: demand.graph.versioned.v1
+                context_type:
+                  const: tenant
+
+  observation.captured.v1:
+    address: observation.captured.v1
+    description: >-
+      payload contract P1 — envelope-only until observation payload contract
+      lands.
+    x-saena-engine-id-required: true
+    messages:
+      observationCaptured:
+        name: ObservationCaptured
+        title: observation.captured.v1
+        summary: Observation captured (chatgpt-observer-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: observation.captured.v1
+                context_type:
+                  const: tenant
+
+  citation.normalized.v1:
+    address: citation.normalized.v1
+    description: >-
+      payload contract P1 — envelope-only until citation payload contract
+      lands.
+    x-saena-engine-id-required: true
+    messages:
+      citationNormalized:
+        name: CitationNormalized
+        title: citation.normalized.v1
+        summary: Citation normalized (citation-intelligence-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: citation.normalized.v1
+                context_type:
+                  const: tenant
+
+  plan.contract.proposed.v1:
+    address: plan.contract.proposed.v1
+    description: ChangePlan (Action Contract) proposed, awaiting approval.
+    messages:
+      planContractProposed:
+        name: PlanContractProposed
+        title: plan.contract.proposed.v1
+        summary: Plan contract proposed (plan-contract-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: plan.contract.proposed.v1
+                context_type:
+                  const: tenant
+                payload:
+                  $ref: "../../../json-schema/event/plan-contract-proposed/v1/plan-contract-proposed.schema.json"
+
+  plan.contract.approved.v1:
+    address: plan.contract.approved.v1
+    description: >-
+      ChangePlan approval/rejection decision notification (notification-only
+      — ADR-0003 authority path is plan-contract-service -> Temporal
+      directly; approver identity intentionally excluded, ADR-0024(e)-2).
+    messages:
+      planContractApproved:
+        name: PlanContractApproved
+        title: plan.contract.approved.v1
+        summary: Plan contract decision notified (plan-contract-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: plan.contract.approved.v1
+                context_type:
+                  const: tenant
+                payload:
+                  $ref: "../../../json-schema/event/plan-contract-approved/v1/plan-contract-approved.schema.json"
+
+  patch.unit.completed.v1:
+    address: patch.unit.completed.v1
+    description: Patch unit completed (ADR-0013 appendix example 1).
+    messages:
+      patchUnitCompleted:
+        name: PatchUnitCompleted
+        title: patch.unit.completed.v1
+        summary: Patch unit completed (agent-runner-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: patch.unit.completed.v1
+                context_type:
+                  const: tenant
+                payload:
+                  $ref: "../../../json-schema/event/patch-unit-completed/v1/patch-unit-completed.schema.json"
+
+  quality.gate.passed.v1:
+    address: quality.gate.passed.v1
+    description: >-
+      Quality gate passed (R4 channel-layer enforcement: failures key MUST
+      be absent — approved plan §1.1 ruling R4/R8).
+    messages:
+      qualityGatePassed:
+        name: QualityGatePassed
+        title: quality.gate.passed.v1
+        summary: Quality gate passed (quality-eval-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: quality.gate.passed.v1
+                context_type:
+                  const: tenant
+                payload:
+                  allOf:
+                    - $ref: "../../../json-schema/event/quality-gate-result/v1/quality-gate-result.schema.json"
+                    - not:
+                        required: ["failures"]
+
+  quality.gate.failed.v1:
+    address: quality.gate.failed.v1
+    description: >-
+      Quality gate failed (R4 channel-layer enforcement: failures key MUST
+      be present, >=1 item — approved plan §1.1 ruling R4/R8).
+    messages:
+      qualityGateFailed:
+        name: QualityGateFailed
+        title: quality.gate.failed.v1
+        summary: Quality gate failed (quality-eval-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: quality.gate.failed.v1
+                context_type:
+                  const: tenant
+                payload:
+                  allOf:
+                    - $ref: "../../../json-schema/event/quality-gate-result/v1/quality-gate-result.schema.json"
+                    - required: ["failures"]
+
+  experiment.outcome.observed.v1:
+    address: experiment.outcome.observed.v1
+    description: >-
+      payload contract P1 — envelope-only until experiment outcome payload
+      contract lands.
+    x-saena-engine-id-required: true
+    messages:
+      experimentOutcomeObserved:
+        name: ExperimentOutcomeObserved
+        title: experiment.outcome.observed.v1
+        summary: Experiment outcome observed (experiment-attribution-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: experiment.outcome.observed.v1
+                context_type:
+                  const: tenant
+
+  strategy.card.eligible.v1:
+    address: strategy.card.eligible.v1
+    description: >-
+      payload contract P1 — envelope-only until strategy card payload
+      contract lands. AggregateContext (cross-tenant, k-anonymity fields —
+      ADR-0006 rev.2 / ADR-0013).
+    messages:
+      strategyCardEligible:
+        name: StrategyCardEligible
+        title: strategy.card.eligible.v1
+        summary: Strategy card eligible (strategy-skill-bank-service).
+        contentType: application/json
+        schemaFormat: "application/schema+json;version=draft-2020-12"
+        payload:
+          allOf:
+            - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+            - properties:
+                event_type:
+                  const: strategy.card.eligible.v1
+                context_type:
+                  const: aggregate
+
+operations:
+  sendRepoIntaken:
+    action: send
+    channel:
+      $ref: "#/channels/repo.intaken.v1"
+    summary: repository-intake-service produces repo.intaken.v1.
+    messages:
+      - $ref: "#/channels/repo.intaken.v1/messages/repoIntaken"
+
+  sendSiteInventoryCompleted:
+    action: send
+    channel:
+      $ref: "#/channels/site.inventory.completed.v1"
+    summary: site-discovery-service produces site.inventory.completed.v1.
+    messages:
+      - $ref: "#/channels/site.inventory.completed.v1/messages/siteInventoryCompleted"
+
+  sendDemandGraphVersioned:
+    action: send
+    channel:
+      $ref: "#/channels/demand.graph.versioned.v1"
+    summary: demand-graph-service produces demand.graph.versioned.v1.
+    messages:
+      - $ref: "#/channels/demand.graph.versioned.v1/messages/demandGraphVersioned"
+
+  sendObservationCaptured:
+    action: send
+    channel:
+      $ref: "#/channels/observation.captured.v1"
+    summary: chatgpt-observer-service produces observation.captured.v1.
+    messages:
+      - $ref: "#/channels/observation.captured.v1/messages/observationCaptured"
+
+  sendCitationNormalized:
+    action: send
+    channel:
+      $ref: "#/channels/citation.normalized.v1"
+    summary: citation-intelligence-service produces citation.normalized.v1.
+    messages:
+      - $ref: "#/channels/citation.normalized.v1/messages/citationNormalized"
+
+  sendPlanContractProposed:
+    action: send
+    channel:
+      $ref: "#/channels/plan.contract.proposed.v1"
+    summary: plan-contract-service produces plan.contract.proposed.v1.
+    messages:
+      - $ref: "#/channels/plan.contract.proposed.v1/messages/planContractProposed"
+
+  sendPlanContractApproved:
+    action: send
+    channel:
+      $ref: "#/channels/plan.contract.approved.v1"
+    summary: plan-contract-service produces plan.contract.approved.v1.
+    messages:
+      - $ref: "#/channels/plan.contract.approved.v1/messages/planContractApproved"
+
+  sendPatchUnitCompleted:
+    action: send
+    channel:
+      $ref: "#/channels/patch.unit.completed.v1"
+    summary: agent-runner-service produces patch.unit.completed.v1.
+    messages:
+      - $ref: "#/channels/patch.unit.completed.v1/messages/patchUnitCompleted"
+
+  sendQualityGatePassed:
+    action: send
+    channel:
+      $ref: "#/channels/quality.gate.passed.v1"
+    summary: quality-eval-service produces quality.gate.passed.v1.
+    messages:
+      - $ref: "#/channels/quality.gate.passed.v1/messages/qualityGatePassed"
+
+  sendQualityGateFailed:
+    action: send
+    channel:
+      $ref: "#/channels/quality.gate.failed.v1"
+    summary: quality-eval-service produces quality.gate.failed.v1.
+    messages:
+      - $ref: "#/channels/quality.gate.failed.v1/messages/qualityGateFailed"
+
+  sendExperimentOutcomeObserved:
+    action: send
+    channel:
+      $ref: "#/channels/experiment.outcome.observed.v1"
+    summary: experiment-attribution-service produces experiment.outcome.observed.v1.
+    messages:
+      - $ref: "#/channels/experiment.outcome.observed.v1/messages/experimentOutcomeObserved"
+
+  sendStrategyCardEligible:
+    action: send
+    channel:
+      $ref: "#/channels/strategy.card.eligible.v1"
+    summary: strategy-skill-bank-service produces strategy.card.eligible.v1.
+    messages:
+      - $ref: "#/channels/strategy.card.eligible.v1/messages/strategyCardEligible"
