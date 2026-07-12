@@ -24,6 +24,8 @@ Public API:
 - Errors: `PersistenceError`, `TenantIsolationError`, `NotFoundError`,
   `DuplicateManifestError`, `OutboxValidationError`, `LedgerIntegrityError`,
   `DecisionConflictError`.
+- Value objects: `TenantRecord` (gate-free tenant status view, critic
+  MUST-FIX 4 — see `ports.py`'s own docstring).
 """
 
 from __future__ import annotations
@@ -53,6 +55,7 @@ from saena_domain.persistence.ports import (
     IdempotencyStore,
     OutboxPort,
     PlanRepository,
+    TenantRecord,
     TenantRepository,
 )
 
@@ -77,5 +80,6 @@ __all__ = [
     "PersistenceError",
     "PlanRepository",
     "TenantIsolationError",
+    "TenantRecord",
     "TenantRepository",
 ]

@@ -22,20 +22,69 @@ raise `TenantIsolationError` (never a bare "not found") when a caller
 supplies a tenant_id that does not own the record it is asking for — see
 `saena_domain.persistence.errors.TenantIsolationError` and
 `InMemoryTenantRepository`/`InMemoryPlanRepository`/etc. in `memory.py` for
-the reference enforcement. `AuditLedgerPort`/`OutboxPort`/`IdempotencyStore`
-are tenant-scoped by the `tenant_id` carried on each entry/envelope/key
-rather than by a leading parameter, since their unit of storage is an
-append-only log/queue keyed by content, not a per-tenant single record — see
-each Protocol's own docstring for the exact isolation shape.
+the reference enforcement. `AuditLedgerPort`/`IdempotencyStore` are
+tenant-scoped by the `tenant_id` carried on each entry/key rather than by a
+leading parameter, since their unit of storage is an append-only log keyed
+by content, not a per-tenant single record — see each Protocol's own
+docstring for the exact isolation shape. `OutboxPort.mark_published` DOES
+take `tenant_id` (or `None` for system/aggregate-context envelopes) as its
+first argument (critic MUST-FIX 3, w2-07 review) — every outbox entry has a
+well-defined owning tenant (or explicit system/aggregate scope) it can be
+checked against, unlike `AuditLedgerPort`/`IdempotencyStore`'s open-ended
+log/set shape.
+
+Return-value copy discipline (critic MUST-FIX 1/2, w2-07 review): every
+method that returns a mutable value the adapter also holds internally
+(`ArtifactManifestPort.get`/`.put`, `OutboxPort.record`/`.list_pending`)
+returns a `copy.deepcopy` of the stored value, never a live alias — a caller
+mutating a returned `dict` must never be able to corrupt the adapter's own
+storage. `PlanRepository`/`DecisionRecordPort` return frozen dataclasses
+(`PlanSnapshot`/`DecisionRecord`, `saena_domain.policy`) and `AuditLedgerPort`
+returns frozen pydantic models (`AuditEntry`, `saena_domain.audit`) — neither
+needs a defensive copy since neither type is mutable in the first place.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Protocol, runtime_checkable
 
 from saena_domain.audit import AuditEntry
 from saena_domain.identity import TenantContext, TenantId
 from saena_domain.policy import DecisionRecord, PlanSnapshot, PlanState
+
+# --- TenantRecord (gate-free tenant status view, critic MUST-FIX 4) ----------------
+
+
+@dataclass(frozen=True, slots=True)
+class TenantRecord:
+    """Gate-free view of a stored tenant record — no `TenantContext`
+    construction, so no `TenantSuspendedError`/`TenantTerminatingError` gate.
+
+    ADR-0014 defines `active`/`suspended`/`terminating` as first-class
+    lifecycle states, and an admin/status flow (e.g. w2-08 tenant-control's
+    suspend -> view -> reactivate) legitimately needs to READ a
+    suspended/terminating tenant's record without that read itself failing —
+    `TenantRepository.get` cannot serve that need because `TenantContext`'s
+    own construction-time status gate (`saena_domain.identity.tenant`,
+    outside this unit's exclusive-write paths and never weakened here) raises
+    for exactly that case, by identity-layer design.
+
+    `TenantRecord` is the fix WITHOUT touching that gate: it is a plain,
+    ungated persistence-layer value object — `tenant_id` + `status` for
+    direct inspection, plus `raw_payload` (an immutable, defensively-copied
+    view of the full stored `TenantContext` payload dict) for callers that
+    need more than just status. `TenantRepository.get` remains the gated
+    accessor for operational business logic that must never proceed against
+    a non-active tenant; `get_record` is the gate-free accessor for
+    admin/status flows that need to observe (not act as) a suspended tenant.
+    """
+
+    tenant_id: str
+    status: str
+    raw_payload: MappingProxyType[str, Any]
+
 
 # --- TenantRepository --------------------------------------------------------------
 
@@ -63,7 +112,8 @@ class TenantRepository(Protocol):
         ...
 
     def get(self, tenant_id: TenantId) -> TenantContext:
-        """Return the stored `TenantContext` for `tenant_id`.
+        """Return the stored `TenantContext` for `tenant_id` — GATED accessor
+        for operational business logic only.
 
         Raises `NotFoundError` if no context has been `put` for this
         `tenant_id`. Raises `saena_domain.identity`'s
@@ -72,22 +122,40 @@ class TenantRepository(Protocol):
         construction-time status gate (see `saena_domain.identity.tenant`
         module docstring) fires on every `get`, by design: a
         suspended/terminating tenant's context must never be handed back as
-        a usable object.
+        a usable object to code that assumes an active tenant.
+
+        Admin/status flows that need to OBSERVE a suspended/terminating
+        tenant (e.g. w2-08 tenant-control's suspend -> view -> reactivate)
+        must use `get_record` instead — `get` is intentionally unusable for
+        that purpose.
         """
         ...
 
-    def update_status(self, tenant_id: TenantId, status: str) -> TenantContext:
-        """Replace the stored context's `status` field, returning the
-        updated `TenantContext`.
+    def get_record(self, tenant_id: TenantId) -> TenantRecord:
+        """Return a gate-free `TenantRecord` view of the stored tenant —
+        ADMIN/STATUS accessor, never raises
+        `TenantSuspendedError`/`TenantTerminatingError`.
 
-        Raises `NotFoundError` if `tenant_id` has no stored context. Raises
-        `TenantSuspendedError`/`TenantTerminatingError` if `status` is
-        `suspended`/`terminating` — same construction-time gate as `get`
-        (the new status IS persisted either way; only the returned/
-        reconstructed `TenantContext` object is what the gate blocks — a
-        caller that wants to persist a suspended status without needing a
-        `TenantContext` back should catch this exception, which does not
-        undo the write).
+        Constructs no `TenantContext` wrapper (so the identity-layer
+        construction-time status gate never fires) — this is the ONLY way to
+        observe a suspended/terminating tenant's stored record through this
+        port. Raises `NotFoundError` if no context has been `put` for this
+        `tenant_id` (the same not-found semantics as `get`).
+        """
+        ...
+
+    def update_status(self, tenant_id: TenantId, status: str) -> str:
+        """Replace the stored context's `status` field; returns the new
+        `status` string (constructs no `TenantContext` wrapper — never
+        raises `TenantSuspendedError`/`TenantTerminatingError`, unlike the
+        pre-fix version of this method).
+
+        Raises `NotFoundError` if `tenant_id` has no stored context.
+        Transitioning to `suspended`/`terminating` succeeds and returns that
+        status directly; a caller that then wants a gated `TenantContext`
+        back must call `get` separately (and accept that it will raise for a
+        non-active status, by design) — `get_record` is the gate-free way to
+        confirm the new status landed.
         """
         ...
 
@@ -280,15 +348,18 @@ class ArtifactManifestPort(Protocol):
     ) -> dict[str, Any]:
         """Store `manifest` under `(tenant_id, patch_unit_id, worktree_commit)`.
 
-        Returns the stored manifest (either the newly-written one, or the
-        pre-existing one on an idempotent-replay no-op — the two are
-        guaranteed equal in that case). Raises `DuplicateManifestError` if
-        the key already holds a DIFFERENT manifest.
+        Returns a deep copy of the stored manifest (either the newly-written
+        one, or the pre-existing one on an idempotent-replay no-op — the two
+        are guaranteed equal in that case) — never a live alias of the
+        adapter's own internal storage, so mutating the returned `dict`
+        cannot corrupt the store or a subsequent `get`. Raises
+        `DuplicateManifestError` if the key already holds a DIFFERENT
+        manifest.
         """
         ...
 
     def get(self, tenant_id: TenantId, patch_unit_id: str, worktree_commit: str) -> dict[str, Any]:
-        """Return the stored manifest for the given key.
+        """Return a deep copy of the stored manifest for the given key.
 
         Raises `NotFoundError` if absent, `TenantIsolationError` if the key
         exists under a different tenant.
@@ -304,13 +375,27 @@ class OutboxPort(Protocol):
     """Transactional outbox — RECORDING ONLY (W2A scope; bus wiring is w2-18).
 
     `record` validates the given mapping is a structurally valid SAENA event
-    envelope (`saena_domain.events` dual jsonschema+pydantic validation) —
-    an invalid envelope is rejected with `OutboxValidationError` before it
-    is ever stored, so nothing malformed can reach a future w2-18 bus
-    publisher reading from this outbox. This Protocol deliberately has no
+    envelope (dual jsonschema 2020-12 + pydantic validation against the same
+    envelope contract `saena_domain.events` validates against — wired
+    locally in `saena_domain.persistence._envelope_validation` rather than
+    importing that sibling unit's private module, critic SHOULD-FIX 1) — an
+    invalid envelope is rejected with `OutboxValidationError` before it is
+    ever stored, so nothing malformed can reach a future w2-18 bus publisher
+    reading from this outbox. This Protocol deliberately has no
     "publish" method: `mark_published` only flips an internal bookkeeping
     flag this port owns, it does not talk to Kafka/Redpanda (that dispatch
     loop is out of scope for w2-07, see the module docstring).
+
+    Tenant scoping (critic MUST-FIX 3): `mark_published` takes `tenant_id`
+    as its first argument, matching every other tenant-scoped method in this
+    module — an envelope's OWNING scope is `context_type: tenant` ->
+    `envelope["tenant_id"]`, or, for `context_type: system` (and
+    `aggregate`, which structurally carries no `tenant_id` either) ->
+    system-context ownership, addressed by passing `tenant_id=None`. A
+    caller supplying a `tenant_id` that does not match the envelope's own
+    owning scope (including a non-`None` `tenant_id` against a
+    system/aggregate-context envelope, or vice versa) gets
+    `TenantIsolationError`, never a silent mark.
     """
 
     def record(self, envelope: dict[str, Any]) -> dict[str, Any]:
@@ -321,7 +406,9 @@ class OutboxPort(Protocol):
         `event_id` doubles as the outbox's own idempotency key alongside the
         envelope's own `idempotency_key` field). Raises
         `OutboxValidationError` if `envelope` fails envelope validation.
-        Returns the stored envelope.
+        Returns a deep copy of the stored envelope — the caller's returned
+        object is never an alias of the outbox's own internal storage, so
+        mutating it cannot corrupt the store.
         """
         ...
 
@@ -330,16 +417,23 @@ class OutboxPort(Protocol):
 
         `tenant_id=None` returns pending envelopes across every tenant plus
         system/aggregate-context envelopes; a given `tenant_id` filters to
-        that tenant's `context_type: tenant` envelopes only.
+        that tenant's `context_type: tenant` envelopes only. Every returned
+        envelope is a deep copy — mutating an entry in the returned tuple
+        cannot corrupt the outbox's own internal storage.
         """
         ...
 
-    def mark_published(self, event_id: str) -> None:
+    def mark_published(self, tenant_id: TenantId | None, event_id: str) -> None:
         """Mark the envelope with this `event_id` as published (bookkeeping
         only — does not itself publish to any bus).
 
-        Raises `NotFoundError` if no envelope with this `event_id` has been
-        recorded.
+        `tenant_id` must match the envelope's own owning scope (see this
+        Protocol's class docstring "Tenant scoping"): the envelope's
+        `tenant_id` field for a `context_type: tenant` envelope, or `None`
+        for `context_type: system`/`aggregate`. Raises `NotFoundError` if no
+        envelope with this `event_id` has been recorded. Raises
+        `TenantIsolationError` if `tenant_id` does not match the recorded
+        envelope's owning scope.
         """
         ...
 
@@ -377,5 +471,6 @@ __all__ = [
     "IdempotencyStore",
     "OutboxPort",
     "PlanRepository",
+    "TenantRecord",
     "TenantRepository",
 ]

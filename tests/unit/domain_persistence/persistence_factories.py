@@ -89,3 +89,32 @@ def make_tenant_envelope(**overrides: Any) -> dict[str, Any]:
     }
     base.update(overrides)
     return EnvelopeFactory.build_tenant_envelope(**base)
+
+
+def make_system_envelope(**overrides: Any) -> dict[str, Any]:
+    """A schema-valid `context_type: system` envelope, built BY HAND rather
+    than via `EnvelopeFactory.build_system_envelope`.
+
+    The v1 CONFIRMED AsyncAPI catalog carries zero `context_type: system`
+    channels (`saena_domain.events.factory` module docstring's own "Catalog
+    gap note") — `build_system_envelope` can only be exercised against a
+    private, test-only fixture catalog belonging to `tests/unit/
+    domain_events` (outside this unit's exclusive-write paths). This helper
+    instead starts from a valid tenant envelope (via the real
+    `EnvelopeFactory`, so every OTHER field is genuinely schema-valid) and
+    reshapes it to `context_type: system` by hand — `tenant_id`/`run_id`
+    dropped, matching the envelope contract's own system-context shape
+    (ADR-0013). Good enough for `saena_domain.persistence`'s own envelope
+    dual-validation and tenant-scoping tests, which only need a
+    schema-valid, `tenant_id`-absent envelope — they do not exercise
+    `EnvelopeFactory`'s AsyncAPI topic/producer resolution at all.
+    """
+    base = make_tenant_envelope(
+        event_type=overrides.pop("event_type", "patch.unit.completed.v1"),
+        idempotency_key=overrides.pop("idempotency_key", "system:adapter-config:v1.3.0"),
+    )
+    base.pop("tenant_id", None)
+    base.pop("run_id", None)
+    base["context_type"] = "system"
+    base.update(overrides)
+    return base

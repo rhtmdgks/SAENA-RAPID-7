@@ -16,17 +16,16 @@ yours" at the type level, matching the exclusive-write-path instruction's
 
 from __future__ import annotations
 
+import copy
 import threading
+from types import MappingProxyType
 from typing import Any
-
-from pydantic import ValidationError
-from saena_schemas.envelope.event_envelope_v1 import SaenaEventEnvelopeV1
 
 from saena_domain.audit import AuditEntry, guard_payload
 from saena_domain.audit import append_entry as _audit_append_entry
 from saena_domain.audit import verify_chain as _audit_verify_chain
-from saena_domain.events._validation import jsonschema_errors
 from saena_domain.identity import TenantContext, TenantId
+from saena_domain.persistence._envelope_validation import validate_envelope
 from saena_domain.persistence.errors import (
     DecisionConflictError,
     DuplicateManifestError,
@@ -34,6 +33,7 @@ from saena_domain.persistence.errors import (
     OutboxValidationError,
     TenantIsolationError,
 )
+from saena_domain.persistence.ports import TenantRecord
 from saena_domain.policy import DecisionRecord, PlanSnapshot, PlanState
 
 # --- TenantRepository ----------------------------------------------------------------
@@ -49,13 +49,21 @@ class InMemoryTenantRepository:
     module docstring — "a suspended tenant's context should never reach
     business logic that assumes an active tenant"), so a repository that
     stored only the wrapper could never represent (or later retrieve) a
-    suspended/terminating tenant at all — `update_status(..., "suspended")`
-    would have nothing valid to construct. Storing the raw payload and
-    reconstructing `TenantContext.from_payload(...)` on every `get`/
-    `update_status` call means those identity-layer gates fire naturally and
-    consistently at read time, exactly as `saena_domain.identity` intends:
-    reading a suspended tenant's context raises `TenantSuspendedError`
-    rather than silently handing back a usable-looking object.
+    suspended/terminating tenant at all. Storing the raw payload keeps
+    reads split two ways:
+
+    - `get` reconstructs `TenantContext.from_payload(...)` — the
+      identity-layer status gate fires naturally, exactly as
+      `saena_domain.identity` intends: reading a suspended tenant's context
+      through this method raises `TenantSuspendedError`/
+      `TenantTerminatingError` rather than silently handing back a
+      usable-looking object.
+    - `get_record`/`update_status` (critic MUST-FIX 4) never construct a
+      `TenantContext` at all — they read/write the raw payload directly, so
+      neither ever raises the identity-layer status gate. `update_status`
+      always lands its write regardless of the new status; `get_record`
+      returns a gate-free `TenantRecord` view for admin/status flows that
+      need to observe (not act as) a suspended/terminating tenant.
     """
 
     def __init__(self) -> None:
@@ -82,7 +90,24 @@ class InMemoryTenantRepository:
             )
         return TenantContext.from_payload(dict(payload))
 
-    def update_status(self, tenant_id: TenantId, status: str) -> TenantContext:
+    def get_record(self, tenant_id: TenantId) -> TenantRecord:
+        with self._lock:
+            payload = self._store.get(tenant_id.value)
+        if payload is None:
+            raise NotFoundError(
+                f"no TenantContext stored for tenant_id {tenant_id.value!r}",
+                context={"tenant_id": tenant_id.value},
+            )
+        # Gate-free: no TenantContext is constructed here, so the
+        # identity-layer status gate never fires (critic MUST-FIX 4).
+        copied = copy.deepcopy(payload)
+        return TenantRecord(
+            tenant_id=tenant_id.value,
+            status=copied["status"],
+            raw_payload=MappingProxyType(copied),
+        )
+
+    def update_status(self, tenant_id: TenantId, status: str) -> str:
         with self._lock:
             payload = self._store.get(tenant_id.value)
             if payload is None:
@@ -93,7 +118,10 @@ class InMemoryTenantRepository:
             updated_payload = dict(payload)
             updated_payload["status"] = status
             self._store[tenant_id.value] = updated_payload
-        return TenantContext.from_payload(dict(updated_payload))
+        # Gate-free (critic MUST-FIX 4): constructs no TenantContext wrapper,
+        # so this never raises TenantSuspendedError/TenantTerminatingError —
+        # the write above always lands regardless of the new status.
+        return status
 
 
 # --- PlanRepository --------------------------------------------------------------------
@@ -297,7 +325,17 @@ class InMemoryDecisionRecordStore:
 
 class InMemoryArtifactManifestStore:
     """Reference `ArtifactManifestPort` — put-once by
-    `(tenant_id, patch_unit_id, worktree_commit)`."""
+    `(tenant_id, patch_unit_id, worktree_commit)`.
+
+    Defensive copies (critic MUST-FIX 1): manifests may nest arbitrarily
+    deep (PatchArtifact manifests carry file listings, hashes, etc.), so both
+    the stored copy (taken at `put` time, from the caller-supplied
+    `manifest`) and every returned copy (`put`'s return value, `get`'s
+    return value) go through `copy.deepcopy`. Three independent objects at
+    all times: the caller's original `manifest` argument, this store's
+    internal copy, and whatever the caller does with what `put`/`get`
+    return — mutating any one can never affect either of the other two.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -323,7 +361,7 @@ class InMemoryArtifactManifestStore:
             existing = tenant_store.get(key)
             if existing is not None:
                 if existing == manifest:
-                    return existing
+                    return copy.deepcopy(existing)
                 raise DuplicateManifestError(
                     f"manifest key {key!r} already stored with different content",
                     context={
@@ -332,9 +370,9 @@ class InMemoryArtifactManifestStore:
                         "worktree_commit": worktree_commit,
                     },
                 )
-            stored = dict(manifest)
+            stored = copy.deepcopy(manifest)
             tenant_store[key] = stored
-            return stored
+            return copy.deepcopy(stored)
 
     def get(self, tenant_id: TenantId, patch_unit_id: str, worktree_commit: str) -> dict[str, Any]:
         key = (patch_unit_id, worktree_commit)
@@ -355,26 +393,36 @@ class InMemoryArtifactManifestStore:
                     "worktree_commit": worktree_commit,
                 },
             )
-        return manifest
+        return copy.deepcopy(manifest)
 
 
 # --- OutboxPort -------------------------------------------------------------------
 
 
-def _validate_envelope(envelope: dict[str, Any]) -> None:
-    """Validate `envelope` the same dual (jsonschema + pydantic) way
-    `saena_domain.events.EnvelopeFactory` does, without re-synthesizing any
-    field — this is a pure validate-as-given check, not a builder."""
-    messages = jsonschema_errors(envelope)
-    try:
-        SaenaEventEnvelopeV1.model_validate(envelope)
-    except ValidationError as exc:
-        messages.append(f"pydantic: {exc}")
+def _check_envelope(envelope: dict[str, Any]) -> None:
+    """Validate `envelope` via `saena_domain.persistence._envelope_validation`
+    (locally-wired dual jsonschema+pydantic check, critic SHOULD-FIX 1 — see
+    that module's docstring for why it does not import `saena_domain.events`),
+    without re-synthesizing any field — this is a pure validate-as-given
+    check, not a builder."""
+    messages = validate_envelope(envelope)
     if messages:
         raise OutboxValidationError(
             "envelope failed dual validation: " + "; ".join(messages),
             context={"messages": messages, "event_id": envelope.get("event_id")},
         )
+
+
+def _envelope_owner(envelope: dict[str, Any]) -> str | None:
+    """The owning tenant_id for an envelope's outbox scope, or `None` for
+    system/aggregate-context envelopes (critic MUST-FIX 3) — `context_type:
+    tenant` envelopes carry `tenant_id`; `system`/`aggregate` envelopes
+    structurally carry no `tenant_id` at all (ADR-0013), so their owning
+    scope is `None` by construction, not merely by convention."""
+    if envelope.get("context_type") == "tenant":
+        owner = envelope.get("tenant_id")
+        return owner if isinstance(owner, str) else None
+    return None
 
 
 class InMemoryOutbox:
@@ -385,6 +433,12 @@ class InMemoryOutbox:
     never enter the outbox, same runtime gate audit entries get — the outbox
     is itself a durable, at-least-once-replayed store, so the same
     guard applies).
+
+    Defensive copies (critic MUST-FIX 2): envelope `payload` may nest
+    arbitrarily, so both the stored copy (taken at `record` time) and every
+    returned copy (`record`'s return value, `list_pending`'s return tuple)
+    go through `copy.deepcopy` — mutating a returned envelope can never
+    corrupt this outbox's own storage.
     """
 
     def __init__(self) -> None:
@@ -394,27 +448,27 @@ class InMemoryOutbox:
         self._published: set[str] = set()
 
     def record(self, envelope: dict[str, Any]) -> dict[str, Any]:
-        _validate_envelope(envelope)
+        _check_envelope(envelope)
         guard_payload(envelope.get("payload", {}))
         event_id = envelope["event_id"]
         with self._lock:
             existing = self._entries.get(event_id)
             if existing is not None:
                 if existing == envelope:
-                    return existing
+                    return copy.deepcopy(existing)
                 raise OutboxValidationError(
                     f"event_id {event_id!r} already recorded with a different envelope",
                     context={"event_id": event_id},
                 )
-            stored = dict(envelope)
+            stored = copy.deepcopy(envelope)
             self._entries[event_id] = stored
             self._order.append(event_id)
-            return stored
+            return copy.deepcopy(stored)
 
     def list_pending(self, tenant_id: TenantId | None = None) -> tuple[dict[str, Any], ...]:
         with self._lock:
             pending = [
-                self._entries[event_id]
+                copy.deepcopy(self._entries[event_id])
                 for event_id in self._order
                 if event_id not in self._published
             ]
@@ -427,12 +481,24 @@ class InMemoryOutbox:
             and envelope.get("tenant_id") == tenant_id.value
         )
 
-    def mark_published(self, event_id: str) -> None:
+    def mark_published(self, tenant_id: TenantId | None, event_id: str) -> None:
         with self._lock:
-            if event_id not in self._entries:
+            entry = self._entries.get(event_id)
+            if entry is None:
                 raise NotFoundError(
                     f"no outbox entry recorded for event_id {event_id!r}",
                     context={"event_id": event_id},
+                )
+            owner = _envelope_owner(entry)
+            caller_owner = tenant_id.value if tenant_id is not None else None
+            if owner != caller_owner:
+                raise TenantIsolationError(
+                    f"event_id {event_id!r} belongs to a different owning scope",
+                    context={
+                        "event_id": event_id,
+                        "requested_tenant_id": caller_owner,
+                        "owning_tenant_id": owner,
+                    },
                 )
             self._published.add(event_id)
 

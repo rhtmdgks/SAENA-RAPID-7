@@ -105,3 +105,27 @@ class DecisionConflictError(PersistenceError):
     """
 
     error_code = "saena.persistence.decision_conflict"
+
+
+# --- tenant status error story (critic MUST-FIX 4 follow-up) -----------------------
+#
+# `TenantRepository.get`/`update_status` return the GATED `TenantContext`
+# wrapper (`saena_domain.identity.tenant`), whose own `__init__` raises
+# `TenantSuspendedError`/`TenantTerminatingError` (from
+# `saena_domain.identity.errors`, NOT this module — that module is outside
+# this unit's exclusive-write paths and is never edited here) for a
+# non-`active` stored record. This module deliberately does NOT wrap, shadow,
+# or re-export those identity-layer exceptions under a `saena_domain.
+# persistence`-prefixed name: doing so would either (a) require catching and
+# re-raising them, silently changing their type across the `get`/
+# `update_status` boundary and breaking any caller that already handles
+# `saena_domain.identity`'s own error hierarchy, or (b) require this module
+# importing/subclassing an `identity` error to preserve `isinstance` — itself
+# a needless coupling for two exception classes this module raises unchanged.
+# Callers should catch `saena_domain.identity.errors.
+# {TenantSuspendedError,TenantTerminatingError}` around `TenantRepository.
+# get`/`update_status` calls exactly as they would around
+# `TenantContext.from_payload` directly — the persistence layer changes
+# nothing about that contract, it only adds storage. `TenantRepository.
+# get_record` (gate-free, ADR-0014 first-class-status view) never raises
+# either error — see its own docstring in `ports.py`.
