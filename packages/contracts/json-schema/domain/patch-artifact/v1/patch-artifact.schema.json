@@ -34,12 +34,12 @@
     "patch_unit_id": {
       "type": "string",
       "minLength": 1,
-      "$comment": "k3s §4.2:193 PatchUnitCompleted.patch_unit_id — corresponds to ChangePlan.patch_units[].id."
+      "$comment": "k3s §4.2:205 PatchUnitCompleted.patch_unit_id — corresponds to ChangePlan.patch_units[].id."
     },
     "worktree_commit": {
       "type": "string",
       "pattern": "^[0-9a-f]{7,40}$",
-      "$comment": "k3s §4.2:194 PatchUnitCompleted.worktree_commit. ADR-0013 appendix examples use short (7-char) sha forms for worktree-scoped commits rather than the full 40-hex git_sha $def used for repo_commit/base_commit — 7-40 hex accepted here (see also ADR-0023 worktree execution conventions)."
+      "$comment": "k3s §4.2:206 PatchUnitCompleted.worktree_commit. ADR-0013 appendix examples use short (7-char) sha forms for worktree-scoped commits rather than the full 40-hex git_sha $def used for repo_commit/base_commit — 7-40 hex accepted here (see also ADR-0023 worktree execution conventions)."
     },
     "base_commit": {
       "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/git_sha",
@@ -55,7 +55,7 @@
     },
     "manifest_uri": {
       "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
-      "$comment": "k3s §4.2:196 PatchUnitCompleted.manifest_uri."
+      "$comment": "k3s §4.2:207 PatchUnitCompleted.manifest_uri."
     },
     "changed_files": {
       "type": "array",
@@ -63,7 +63,7 @@
         "type": "string"
       },
       "minItems": 1,
-      "$comment": "k3s §4.2:197 PatchUnitCompleted.changed_files. Paths only, never content — same customer-proprietary boundary principle as SourceSnapshot (no raw content/listing fields)."
+      "$comment": "k3s §4.2:208 PatchUnitCompleted.changed_files. Paths only, never content — same customer-proprietary boundary principle as SourceSnapshot (no raw content/listing fields)."
     },
     "quality_gate_ids": {
       "type": "array",
@@ -71,7 +71,7 @@
         "type": "string"
       },
       "minItems": 1,
-      "$comment": "k3s §4.2:198 PatchUnitCompleted.quality_gate_ids."
+      "$comment": "k3s §4.2:209 PatchUnitCompleted.quality_gate_ids."
     },
     "evidence_ids": {
       "type": "array",
