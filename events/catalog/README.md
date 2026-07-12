@@ -40,7 +40,7 @@ workspace.destroyed.v1 (TTL 파기 증명), deployment.confirmed.v1 (7일 clock 
 
 ## Constraints
 
-Schema files go under `events/schemas/` (future).
+Schema files live under `packages/contracts` (sole hand-edited SSOT — ADR-0011/0024; the former "events/schemas/ (future)" placement note is superseded). `events/schemas/` is a pointer-only directory in W1.
 
 ## Open decisions
 
