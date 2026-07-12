@@ -85,6 +85,12 @@ OPEN_CONTRACTS: dict[str, str] = {
     "context/site_context_v1": "context/site-context/v1",
     "context/run_context_lifecycle_v1": "context/run-context-lifecycle/v1",
     "domain/verification_result_v1": "domain/verification-result/v1",
+    "event/patch_unit_completed_v1": "event/patch-unit-completed/v1",
+    "event/quality_gate_result_v1": "event/quality-gate-result/v1",
+    "event/plan_contract_proposed_v1": "event/plan-contract-proposed/v1",
+    "event/plan_contract_approved_v1": "event/plan-contract-approved/v1",
+    "event/repo_intaken_v1": "event/repo-intaken/v1",
+    "event/site_inventory_completed_v1": "event/site-inventory-completed/v1",
 }
 
 CLOSED_CONTRACTS: dict[str, str] = {
