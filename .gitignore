@@ -61,7 +61,9 @@ package-lock.json
 # .claude/settings.json is CHECKED IN since W0 (team-wide hook wiring + deny
 # rules — ADR-0019). Personal overrides go to settings.local.json (ignored).
 .claude/settings.local.json
-audit/
+# Anchored to repo root: local agent-hook logs only (ADR-0019). The previous
+# bare 'audit/' also shadowed packages/**/audit/ module dirs (found by w2-04).
+/audit/
 
 # Customer source workspaces (never commit)
 workspaces/
