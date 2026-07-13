@@ -34,6 +34,47 @@ record it as a production-only decision"), **no `TTL` clause is emitted by
 any `CREATE TABLE` below**. See `README.md` "Open decisions" for the
 production-only follow-up this implies.
 
+`non_replicated_deduplication_window` (r4-02 distributed-idempotency fix,
+see `store.py` module docstring for the full invariant): every table below
+is a plain (non-replicated) `MergeTree`, and ClickHouse's block-level insert
+deduplication (`insert_deduplication_token`) is **disabled by default on a
+non-replicated `MergeTree`** — `system.merge_tree_settings.non_replicated_
+deduplication_window` defaults to `0` (verified empirically against a live
+`clickhouse/clickhouse-server:24.8-alpine` container as part of this fix,
+not assumed from documentation alone: a fresh table with this setting unset
+does NOT deduplicate a same-token repeated insert). Every `CREATE TABLE`
+below therefore sets `non_replicated_deduplication_window = 1000` (last
+1000 inserted blocks kept for dedup comparison — the block-count-bounded
+window ClickHouse itself exposes for non-replicated tables; there is no
+non-replicated `_seconds` variant in this ClickHouse version, confirmed via
+the same live-server probe) — this is what makes `store.py`'s
+`insert_deduplication_token`-keyed insert an ACTUAL atomic, server-side dedup
+guarantee rather than a no-op setting on an executor that silently ignores
+it.
+
+`query_text` -> `query_ref`/`query_digest` (r4-04 query privacy boundary —
+FORMAT BOUNDARY, not a live-data migration): the pre-r4-04 `observations`
+table had a `query_text String` column carrying the raw customer query
+verbatim (`data-ownership.md` Constraints violation — "No PII/secrets in
+event payloads — object refs + access policy"). This migration's
+`CREATE TABLE` below REPLACES that column outright with `query_ref String`
+(required, opaque `query://...` ref — see `query_privacy.py`) and
+`query_digest Nullable(String)` (optional, KEYED HMAC digest, `NULL` when a
+caller did not derive one). This is recorded here, explicitly, as a
+CONTRACT change to `MIGRATIONS[0]` itself (not a new additive migration
+entry) because — per this task's own instruction — **no Wave-4 data has
+reached a real production deployment through this still-unreleased schema**
+(same "no real deployment has ingested data" precondition `dedup_witness`'s
+own r4-02 addition already relied on, see below); the module docstring's
+own CONTRACT-is-forbidden-once-deployed policy therefore does not (yet)
+apply to this specific column swap. A schema already carrying LIVE data
+under the pre-r4-04 `query_text` shape would require a separate, explicitly
+human-approved, additive migration (`ALTER TABLE ... ADD COLUMN query_ref
+...` + a backfill/dual-write window + a LATER drop of `query_text`) — this
+migration is NOT that; it is a same-commit format-boundary replacement,
+valid only because no production data exists yet. Do not silently reuse
+this same-commit pattern once real data has landed.
+
 Expand/contract policy note (mirrors `saena_domain.persistence.postgres.
 tables`'s own documented policy — same rationale, reproduced for this
 store): this module is the ONLY schema definition for these three tables.
@@ -79,17 +120,52 @@ def require_known_table(table: str) -> None:
 # --- DDL --------------------------------------------------------------------------
 #
 # Every table: append-only `MergeTree` (no `ReplacingMergeTree`/`Collapsing*`
-# — this package's idempotency dedup is enforced at the ADAPTER layer,
-# `store.py`'s existence-check-before-insert, not by a ClickHouse
-# background-merge dedup engine, because `ReplacingMergeTree` merges are
-# ASYNCHRONOUS and do not guarantee read-your-own-write dedup — a query run
-# immediately after a duplicate insert could still observe two rows without
-# a `FINAL` modifier this package does not otherwise need). `PARTITION BY
-# toYYYYMM(occurred_at)` (time partition, see module docstring) + `ORDER BY
-# (tenant_id, occurred_at, id)` (tenant_id-prefixed, per-tenant partitioning
-# FORBIDDEN — ADR-0007 rev.2 §5) on every table.
+# — `ReplacingMergeTree` merges are ASYNCHRONOUS and do not guarantee
+# read-your-own-write dedup, a query run immediately after a duplicate
+# insert could still observe two rows without a `FINAL` modifier this
+# package does not otherwise need). Idempotency dedup (r4-02 fix) is
+# enforced by ClickHouse's OWN server-side, atomic, block-level insert
+# deduplication (`insert_deduplication_token`, driven by `store.py`) — NOT
+# by a client-side existence-check-before-insert (the r4-02 defect this
+# migration's `SETTINGS non_replicated_deduplication_window` clause fixes
+# the table-level precondition for; see `store.py` module docstring for the
+# full invariant/mechanism and the live-server verification performed).
+# `PARTITION BY toYYYYMM(occurred_at)` (time partition, see module
+# docstring) + `ORDER BY (tenant_id, occurred_at, id)` (tenant_id-prefixed,
+# per-tenant partitioning FORBIDDEN — ADR-0007 rev.2 §5) on every table.
 
-_CREATE_OBSERVATIONS = """
+#: Production physical-dedup window (blocks). Read paths do NOT depend on this
+#: for correctness — they perform query-time LOGICAL dedup (see store.py
+#: `get_*` / query.py `to_deduplicated_select_sql`), so a duplicate replay
+#: delayed beyond this window is still observed exactly once. The window only
+#: bounds how far apart two physical copies can be while ClickHouse still
+#: collapses them at insert time.
+DEFAULT_DEDUP_WINDOW = 1000
+
+
+def _dedup_window_settings(deduplication_window: int) -> str:
+    if deduplication_window < 0:
+        raise ValueError(f"deduplication_window must be >= 0, got {deduplication_window}")
+    return f"SETTINGS non_replicated_deduplication_window = {int(deduplication_window)}"
+
+
+_DEDUP_WINDOW_SETTINGS = _dedup_window_settings(DEFAULT_DEDUP_WINDOW)
+
+# `dedup_witness` (r4-02): adapter-internal bookkeeping column, NEVER part of
+# any public `rows.py` dataclass and NEVER selected by any `get_*` query
+# (`store.py`'s `_OBSERVATIONS_SELECT_COLUMNS`/etc. never name it) — its only
+# purpose is to let `store.py._append` determine, via an immediate read-back,
+# whether the CALLING process's own insert attempt is the one ClickHouse's
+# server-side `insert_deduplication_token` dedup kept for a given
+# `(tenant_id, idempotency_key)` pair (see `store.py` module docstring
+# "Return value semantics"). An EXPAND-only addition per this module's own
+# migration policy (module docstring) — safe to add to `MIGRATIONS[0]`
+# directly since no real deployment has ingested data through this
+# still-unreleased (Wave 4 remediation) schema yet.
+
+
+def _observations_ddl(settings: str) -> str:
+    return f"""
 CREATE TABLE IF NOT EXISTS observations
 (
     tenant_id String,
@@ -99,16 +175,21 @@ CREATE TABLE IF NOT EXISTS observations
     ingested_at DateTime64(3, 'UTC') DEFAULT now64(3, 'UTC'),
     engine_id String,
     run_id String,
-    query_text String,
+    query_ref String,
+    query_digest Nullable(String),
     citation_refs Array(String),
-    raw_object_ref String
+    raw_object_ref String,
+    dedup_witness String DEFAULT ''
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (tenant_id, occurred_at, id)
+{settings}
 """.strip()
 
-_CREATE_CITATIONS = """
+
+def _citations_ddl(settings: str) -> str:
+    return f"""
 CREATE TABLE IF NOT EXISTS citations
 (
     tenant_id String,
@@ -120,14 +201,18 @@ CREATE TABLE IF NOT EXISTS citations
     observation_id String,
     citation_ref String,
     source_domain String,
-    contribution_score Float64
+    contribution_score Float64,
+    dedup_witness String DEFAULT ''
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (tenant_id, occurred_at, id)
+{settings}
 """.strip()
 
-_CREATE_EXPERIMENT_REGISTRATIONS = """
+
+def _experiment_registrations_ddl(settings: str) -> str:
+    return f"""
 CREATE TABLE IF NOT EXISTS experiment_registrations
 (
     tenant_id String,
@@ -139,12 +224,34 @@ CREATE TABLE IF NOT EXISTS experiment_registrations
     locale String,
     observation_cell String,
     registration_hash String,
-    status String
+    status String,
+    dedup_witness String DEFAULT ''
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (tenant_id, occurred_at, id)
+{settings}
 """.strip()
+
+
+def create_table_statements(
+    *, deduplication_window: int = DEFAULT_DEDUP_WINDOW
+) -> tuple[str, str, str]:
+    """The three `CREATE TABLE IF NOT EXISTS` statements, with a configurable
+    physical-dedup window. Production uses `DEFAULT_DEDUP_WINDOW`; a test that
+    needs to force a physical duplicate PAST the window (to prove query-time
+    logical dedup still collapses it) passes a small value (e.g. 1)."""
+    settings = _dedup_window_settings(deduplication_window)
+    return (
+        _observations_ddl(settings),
+        _citations_ddl(settings),
+        _experiment_registrations_ddl(settings),
+    )
+
+
+_CREATE_OBSERVATIONS, _CREATE_CITATIONS, _CREATE_EXPERIMENT_REGISTRATIONS = create_table_statements(
+    deduplication_window=DEFAULT_DEDUP_WINDOW
+)
 
 _DROP_OBSERVATIONS = "DROP TABLE IF EXISTS observations"
 _DROP_CITATIONS = "DROP TABLE IF EXISTS citations"
@@ -215,9 +322,11 @@ def migrate_down(executor: object, *, migrations: tuple[Migration, ...] = MIGRAT
 
 
 __all__ = [
+    "DEFAULT_DEDUP_WINDOW",
     "MIGRATIONS",
     "TABLE_NAMES",
     "Migration",
+    "create_table_statements",
     "migrate_down",
     "migrate_up",
     "require_known_table",

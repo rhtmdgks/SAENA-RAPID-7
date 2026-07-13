@@ -1,6 +1,7 @@
 # saena-analytics-clickhouse
 
-ClickHouse analytical-store adapter + migrations (w4-06, Wave 4).
+ClickHouse analytical-store adapter + migrations (w4-06, Wave 4; query
+privacy boundary fix — r4-04, Wave 4 remediation).
 
 ## Spec basis
 
@@ -41,6 +42,55 @@ Every table:
 
 See `schema.py` for the exact DDL and `MIGRATIONS` (a single, reversible
 `Migration` entry as of this patch unit — `migrate_up`/`migrate_down`).
+
+## Query privacy boundary (r4-04, round 2)
+
+`observations.query_text String` (the pre-r4-04 column) stored the raw
+customer query VERBATIM — a `data-ownership.md` Constraints violation ("No
+PII/secrets in event payloads — object refs + access policy") that
+`guard.py`'s SHAPE-only heuristic never caught (an ordinary sentence
+carrying an email/phone/customer name has no oversize/secret-pattern/
+forbidden-name shape). Fixed by replacing that column outright with:
+
+- `query_ref String` (required) — an opaque, KEYED reference
+  `query://<tenant_id>/<hmac_sha256_hex>`, mirroring `saena_chatgpt_observer.
+  artifact_gateway.RawArtifactGatewayPort`'s "single gateway, ref only, raw
+  content never leaves the gateway" discipline. Derive with
+  `query_privacy.derive_query_ref(tenant_id=..., raw_query=...)`.
+- `query_digest Nullable(String)` (optional) — a KEYED HMAC-SHA256
+  pseudonymous digest, only present when a caller has an actual
+  cross-run/cross-tenant query-correlation need. Derive with
+  `query_privacy.derive_query_digest(raw_query=...)`.
+
+**Round 2 (independent-critic MUST-FIX, both closed):** the FIRST version of
+this fix derived `query_ref` from a PLAIN, UNKEYED `sha256(raw_query)` with
+`tenant_id` used only as a cosmetic path prefix — (1) trivially reversible
+by dictionary/brute-force attack for a low-entropy natural-language query,
+and (2) the SAME query under two different tenants produced the SAME hash,
+a cross-tenant correlation leak. `derive_query_ref` is now KEYED by the SAME
+mechanism as `derive_query_digest`, with `tenant_id` INSIDE the HMAC input
+(not a cosmetic prefix) — the SAME query under two different tenants, even
+with the SAME key, now yields two DIFFERENT `query_ref` values, and reversal
+requires the signing key.
+
+Both `derive_query_ref`/`derive_query_digest` **fail closed**
+(`MissingQuerySigningKeyError`) if the HMAC key is not resolvable via a
+runtime `QuerySigningKeyRef` (env var `SAENA_ANALYTICS_QUERY_SIGNING_KEY`,
+never committed) — neither function ever falls back to an unkeyed hash (an
+unkeyed SHA-256 of a low-entropy natural-language query is reversible by
+dictionary attack — see `query_privacy.py`'s module docstring for the full
+rationale). `query_ref` is consequently ALWAYS required and ALWAYS keyed;
+there is no keyless code path for either field.
+
+The raw query itself never reaches `ObservationRow`/`observations` in any
+form — a caller still holding the raw query (e.g. intelligence processing
+upstream, transiently, in memory) must derive a `QueryRef`/`QueryDigest`
+BEFORE constructing the row; there is no field on `ObservationRow` that
+accepts raw query text any more. This is a same-commit `CREATE TABLE`
+column swap (not an additive migration) — valid only because no Wave-4
+data has reached a real production deployment through this still-
+unreleased schema; see `schema.py`'s "r4-04" migration note for the exact
+format-boundary record.
 
 ## Adapter API
 

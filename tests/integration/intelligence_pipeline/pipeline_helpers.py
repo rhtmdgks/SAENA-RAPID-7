@@ -49,10 +49,12 @@ own raw bytes.
 from __future__ import annotations
 
 import hashlib
+import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from saena_analytics_clickhouse.query_privacy import QuerySigningKeyRef, derive_query_ref
 from saena_analytics_clickhouse.rows import CitationRow, ObservationRow
 from saena_analytics_clickhouse.store import ClickHouseAnalyticsStore
 from saena_chatgpt_observer.artifact_gateway import FakeArtifactGateway
@@ -62,6 +64,19 @@ from saena_citation_intelligence.service import CitationNormalizationResult, nor
 from saena_domain.execution import JobContext, JobStatus
 
 ENGINE_ID = "chatgpt-search"
+
+# `derive_query_ref` (independent-critic MUST-FIX round 2) is now KEYED and
+# fail-closed, exactly like `derive_query_digest` — this helper module needs
+# a deterministic test signing key to keep projecting `ObservationRow`s. A
+# DEDICATED env var name, set once at module-import time to a fixed,
+# obviously-synthetic value — never a real secret. `os.environ.setdefault`
+# so a real run that already set this var for its own reason is never
+# silently overwritten.
+_TEST_QUERY_SIGNING_KEY_ENV_VAR = "SAENA_ANALYTICS_QUERY_SIGNING_KEY__PIPELINE_TEST_FIXTURE"
+os.environ.setdefault(
+    _TEST_QUERY_SIGNING_KEY_ENV_VAR, "pipeline-test-fixture-signing-key-not-a-real-secret"
+)
+_TEST_SIGNING_KEY_REF = QuerySigningKeyRef(env_var=_TEST_QUERY_SIGNING_KEY_ENV_VAR)
 
 
 def make_job_context(*, tenant_id: str, run_id: str) -> JobContext:
@@ -204,7 +219,14 @@ def run_capture_store_and_normalize_chain(
     (`conftest.py`'s `analytics_store` fixture). `ObservationRow`'s own
     `__post_init__`/`guard_row_fields` re-validate that no raw content ever
     reaches this step (defense in depth; nothing this helper builds could
-    trip that guard, since only ref/hash fields are projected).
+    trip that guard, since only ref/hash fields are projected). r4-04: the
+    query text itself is reduced to an opaque `query_ref`
+    (`saena_analytics_clickhouse.query_privacy.derive_query_ref`) RIGHT
+    HERE, at this exact projection step — the raw `query_text` string this
+    helper receives from its own caller (`queries`, a plain
+    `Sequence[str]`) is used ONLY to derive that ref and to look up
+    `citation_urls_by_response` below; it is never itself passed into
+    `ObservationRow`/`analytics_store`.
 
     Step 3 (citation normalization): for every RAW (pre-normalization)
     citation URL registered for that query's response in
@@ -245,7 +267,16 @@ def run_capture_store_and_normalize_chain(
             occurred_at=occurred_at,
             engine_id=record["engine_id"],
             run_id=record["run_id"],
-            query_text=query_text,
+            # r4-04 (round 2: KEYED, fail-closed): the raw query is reduced
+            # to an opaque, HMAC-keyed `query_ref` RIGHT HERE, at the exact
+            # persistence boundary — `query_text` (the raw string) never
+            # crosses into `ObservationRow`/ClickHouse in any form (see
+            # `saena_analytics_clickhouse.query_privacy` module docstring).
+            query_ref=derive_query_ref(
+                tenant_id=record["tenant_id"],
+                raw_query=query_text,
+                signing_key_ref=_TEST_SIGNING_KEY_REF,
+            ).query_ref,
             citation_refs=tuple(record["citation_refs"]),
             raw_object_ref=record["raw_object_ref"],
         )

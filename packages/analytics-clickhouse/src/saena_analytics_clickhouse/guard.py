@@ -27,12 +27,13 @@ from typing import Any
 from saena_analytics_clickhouse.errors import RawContentRejectedError
 
 # A metadata/hash/ref column (opaque object-storage ref, content hash,
-# short query text, locale code, ...) has no legitimate reason to exceed
-# this length. Chosen well above the longest legitimate field this package
-# defines today (`query_text`, capped at 2000 chars by the upstream
-# `PlatformObservation` contract this package's `ObservationRow` mirrors —
-# see `rows.py`) while still catching a raw HTML page / screenshot
-# data-URI / full model response smuggled into a "metadata" field.
+# locale code, ...) has no legitimate reason to exceed this length. Chosen
+# well above the longest legitimate field this package defines today
+# (r4-04: `ObservationRow` no longer carries any raw query text at all —
+# see `rows.py`/`query_privacy.py`; `query_ref`/`query_digest` are both
+# short opaque ref/hash strings, `_OPAQUE_REF_MAX_LENGTH`=512 in `rows.py`)
+# while still catching a raw HTML page / screenshot data-URI / full model
+# response smuggled into a "metadata" field.
 _MAX_FIELD_VALUE_LENGTH = 4096
 
 # Field NAME markers that name raw content outright — checked

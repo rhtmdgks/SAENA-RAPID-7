@@ -52,6 +52,20 @@ def test_no_table_emits_a_ttl_clause() -> None:
         assert "TTL" not in statement.upper() or "TTL" not in statement
 
 
+def test_observations_ddl_has_no_query_text_column() -> None:
+    """r4-04 leak-closure proof at the DDL level: the `observations`
+    CREATE TABLE statement must never define a `query_text` column again —
+    the pre-fix column that stored the raw customer query verbatim."""
+    (ddl,) = [s for s in MIGRATIONS[0].up_sql if "CREATE TABLE IF NOT EXISTS observations" in s]
+    assert "query_text" not in ddl
+
+
+def test_observations_ddl_has_query_ref_and_query_digest_columns() -> None:
+    (ddl,) = [s for s in MIGRATIONS[0].up_sql if "CREATE TABLE IF NOT EXISTS observations" in s]
+    assert "query_ref String" in ddl
+    assert "query_digest Nullable(String)" in ddl
+
+
 def test_migrate_up_creates_every_table() -> None:
     executor = FakeClickHouseExecutor()
     migrate_up(executor)

@@ -87,19 +87,48 @@ class MetricDefinition(BaseModel):
 class ExperimentRegistration(BaseModel):
     """One append-only, pre-registered experiment design entry.
 
-    Every field the w4-09 mission lists is present verbatim. `canonical_hash`
-    and `previous_hash` are `None` on a freshly constructed registration (the
-    caller has not yet appended it to a ledger) and are populated by
-    `saena_domain.experiment.ledger.register`, which returns a NEW instance
-    (`model_copy`, since this model is `frozen=True`) with both hash fields
-    filled in — mirroring `saena_domain.audit.chain.build_entry`'s pattern of
-    constructing the hash-bearing entry only once its position in the chain
-    is known.
+    Every field the w4-09 mission lists is present verbatim. `canonical_hash`,
+    `previous_hash`, and `content_fingerprint` are all `None` on a freshly
+    constructed registration (the caller has not yet appended it to a ledger)
+    and are populated by `saena_domain.experiment.ledger.register`, which
+    returns a NEW instance (`model_copy`, since this model is `frozen=True`)
+    with all three fields filled in — mirroring
+    `saena_domain.audit.chain.build_entry`'s pattern of constructing the
+    hash-bearing entry only once its position in the chain is known.
 
     `tenant_id` is mandatory (ADR-0007 rev.2 D-3 tenant-discriminator rule:
     every tenant-scoped record carries a `tenant_id` field; there is no
     system-scope carve-out for experiment registrations, unlike
     `saena_domain.audit.AuditEntry`'s `scope="system"` case).
+
+    ## Ledger format boundary (r4-03 remediation, 2026-07-13)
+
+    `content_fingerprint` is a NEW field added by r4-03. Prior to this
+    remediation, `canonical_hash` served two conflated roles: (1) a
+    content-only fingerprint used to detect byte-identical re-registration
+    (idempotent replay), and (2) the value checked by `verify_ledger` for
+    chain-linkage integrity. Because `canonical_hash` never committed to
+    `previous_hash`, an attacker could reorder entries, relink
+    `previous_hash` to match the new order, and reuse each entry's existing
+    `canonical_hash` unchanged — `verify_ledger` could not detect the
+    reorder. See `tests/unit/domain_experiment/test_ledger.py::
+    test_old_vulnerability_reorder_and_relink_would_have_passed_verify` for
+    the pinned regression proving the old shape's failure.
+
+    As of r4-03: `content_fingerprint` carries role (1) — content-only,
+    excludes `previous_hash`/`canonical_hash`/`content_fingerprint` itself,
+    used ONLY by `register`'s idempotency comparison. `canonical_hash` now
+    carries role (2) ONLY — it commits to the entry's content AND
+    `previous_hash` (chain position), and is what `verify_ledger` checks.
+    This is an additive, non-silent field split: any ledger entry produced
+    before r4-03 lacks `content_fingerprint` (it will be `None`) and its
+    stored `canonical_hash` was computed WITHOUT `previous_hash`, so it will
+    fail `verify_ledger` under the new chain-hash rule. No W4 experiment
+    ledger has shipped to production (see wave4-plan.md — W4 has not been
+    merged/deployed), so there is no live data requiring a migration path;
+    this note exists so that fact is never silently assumed for a future
+    ledger format change — any future breaking change to the hashed field
+    set MUST similarly record an explicit compatibility boundary here.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -120,6 +149,7 @@ class ExperimentRegistration(BaseModel):
     created_at: datetime
     canonical_hash: str | None = None
     previous_hash: str | None = None
+    content_fingerprint: str | None = None
 
     @model_validator(mode="after")
     def _check_arm_design(self) -> ExperimentRegistration:

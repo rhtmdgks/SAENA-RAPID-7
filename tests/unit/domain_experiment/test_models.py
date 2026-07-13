@@ -29,6 +29,7 @@ def test_registration_round_trips_all_named_fields() -> None:
     assert reg.created_at is not None
     assert reg.canonical_hash is None
     assert reg.previous_hash is None
+    assert reg.content_fingerprint is None
 
 
 def test_tenant_id_is_mandatory() -> None:

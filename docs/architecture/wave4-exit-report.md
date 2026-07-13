@@ -6,9 +6,11 @@ document, not `docs/specs/**`.
 
 ## Status
 
-Stage 0–3 COMPLETE and integrated to `wave4-intelligence` (all 20 DAG units).
-Final integration critics (w4-20) + the Wave-4→main PR are the only remaining
-steps. **No Wave-4→main merge is performed here — that stays a human decision.**
+Stage 0–3 COMPLETE. **PR #5 (Wave 4 → main) was MERGED — main = `a8de390`.**
+A follow-on remediation (`wave4-remediation`, branched from `a8de390`) then
+closed four concurrency/integrity/privacy defects the original W4 CI did not
+catch — see `docs/architecture/wave4-remediation-report.md` and the
+"Post-merge remediation" section below.
 
 ## Delivered units (integrated, `just verify` green at each merge)
 
@@ -129,6 +131,33 @@ publishability is copied verbatim from the fail-closed write-model. Determinism
 11 import-linter boundary contracts KEPT; registry 26→38 with codegen↔schema
 parity.
 
+## Post-merge remediation (wave4-remediation)
+
+PR #5 merged to main at `a8de390`. A post-merge audit found four defects the
+original CI missed; `wave4-remediation` (from `a8de390`) closes them, each
+reproducer-first + real-container verified (full detail:
+`wave4-remediation-report.md`):
+
+- **r4-01** pgvector concurrent upsert — advisory lock + partial unique index
+  (the original `FOR UPDATE` locked nothing on a first-empty-key race).
+- **r4-02** ClickHouse idempotency — server-side dedup token replaces a
+  check-then-insert race. Guarantee is **window-bounded physical + logical**
+  (disclosed), not unconditional physical exactly-once.
+- **r4-03** experiment ledger — chain-entry hash now commits `previous_hash`
+  (reorder+relink previously passed verify); content-fingerprint vs chain-hash
+  split.
+- **r4-04** query privacy — raw `query_text` removed from ClickHouse; replaced
+  by a **keyed, tenant-scoped, fail-closed** `query_ref` (the earlier
+  exit-report "no raw content/PII" claim was stronger than the code enforced —
+  now it holds).
+
+Verdicts recorded as **Lead verification** (no separate critic delivered a bus
+verdict; the Lead ran the adversarial checks directly against real containers,
+and acted as the independent critic that found + returned r4-04's two MUST-FIX
+defects). Remediation gates: `vector-concurrency`, `analytics-idempotency`,
+`experiment-chain-adversarial`, `intelligence-privacy` (justfile SSOT + ci.yml).
+
 ## Remaining
 
-- Wave-4 → main PR (CI green). **Merge is a human decision — no auto-merge.**
+- Wave-4-remediation → main PR (CI green). **Merge is a human decision — no
+  auto-merge.**

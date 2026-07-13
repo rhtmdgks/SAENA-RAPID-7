@@ -66,5 +66,6 @@ def test_experiment_registration_has_exactly_the_specified_fields() -> None:
         "created_at",
         "canonical_hash",
         "previous_hash",
+        "content_fingerprint",
     }
     assert set(ExperimentRegistration.model_fields) == expected
