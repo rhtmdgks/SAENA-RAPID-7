@@ -156,3 +156,161 @@
     in TenantContext and SystemContext since it has no meaning outside an
     aggregate/de-identified scope and its presence there would signal
     aggregate-context leakage into non-aggregate telemetry.
+
+# ---------------------------------------------------------------------------
+# Wave 4 (Intelligence, w4-15) additions below. Every new entry follows the
+# same discipline as the W0 set above: identifiers/hashes/closed-vocabulary
+# enums/booleans only — NEVER a raw query, URL, evidence excerpt, or any
+# other customer-source-bearing value. See
+# docs/architecture/wave4-plan.md and CLAUDE.md "Engine scope (v1)" /
+# W4 constraints ("no PII/secret/customer-source in any telemetry field").
+# ---------------------------------------------------------------------------
+
+- name: saena.demand_graph_version
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Content-addressed `sha256:<64-hex>` version hash of a built demand graph
+    (mirrors services/intelligence/demand-graph-service `DemandGraph.graph_version`
+    / the `demand.graph.versioned.v1` event payload field of
+    the same name, w4-02/w4-10). A hash, never the graph's own paraphrase
+    text/provenance content — safe to carry across all three contexts as an
+    opaque version marker, matching saena.contract_hash's optional-everywhere
+    precedent.
+
+- name: saena.entity_graph_version
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Content-addressed `sha256:<64-hex>` version hash of a resolved entity
+    graph (mirrors services/intelligence/entity-resolution-service
+    `EntityResolutionResult.graph_version` / the `entity.graph.versioned.v1`
+    event payload field, w4-03/w4-10). Same opaque-hash discipline as
+    saena.demand_graph_version — never the resolved entity names/aliases
+    themselves.
+
+- name: saena.claim_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: forbidden
+  description: >
+    Identifier of one extracted claim in the claim-evidence ledger (mirrors
+    services/intelligence/claim-evidence-service `ExtractedClaim.claim_id` /
+    `ClaimPublishability.claim_id`, w4-04). An opaque id, never the claim's
+    own `claim_text` (which must never appear in telemetry at all — see
+    redaction-rules.yaml). Forbidden in AggregateContext: a claim id is a
+    high-cardinality, potentially re-identifying operational detail, same
+    rationale as saena.patch_unit_id.
+
+- name: saena.evidence_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: forbidden
+  description: >
+    Identifier of one evidence record linked to a claim (mirrors
+    services/intelligence/claim-evidence-service `EvidenceRecord.evidence_id`,
+    w4-04). An opaque id, never the evidence's own
+    `source_uri`/`excerpt` (customer-source-bearing fields that must never
+    appear in telemetry — see redaction-rules.yaml). Forbidden in
+    AggregateContext, same rationale as saena.claim_id.
+
+- name: saena.claim_publishable
+  type: boolean
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    The boolean outcome of `evaluate_claim_publishability` (w4-04) — whether
+    a claim currently has at least one present/fresh/unblocked evidence
+    link. Two-valued (low cardinality), carries no claim/evidence content
+    itself, so it is safe in all three contexts including de-identified
+    aggregate rollups (e.g. "% of claims publishable" dashboards) — contrast
+    saena.claim_id/saena.evidence_id, which stay forbidden in aggregate.
+
+- name: saena.citation_normalized_uri_hash
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: forbidden
+  description: >
+    `sha256:<64-hex>` digest of a citation's normalized URI (mirrors
+    services/intelligence/citation-intelligence-service `normalize_url`
+    output, w4-05) — a hash of the normalized URI, NEVER the URI string
+    itself (a raw/normalized URL is customer-source-adjacent,
+    high-cardinality, and potentially re-identifying; this entry exists so
+    citation-normalization telemetry can correlate/count without ever
+    carrying the URL). Forbidden in AggregateContext, same rationale as
+    saena.claim_id.
+
+- name: saena.browser_pool_state
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Closed-vocabulary lifecycle state of one chatgpt-observer browser-pool
+    session (mirrors services/acquisition/chatgpt-observer-service `BrowserPool`
+    acquire/release/recycle/close lifecycle, w4-08): one of
+    "acquired", "released", "recycled", "closed". Low cardinality, no
+    session/query content — safe in all three contexts.
+
+- name: saena.experiment_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: forbidden
+  description: >
+    Identifier of one pre-registered experiment (mirrors
+    packages/domain/src/saena_domain/experiment `ExperimentRegistration.experiment_id`,
+    w4-09). An opaque id, never the registration's own
+    query_cluster_ref/asset_hash content beyond this identifier. Forbidden
+    in AggregateContext, same rationale as saena.claim_id — this registry
+    entry carries no outcome/lift/causal value (W4/Wave-5-forbidden scope,
+    CLAUDE.md "Current decision"); it identifies a REGISTRATION event only.
+
+- name: saena.intent_label
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Closed 9-value query-cluster intent taxonomy (mirrors
+    services/intelligence/demand-graph-service `IntentLabel` enum, w4-02:
+    "definition|integration|security|pricing|comparison|implementation|migration|support|procurement" —
+    a fixed, low-cardinality label, never
+    the underlying paraphrase/query text — safe in all three contexts,
+    including de-identified aggregate rollups (e.g. "graph builds by
+    intent" dashboards).

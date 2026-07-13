@@ -17,6 +17,10 @@ Public API surface (Wave 2 runtime, unit w2-06):
   and `saena.<domain>.<name>` metric-name validators.
 - `saena_observability.attributes` — `set_redacted_attribute(s)`, an OTel
   `Span.set_attribute` wrapper routed through redaction.
+- `saena_observability.intelligence` — Wave 4 (Intelligence) metric/span
+  name constants for demand-graph, entity-resolution, claim-evidence,
+  citation-normalization, browser-pool, and experiment-registration
+  telemetry (w4-15).
 
 This package must not import `saena_domain` (import-linter enforced,
 `observability-below-services` / boundary rules in `.importlinter`).
@@ -26,6 +30,11 @@ from saena_observability.context import (
     TelemetryContext,
     bind_telemetry_context,
     current_telemetry_context,
+)
+from saena_observability.intelligence import (
+    INTELLIGENCE_ATTRIBUTE_NAMES,
+    INTELLIGENCE_METRIC_NAMES,
+    INTELLIGENCE_SPAN_NAMES,
 )
 from saena_observability.logging import SaenaJsonFormatter, get_logger
 from saena_observability.redaction import (
@@ -47,6 +56,9 @@ from saena_observability.trace import (
 )
 
 __all__ = [
+    "INTELLIGENCE_ATTRIBUTE_NAMES",
+    "INTELLIGENCE_METRIC_NAMES",
+    "INTELLIGENCE_SPAN_NAMES",
     "TelemetryContext",
     "bind_telemetry_context",
     "current_telemetry_context",
