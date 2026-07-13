@@ -115,6 +115,20 @@ in for bundle verification. The former w3-10 eval `gap` (`fm-05-skill-compromise
 is now `covered` (9/9). This closes the earlier framing inconsistency where a
 run without a dedicated verifier was reported as if F-5 were fully implemented.
 
+**F-5 gate is MANDATORY (w3-13)**: the fail-closed semantics were tightened so a
+*missing* `expected_skill_bundle_hash` is itself a DENY, not a skip — closing a
+fail-open hole where a run/session with no pin would have proceeded unverified.
+agent-runner `run()` unconditionally requires a valid pin + wired source (a run
+always executes skill-derived commands); a None pin → `SkillBundleHashMissingError`,
+a None source → `SkillBundleMissingError`, both before any worktree. session_start
+requires the pin by default (`skill_bundle_required=True`); a genuinely
+non-executing session must set an explicit, auditable `skill_bundle_required=False`
+waiver a production execution wiring never sets. The formerly permissive tests
+`test_no_pin_means_bundle_gate_is_skipped` and `test_no_pin_allows_without_a_port`
+were REVERSED to assert DENY; positive+negative tests (missing / malformed /
+mismatch / missing-bundle / valid-match) are kept at both boundaries, with
+deny-before-worktree/executor + audit proven.
+
 **F-9 boundary (explicit)**: the measurement-fraud evaluator here is a Wave 3
 failure-mode *fixture + deterministic discrimination check* only. It is NOT a
 production B-layer measurement service — that owner/service is **Wave 5** scope.

@@ -5,8 +5,10 @@ from __future__ import annotations
 from runner_factories import (
     CONTRACT_HASH,
     PATCH_UNIT_ID,
+    VALID_SKILL_BUNDLE_PIN,
     build_approval_decision,
     build_change_plan,
+    make_skill_bundle_source,
 )
 from saena_agent_runner.approval import parse_approval_decision
 from saena_agent_runner.artifact import FakeArtifactRegistryGateway
@@ -68,12 +70,14 @@ def test_cancellation_signal_aborts_execution_and_rolls_back(
         audit_chain=audit_chain,
         cancellation_signal=_AlwaysCancel(),
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
     result = runner.run(
         job_context=job_context,
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -108,6 +112,7 @@ def test_active_deadline_exceeded_times_out_and_rolls_back(
         audit_chain=audit_chain,
         cancellation_signal=_NeverCancel(),
         clock=_JumpingClock(jump_to=deadline + 1),
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     result = runner.run(
@@ -115,6 +120,7 @@ def test_active_deadline_exceeded_times_out_and_rolls_back(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,

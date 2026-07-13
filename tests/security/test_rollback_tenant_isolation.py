@@ -19,9 +19,11 @@ from runner_factories import (
     PATCH_UNIT_ID,
     TENANT_A,
     TENANT_B,
+    VALID_SKILL_BUNDLE_PIN,
     build_approval_decision,
     build_change_plan,
     build_job_context,
+    make_skill_bundle_source,
 )
 from saena_agent_runner.approval import parse_approval_decision
 from saena_agent_runner.artifact import FakeArtifactRegistryGateway
@@ -60,6 +62,7 @@ def test_cross_tenant_worktree_handoff_is_refused_worktree_never_touched(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     result = runner.run(
@@ -67,6 +70,7 @@ def test_cross_tenant_worktree_handoff_is_refused_worktree_never_touched(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -102,6 +106,7 @@ def test_tenant_bs_own_successful_run_is_unaffected_by_tenant_as_rollback(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     # tenant A: denied (out-of-scope write) and rolled back.
@@ -126,6 +131,7 @@ def test_tenant_bs_own_successful_run_is_unaffected_by_tenant_as_rollback(
         contract=tenant_a_contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=tenant_a_approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -144,6 +150,7 @@ def test_tenant_bs_own_successful_run_is_unaffected_by_tenant_as_rollback(
         contract=tenant_b_contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=tenant_b_approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,

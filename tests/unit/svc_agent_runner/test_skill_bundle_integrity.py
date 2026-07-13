@@ -25,6 +25,7 @@ from saena_agent_runner.skill_bundle import (
 from saena_domain.execution import compute_skill_bundle_hash
 from saena_domain.execution.skill_bundle import (
     SkillBundleHashMismatchError,
+    SkillBundleHashMissingError,
     SkillBundleMissingError,
 )
 
@@ -146,14 +147,21 @@ def test_denial_records_audit_entry(
     assert any("skill_bundle" in getattr(e, "action", "") for e in entries)
 
 
-def test_no_pin_means_bundle_gate_is_skipped(
+def test_no_pin_denies_execution_fail_closed(
     job_context, worktree_factory, command_executor, artifact_gateway, audit_chain, clock
 ) -> None:
-    # A run that carries NO skill_bundle_hash pin is not gated by F-5 here
-    # (nothing to verify against); execution proceeds on approval alone.
-    runner = _runner(worktree_factory, command_executor, artifact_gateway, audit_chain, clock, None)
-    result = _run(runner, job_context, bundle_pin=None)
-    assert result.outcomes[0].status.value in {"succeeded", "running"}
+    # MANDATORY gate (reversed from the former permissive test): a run that
+    # carries NO skill_bundle_hash pin must DENY fail-closed — never execute.
+    # An agent-runner run always executes skill-derived commands, so a missing
+    # pin is not a skip. Denies BEFORE any worktree/executor.
+    source = InMemorySkillBundleSource(bundle=dict(_BUNDLE))
+    runner = _runner(
+        worktree_factory, command_executor, artifact_gateway, audit_chain, clock, source
+    )
+    with pytest.raises(SkillBundleHashMissingError):
+        _run(runner, job_context, bundle_pin=None)
+    assert worktree_factory.created == []
+    assert command_executor.invocations == []
 
 
 def test_bundle_content_never_echoed_in_denial(

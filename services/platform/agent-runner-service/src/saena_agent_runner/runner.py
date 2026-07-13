@@ -156,10 +156,13 @@ class PatchUnitRunner:
     audit_chain: InMemoryAuditChain
     cancellation_signal: CancellationSignal | None = None
     clock: Clock = field(default_factory=SystemClock)
-    #: F-5 skill-bundle integrity boundary. When a run is pinned to an
-    #: `expected_skill_bundle_hash`, this source is read (before any worktree)
-    #: and the bundle content is verified against the pin. Left None only for
-    #: runs that carry no skill-bundle pin at all.
+    #: F-5 skill-bundle integrity boundary (MANDATORY). Every run reads this
+    #: source (before any worktree) and verifies the bundle content against the
+    #: run's `expected_skill_bundle_hash`. A None source is a fail-closed DENY
+    #: when `run()` is called (an agent-runner run always executes skill-derived
+    #: commands) — it is NOT an opt-out. The runtime host must wire a real
+    #: source; only refusal-before-execution paths (approval refused) return
+    #: before this is read.
     skill_bundle_source: SkillBundleSource | None = None
 
     def run(
@@ -181,12 +184,16 @@ class PatchUnitRunner:
         patch unit is ever attempted, no worktree is ever created, if
         approval verification itself fails.
 
-        Then, when `expected_skill_bundle_hash` is pinned, raises a
-        `SkillBundleIntegrityError` subclass (F-5, k3s §10) if the actual
-        skill bundle's content hash does not match — again BEFORE any worktree
-        is created or executor invoked. The whole-contract `contract_hash`
-        check inside `verify_approval` is the complementary defense; it does
-        not, and cannot, prove the bundle files themselves are unaltered.
+        Then raises a `SkillBundleIntegrityError` subclass (F-5, k3s §10) —
+        again BEFORE any worktree/executor — if the skill bundle fails
+        integrity. This gate is MANDATORY: `expected_skill_bundle_hash` MUST be
+        a valid `sha256:<hex>` pin and `skill_bundle_source` MUST be wired. A
+        None pin raises `SkillBundleHashMissingError`; a None source raises
+        `SkillBundleMissingError`; a content mismatch raises
+        `SkillBundleHashMismatchError`. There is no "no bundle → skip" path
+        (that would be fail-open). The whole-contract `contract_hash` check
+        inside `verify_approval` is the complementary defense; it does not, and
+        cannot, prove the bundle files themselves are unaltered.
         """
         try:
             approved_ids = verify_approval(
@@ -205,24 +212,28 @@ class PatchUnitRunner:
             )
             raise
 
-        # F-5 skill-bundle integrity — fail-closed, BEFORE any worktree /
-        # executor. Only enforced when the run carries a pin (a run with no
-        # skill bundle at all passes None and is not gated here).
-        if expected_skill_bundle_hash is not None:
-            try:
-                enforce_skill_bundle_integrity(
-                    expected_skill_bundle_hash=expected_skill_bundle_hash,
-                    source=self.skill_bundle_source,
-                    job_context=job_context,
-                )
-            except SkillBundleIntegrityError as exc:
-                audit_mod.record_skill_bundle_refused(
-                    self.audit_chain,
-                    job_context=job_context,
-                    error_code=exc.error_code,
-                    recorded_at=self.clock.now_iso(),
-                )
-                raise
+        # F-5 skill-bundle integrity — MANDATORY, fail-closed, BEFORE any
+        # worktree / executor. An agent-runner run executes commands that come
+        # from a skill bundle, so a run MUST pin an `expected_skill_bundle_hash`
+        # and wire a source: a missing pin (None) or a missing source is a
+        # DENY, NOT a skip. There is no "no bundle → skip" path — that would be
+        # fail-open (a run with an unverified/absent bundle could execute).
+        # `enforce_skill_bundle_integrity` raises SkillBundleHashMissingError
+        # for a None pin and SkillBundleMissingError for a None source.
+        try:
+            enforce_skill_bundle_integrity(
+                expected_skill_bundle_hash=expected_skill_bundle_hash,
+                source=self.skill_bundle_source,
+                job_context=job_context,
+            )
+        except SkillBundleIntegrityError as exc:
+            audit_mod.record_skill_bundle_refused(
+                self.audit_chain,
+                job_context=job_context,
+                error_code=exc.error_code,
+                recorded_at=self.clock.now_iso(),
+            )
+            raise
 
         deadline_seconds = resource_limits_for(JobKind.AGENT_RUNNER).active_deadline_seconds
         start_time = self.clock.monotonic()

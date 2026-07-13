@@ -4,7 +4,16 @@ secret)")."""
 
 from __future__ import annotations
 
-from hooks_runtime_factories import RUN_ID, TENANT_ID, TRACE_ID, TS, make_budget, make_contract
+from hooks_runtime_factories import (
+    RUN_ID,
+    TENANT_ID,
+    TRACE_ID,
+    TS,
+    VALID_SKILL_BUNDLE_HASH,
+    make_allowing_skill_bundle_port,
+    make_budget,
+    make_contract,
+)
 from saena_hooks_runtime.hooks.session_start import SecretFinding, SessionStartInput, session_start
 from saena_hooks_runtime.redact import redact_known, redact_patterns
 
@@ -68,6 +77,8 @@ def test_session_start_secret_scan_detail_never_carries_raw_value() -> None:
             policy_signature_valid=True,
             secret_findings=(finding,),
             budget=make_budget("session_start"),
+            expected_skill_bundle_hash=VALID_SKILL_BUNDLE_HASH,
+            skill_bundle_port=make_allowing_skill_bundle_port(),
         )
     )
     assert planted_secret not in result.detail

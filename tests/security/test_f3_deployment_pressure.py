@@ -33,8 +33,10 @@ from hooks_runtime_factories import RUN_ID, TENANT_ID, TRACE_ID, TS, make_budget
 from runner_factories import (
     CONTRACT_HASH,
     PATCH_UNIT_ID,
+    VALID_SKILL_BUNDLE_PIN,
     build_approval_decision,
     build_change_plan,
+    make_skill_bundle_source,
 )
 from saena_agent_runner.approval import parse_approval_decision
 from saena_agent_runner.artifact import FakeArtifactRegistryGateway
@@ -129,6 +131,7 @@ def test_deployment_pressure_command_denied_end_to_end_via_patch_unit_runner(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     result = runner.run(
@@ -136,6 +139,7 @@ def test_deployment_pressure_command_denied_end_to_end_via_patch_unit_runner(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
