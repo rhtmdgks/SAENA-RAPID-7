@@ -150,13 +150,20 @@ measurement-privacy:
 # failure-mode suite (w5-20) are residual (see wave5-exit-report.md).
 measurement-e2e:
     uv run pytest tests/unit/svc_experiment_attribution_boundary tests/unit/svc_experiment_attribution_pipeline -q
-    uv run pytest -q -m integration tests/integration/measurement_workflow -p no:cacheprovider
+    # The REAL composed E2E (w5-19/c5-01): real Postgres 16 + ClickHouse 24.8 +
+    # Temporal time-skipping. SAENA_MEASUREMENT_E2E_REQUIRED=1 arms the
+    # conftest's zero-collected hard-fail guard (a naming typo / import error
+    # that collects 0 from this required lane exits non-0, never a silent pass).
+    SAENA_MEASUREMENT_E2E_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_e2e tests/integration/measurement_workflow -p no:cacheprovider
 
 # w5-06/w5-13/w5-18: measurement fail-closed / fraud / UNDETERMINED-never-PASS
 # discriminators (named explicitly — non-test_* helper files).
 measurement-failure-modes:
     uv run pytest tests/security/measurement_fraud.py tests/security/measurement_adversarial.py -q
     uv run pytest tests/unit/svc_experiment_attribution_pipeline -q
+    # The completed failure-mode matrix (w5-20/c5-02): real Postgres crash/
+    # replay/rollback/conflict + F-9 fraud repoint through the integrated engine.
+    uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
 
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
