@@ -131,6 +131,55 @@ denylist_patterns:
       raw search query is customer-source content and must never be a
       telemetry attribute.
 
+  # -------------------------------------------------------------------
+  # Wave 5 (Measurement / B-layer, w5-17) additions: measurement-domain
+  # raw-content / identity field names that must never be attached as a
+  # telemetry attribute KEY. Same defense-in-depth shape as the w4-15
+  # customer-source denylist above (match on key) — these raw fields are
+  # never allowlisted in attributes.yaml either (only opaque *_id/*_hash and
+  # closed decision/verdict/reason enums were added for w5-17), so
+  # allowlist-first already drops them; this denylist is the secondary
+  # guard against a producer bug that reuses one of these raw field names
+  # as an attribute key anyway. Measurement is the highest-risk domain for
+  # this because it handles confirmer identities, raw reason messages, and
+  # evidence-bundle raw content (snapshot/citation) — none of which may
+  # ever reach telemetry (wave5-plan.md FORBIDDEN scope; H10).
+  # -------------------------------------------------------------------
+  - id: R-CUSTOMER-SOURCE-CONFIRMER-IDENTITY
+    pattern: '(?i)confirmer_identity'
+    applies_to: [key]
+    description: >
+      Matches an attribute key containing "confirmer_identity" (the signed
+      external identity that submits a `deployment.confirmed.v1`, w5-03 /
+      ADR-0003 confirmer trust model). A confirmer identity is potentially
+      PII / re-identifying customer-side detail and must never be a
+      telemetry attribute — only the opaque saena.measurement.window_id it
+      produces is registered.
+
+  - id: R-CUSTOMER-SOURCE-REASON-MESSAGE
+    pattern: '(?i)reason_message'
+    applies_to: [key]
+    description: >
+      Matches an attribute key containing "reason_message" — a free-text
+      human-readable reason string (contrast the registered, safe,
+      closed-enum saena.measurement.reason_code). A free-text message can
+      interpolate a confirmer identity, a raw query, or other
+      customer-source content, so only the bounded CODE is telemetry-safe;
+      the raw message must never be a telemetry attribute.
+
+  - id: R-CUSTOMER-SOURCE-EVIDENCE-CONTENT
+    pattern: '(?i)(evidence_snapshot|evidence_content|bundle_content|snapshot_content)'
+    applies_to: [key]
+    description: >
+      Matches an attribute key containing "evidence_snapshot",
+      "evidence_content", "bundle_content", or "snapshot_content" (the raw
+      snapshot/citation content sealed into an evidence bundle, w5-08 /
+      Algorithm §3.7-3). Raw evidence-bundle content is customer-source and
+      must never be a telemetry attribute (H10: the bundle carries
+      hashes/refs only) — only the opaque saena.measurement.evidence_bundle_id
+      and the saena.measurement.evidence_bundle_hash (a HASH, never the
+      content) are registered.
+
 violation_rules:
   # Structural (context x attribute) violations, independent of the regex
   # denylist above. These encode the ADR-0013 context_type table's
@@ -170,3 +219,26 @@ violation_rules:
       enforcement source of truth `decide_redaction` actually evaluates —
       matching V-AGG-TENANT's own division of labor between the
       documentation-only `contexts` column and this executable rule).
+
+  - id: V-AGG-MEASUREMENT-IDENTIFIER
+    context: aggregate
+    forbidden_attributes:
+      - saena.measurement.window_id
+      - saena.measurement.evidence_bundle_id
+    description: >
+      AggregateContext telemetry (saena.context=aggregate) MUST NOT contain
+      the Wave-5-measurement high-cardinality per-record identifiers
+      saena.measurement.window_id or saena.measurement.evidence_bundle_id
+      (w5-17) — same re-identification-prevention rationale as V-AGG-TENANT /
+      V-AGG-INTELLIGENCE-IDENTIFIER, applied to the new measurement-workload
+      identifiers registered in attributes.yaml (each already marked
+      aggregate=forbidden there; this rule is the registry-level runtime
+      enforcement source of truth `decide_redaction` actually evaluates).
+      Deliberately EXCLUDED from this forbidden set:
+      saena.measurement.evidence_bundle_hash (an aggregate-safe opaque
+      CONTENT hash, marked aggregate=optional — a bundle revision marker,
+      not a per-tenant/per-individual identifier, mirroring
+      saena.demand_graph_version's exclusion from
+      V-AGG-INTELLIGENCE-IDENTIFIER) and the closed low-cardinality
+      decision/verdict/reason enums (verdict/reason_code/grs_decision/
+      intake_decision), which are safe category labels in aggregate rollups.
