@@ -16,6 +16,7 @@ integration lane (tests/integration/measurement_failure).
 from __future__ import annotations
 
 import dataclasses
+import json
 
 from pipeline_factories import (
     make_deployment_confirmation,
@@ -169,9 +170,13 @@ def test_seam_never_echoes_confirmation_content_in_reason_codes() -> None:
     )
 
     outcome = run_measurement(conflicting_inputs, ports, make_policies(registration))
-    rendered = outcome.canonical_payload()
+    # `canonical_payload()` is a dict — `x in dict` only checks KEYS, so
+    # serialize the whole structure to search actual nested VALUES (c5-03
+    # security should-fix sec-2).
+    rendered = json.dumps(outcome.canonical_payload(), sort_keys=True, default=str)
     assert secret_sha not in rendered
     assert "sig-1" not in rendered
+    assert "confirmer-1" not in rendered
 
     # Also assert the STORED evidence bundle (a separate persistence surface
     # from the outcome payload) never carries the raw content — only the
