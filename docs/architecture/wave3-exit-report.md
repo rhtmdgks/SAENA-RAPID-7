@@ -115,19 +115,30 @@ in for bundle verification. The former w3-10 eval `gap` (`fm-05-skill-compromise
 is now `covered` (9/9). This closes the earlier framing inconsistency where a
 run without a dedicated verifier was reported as if F-5 were fully implemented.
 
-**F-5 gate is MANDATORY (w3-13)**: the fail-closed semantics were tightened so a
-*missing* `expected_skill_bundle_hash` is itself a DENY, not a skip — closing a
-fail-open hole where a run/session with no pin would have proceeded unverified.
-agent-runner `run()` unconditionally requires a valid pin + wired source (a run
-always executes skill-derived commands); a None pin → `SkillBundleHashMissingError`,
-a None source → `SkillBundleMissingError`, both before any worktree. session_start
-requires the pin by default (`skill_bundle_required=True`); a genuinely
-non-executing session must set an explicit, auditable `skill_bundle_required=False`
-waiver a production execution wiring never sets. The formerly permissive tests
-`test_no_pin_means_bundle_gate_is_skipped` and `test_no_pin_allows_without_a_port`
-were REVERSED to assert DENY; positive+negative tests (missing / malformed /
-mismatch / missing-bundle / valid-match) are kept at both boundaries, with
-deny-before-worktree/executor + audit proven.
+**F-5 gate is MANDATORY (w3-13) and has NO opt-out (w3-14)**: the fail-closed
+semantics were tightened so a *missing* `expected_skill_bundle_hash` is itself a
+DENY, not a skip — closing a fail-open hole where a run/session with no pin would
+have proceeded unverified.
+
+- agent-runner `run()` unconditionally requires a valid pin + wired source (a run
+  always executes skill-derived commands); a None pin → `SkillBundleHashMissingError`,
+  a None source → `SkillBundleMissingError`, both before any worktree.
+- session_start (w3-14): the `skill_bundle_required` boolean opt-out was REMOVED
+  entirely (it was a public-input bypass of F-5). `SessionStartInput` now makes
+  `expected_skill_bundle_hash` and `skill_bundle_port` REQUIRED fields (no
+  default) — the execution session cannot be constructed without them, and the
+  gate is unconditional: None pin / None port / raising adapter each DENY, only a
+  valid pin that verifies ALLOWs. There is no non-executing entry point (none is
+  needed); if one were ever required it must be a SEPARATE input type + function
+  that this execution `session_start` cannot accept, never a flag on the same
+  input.
+
+The formerly permissive tests `test_no_pin_means_bundle_gate_is_skipped` and
+`test_no_pin_allows_without_a_port` were REVERSED to assert DENY; the waiver test
+was removed and replaced with a construction-fails-without-bundle-fields test.
+Positive+negative tests (missing / malformed / mismatch / missing-bundle /
+valid-match) are kept at both boundaries, with deny-before-worktree/executor +
+audit proven.
 
 **F-9 boundary (explicit)**: the measurement-fraud evaluator here is a Wave 3
 failure-mode *fixture + deterministic discrimination check* only. It is NOT a

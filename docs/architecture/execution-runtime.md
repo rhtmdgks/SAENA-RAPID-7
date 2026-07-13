@@ -144,11 +144,15 @@ with an unverified/absent bundle could execute).
 - **hooks-runtime `session_start`** — via an injected `SkillBundleIntegrityPort`.
   hooks-runtime is a stdlib-only leaf and CANNOT import `saena_domain`, so the
   concrete adapter (wrapping `verify_skill_bundle`) is supplied by the runtime
-  host; hooks-runtime defines the Port + the fail-closed enforcement. Here the
-  gate is on by default (`skill_bundle_required=True`): a missing pin, a missing
-  port, or a raising adapter all DENY. A genuinely non-executing session may
-  set `skill_bundle_required=False` — an explicit, auditable waiver a production
-  execution wiring never sets. (agent-runner has no such flag — it always
+  host; hooks-runtime defines the Port + the fail-closed enforcement. The gate
+  is UNCONDITIONAL — there is NO opt-out flag. `SessionStartInput` makes
+  `expected_skill_bundle_hash` and `skill_bundle_port` REQUIRED fields (no
+  default): an execution session cannot even be constructed without them, and a
+  None pin / None port / raising adapter each DENY at runtime. The input type
+  cannot express "skip the bundle gate" — a genuinely non-executing session
+  would require a SEPARATE input type + entry point that this execution
+  `session_start` cannot accept (none exists; there is no non-executing
+  session-start caller). (agent-runner likewise has no waiver — it always
   executes.)
 
 The `contract_hash` pin is retained as a complementary defense; it does not
