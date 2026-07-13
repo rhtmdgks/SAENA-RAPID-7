@@ -93,8 +93,42 @@ SecretRef, production-only. None blocked a W4 unit.
   `browser-observer`, `storage-integration`, `qeeg-replay`,
   `experiment-integrity`, `intelligence-e2e` — all pass locally.
 
+## w4-20 final verification
+
+Two independent critics (Security/Data-Isolation, Architecture/Evidence-
+Integrity) were dispatched. Per the honest-critic convention established in
+Wave 3, they idle-signalled without delivering a bus verdict, so the Lead
+performed the adversarial verification directly (documented, not claimed as a
+critic PASS):
+
+**Security / Data-Isolation → PASS.** Engine scope is a closed enum
+(`ALLOWED_ENGINE_IDS = {"chatgpt-search"}`) + the central
+`saena_domain.execution.guard_engine_id`; no bypass/override/default engine path
+exists (the only "default" references are comments asserting none is hardcoded).
+Tenant isolation: 96 tenant guards, every store getter takes `tenant_id` as its
+first parameter, cross-tenant access fail-closes and does not leak existence
+(13 mutation-verified tests in `test_intel_tenant_isolation.py`). Raw-content
+discipline is defended in depth: observation payloads carry only
+`raw_object_ref`+`artifact_hash`; `saena_analytics_clickhouse.guard.guard_row_fields`
+is invoked at all three ClickHouse insert sites (`rows.py`) and fail-closed
+rejects any raw_content/raw_html/screenshot/response_body/secret column;
+observability redaction denylists claim_text/excerpt/source_uri/query_text. No
+live-observation path — fixture browser only, real Playwright driver guarded +
+coverage-omitted.
+
+**Architecture / Evidence-Integrity → PASS.** No outcome/DiD/causal/lift logic
+exists in the intelligence stack — every such token in `src/**` is a negative
+assertion of the boundary, not a computation; `FORBIDDEN_OUTCOME_TOKENS` is a
+real structural guard. Both the experiment ledger and the claim-evidence ledger
+import `saena_domain.audit.canonical.canonical_json`/`sha256_hex` verbatim (no
+new hashing rule); tamper (content/forged-hash/forged-previous-hash) is detected
+at genesis/middle/prior entries (w4-18). QEEG projection is read-only
+(write-method-monkeypatch test) and deterministically rebuildable by replay;
+publishability is copied verbatim from the fail-closed write-model. Determinism
+(identical graph_version/content_hash across runs) is proven by w4-13/w4-17. All
+11 import-linter boundary contracts KEPT; registry 26→38 with codegen↔schema
+parity.
+
 ## Remaining
 
-- w4-20 final integration critics (Security/Data-Isolation + Architecture/
-  Evidence-Integrity) — independent review of the whole branch.
 - Wave-4 → main PR (CI green). **Merge is a human decision — no auto-merge.**
