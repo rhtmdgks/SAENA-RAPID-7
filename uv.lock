@@ -15,6 +15,7 @@ members = [
     "saena-domain",
     "saena-engine-gateway",
     "saena-entity-resolution",
+    "saena-experiment-attribution",
     "saena-forge-console",
     "saena-forgectl",
     "saena-hooks-runtime",
@@ -1431,6 +1432,25 @@ requires-dist = [
 ]
 
 [[package]]
+name = "saena-experiment-attribution"
+version = "0.1.0"
+source = { editable = "services/experimentation/experiment-attribution-service" }
+dependencies = [
+    { name = "asyncpg" },
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asyncpg", specifier = ">=0.30,<1" },
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+    { name = "sqlalchemy", specifier = ">=2.0.36,<3" },
+]
+
+[[package]]
 name = "saena-forge-console"
 version = "0.1.0"
 source = { editable = "services/platform/forge-console-api" }
@@ -1504,6 +1524,7 @@ dev = [
     { name = "saena-domain" },
     { name = "saena-engine-gateway" },
     { name = "saena-entity-resolution" },
+    { name = "saena-experiment-attribution" },
     { name = "saena-forge-console" },
     { name = "saena-forgectl" },
     { name = "saena-hooks-runtime" },
@@ -1550,6 +1571,7 @@ dev = [
     { name = "saena-domain", editable = "packages/domain" },
     { name = "saena-engine-gateway", editable = "services/platform/engine-adapter-gateway" },
     { name = "saena-entity-resolution", editable = "services/intelligence/entity-resolution-service" },
+    { name = "saena-experiment-attribution", editable = "services/experimentation/experiment-attribution-service" },
     { name = "saena-forge-console", editable = "services/platform/forge-console-api" },
     { name = "saena-forgectl", editable = "tools/forgectl" },
     { name = "saena-hooks-runtime", editable = "packages/hooks-runtime" },
