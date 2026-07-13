@@ -98,6 +98,60 @@ class TenantScopedQuery:
             sql += f" LIMIT {int(self.limit)}"
         return sql, dict(self.params)
 
+    def to_deduplicated_select_sql(
+        self,
+        *,
+        columns: tuple[str, ...] = ("*",),
+        dedup_by: tuple[str, ...] = ("tenant_id", "idempotency_key"),
+        winner_order: tuple[str, ...] = ("id",),
+    ) -> tuple[str, dict[str, Any]]:
+        """Render a `(sql, params)` SELECT that collapses each `dedup_by`
+        group to ONE deterministic logical row, THEN applies display ordering
+        and the pagination `limit`.
+
+        This is the r4-02 follow-on fix: ClickHouse's insert `dedup_token`
+        only deduplicates *physically* within the table's bounded
+        `non_replicated_deduplication_window`; a duplicate replay delayed
+        beyond that window lands as a second physical row. Every read path
+        (`store.get_observations`/`get_citations`/`get_experiment_registrations`)
+        therefore performs its OWN query-time LOGICAL dedup so a caller always
+        observes each `(tenant_id, idempotency_key)` exactly once, independent
+        of the physical window.
+
+        Winner rule (deterministic + wall-clock independent): the row minimal
+        under `winner_order` — default the row `id` (a stable, unique,
+        content-derived tie-breaker; NOT `ingested_at`, which is a server-side
+        wall-clock `DEFAULT now64()` and would make the winner nondeterministic
+        across replays). Implemented with `ORDER BY <winner> LIMIT 1 BY
+        <dedup_by>` in an inner query.
+
+        Collision policy (same `(tenant_id, idempotency_key)`, DIFFERENT
+        payload — a producer contract violation): the query does NOT silently
+        pick an arbitrary row; it deterministically returns the
+        `winner_order`-minimal (default lexicographically-minimal `id`) row,
+        every time, on every replica. This is a fixed, explicit, deterministic
+        resolution — never wall-clock- or insert-order-dependent.
+
+        The pagination `limit` is applied in the OUTER query, AFTER dedup, so
+        it bounds distinct logical rows, never physical duplicates. The
+        `tenant_id` predicate + time-range are applied in the INNER query,
+        BEFORE dedup, so dedup happens within the requested window.
+        """
+        column_sql = ", ".join(columns)
+        where = " AND ".join(self.where_sql)
+        dedup_cols = ", ".join(dedup_by)
+        winner_sql = ", ".join(f"{col} ASC" for col in winner_order)
+        inner = (
+            f"SELECT {column_sql} FROM {self.table} WHERE {where} "
+            f"ORDER BY {winner_sql} LIMIT 1 BY {dedup_cols}"
+        )
+        # Deterministic display order over the deduplicated set (occurred_at is
+        # the table's own time key; `id` breaks ties stably).
+        sql = f"SELECT {column_sql} FROM ({inner}) ORDER BY {self.order_by}, id"
+        if self.limit is not None:
+            sql += f" LIMIT {int(self.limit)}"
+        return sql, dict(self.params)
+
 
 class AnalyticsQuery:
     """Entry point — the ONLY way to obtain a `TenantScopedQuery`."""

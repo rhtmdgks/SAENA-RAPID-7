@@ -134,7 +134,22 @@ def require_known_table(table: str) -> None:
 # docstring) + `ORDER BY (tenant_id, occurred_at, id)` (tenant_id-prefixed,
 # per-tenant partitioning FORBIDDEN — ADR-0007 rev.2 §5) on every table.
 
-_DEDUP_WINDOW_SETTINGS = "SETTINGS non_replicated_deduplication_window = 1000"
+#: Production physical-dedup window (blocks). Read paths do NOT depend on this
+#: for correctness — they perform query-time LOGICAL dedup (see store.py
+#: `get_*` / query.py `to_deduplicated_select_sql`), so a duplicate replay
+#: delayed beyond this window is still observed exactly once. The window only
+#: bounds how far apart two physical copies can be while ClickHouse still
+#: collapses them at insert time.
+DEFAULT_DEDUP_WINDOW = 1000
+
+
+def _dedup_window_settings(deduplication_window: int) -> str:
+    if deduplication_window < 0:
+        raise ValueError(f"deduplication_window must be >= 0, got {deduplication_window}")
+    return f"SETTINGS non_replicated_deduplication_window = {int(deduplication_window)}"
+
+
+_DEDUP_WINDOW_SETTINGS = _dedup_window_settings(DEFAULT_DEDUP_WINDOW)
 
 # `dedup_witness` (r4-02): adapter-internal bookkeeping column, NEVER part of
 # any public `rows.py` dataclass and NEVER selected by any `get_*` query
@@ -148,7 +163,9 @@ _DEDUP_WINDOW_SETTINGS = "SETTINGS non_replicated_deduplication_window = 1000"
 # directly since no real deployment has ingested data through this
 # still-unreleased (Wave 4 remediation) schema yet.
 
-_CREATE_OBSERVATIONS = f"""
+
+def _observations_ddl(settings: str) -> str:
+    return f"""
 CREATE TABLE IF NOT EXISTS observations
 (
     tenant_id String,
@@ -167,10 +184,12 @@ CREATE TABLE IF NOT EXISTS observations
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (tenant_id, occurred_at, id)
-{_DEDUP_WINDOW_SETTINGS}
+{settings}
 """.strip()
 
-_CREATE_CITATIONS = f"""
+
+def _citations_ddl(settings: str) -> str:
+    return f"""
 CREATE TABLE IF NOT EXISTS citations
 (
     tenant_id String,
@@ -188,10 +207,12 @@ CREATE TABLE IF NOT EXISTS citations
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (tenant_id, occurred_at, id)
-{_DEDUP_WINDOW_SETTINGS}
+{settings}
 """.strip()
 
-_CREATE_EXPERIMENT_REGISTRATIONS = f"""
+
+def _experiment_registrations_ddl(settings: str) -> str:
+    return f"""
 CREATE TABLE IF NOT EXISTS experiment_registrations
 (
     tenant_id String,
@@ -209,8 +230,28 @@ CREATE TABLE IF NOT EXISTS experiment_registrations
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(occurred_at)
 ORDER BY (tenant_id, occurred_at, id)
-{_DEDUP_WINDOW_SETTINGS}
+{settings}
 """.strip()
+
+
+def create_table_statements(
+    *, deduplication_window: int = DEFAULT_DEDUP_WINDOW
+) -> tuple[str, str, str]:
+    """The three `CREATE TABLE IF NOT EXISTS` statements, with a configurable
+    physical-dedup window. Production uses `DEFAULT_DEDUP_WINDOW`; a test that
+    needs to force a physical duplicate PAST the window (to prove query-time
+    logical dedup still collapses it) passes a small value (e.g. 1)."""
+    settings = _dedup_window_settings(deduplication_window)
+    return (
+        _observations_ddl(settings),
+        _citations_ddl(settings),
+        _experiment_registrations_ddl(settings),
+    )
+
+
+_CREATE_OBSERVATIONS, _CREATE_CITATIONS, _CREATE_EXPERIMENT_REGISTRATIONS = create_table_statements(
+    deduplication_window=DEFAULT_DEDUP_WINDOW
+)
 
 _DROP_OBSERVATIONS = "DROP TABLE IF EXISTS observations"
 _DROP_CITATIONS = "DROP TABLE IF EXISTS citations"
@@ -281,9 +322,11 @@ def migrate_down(executor: object, *, migrations: tuple[Migration, ...] = MIGRAT
 
 
 __all__ = [
+    "DEFAULT_DEDUP_WINDOW",
     "MIGRATIONS",
     "TABLE_NAMES",
     "Migration",
+    "create_table_statements",
     "migrate_down",
     "migrate_up",
     "require_known_table",

@@ -102,24 +102,33 @@ raises on a duplicate; it never did, and this fix does not change that.
 
 Physical vs logical guarantee (explicit split, per r4-02 instructions)
 ------------------------------------------------------------------------------
-- LOGICAL dedup: unconditional, for the lifetime of this store — every
-  `get_*` query is a plain `SELECT` (no `FINAL`) and is guaranteed to never
-  observe more than one row for a given `(tenant_id, idempotency_key)` pair
-  AS LONG AS the physical guarantee below holds (i.e. within the
-  configured dedup window). This module does not offer an unconditional
-  logical guarantee independent of the physical one — see below.
-- PHYSICAL dedup: guaranteed WITHIN `non_replicated_deduplication_window`
-  (1000 most-recently-inserted blocks, `schema.py`) — ClickHouse retires the
-  oldest tracked block hash once the window is exceeded, per
-  `system.merge_tree_settings` semantics. A duplicate insert for the SAME
-  `(tenant_id, idempotency_key)` that arrives after >1000 OTHER blocks have
-  since been inserted into the SAME table is outside the window and is NOT
-  guaranteed to be caught — this is a real, disclosed limitation of
-  block-count-bounded dedup (there is no `non_replicated_deduplication_
-  window_seconds` variant in this ClickHouse version, confirmed against the
-  same live-server probe), not a hidden one. `TTL`/retention is a separate,
-  already-OPEN decision (`schema.py`) — the dedup window is orthogonal to
-  data retention and does not depend on it.
+- LOGICAL dedup: UNCONDITIONAL and INDEPENDENT of the physical window — every
+  `get_*` query performs query-time dedup (`query.py`'s
+  `to_deduplicated_select_sql`: an inner `ORDER BY id LIMIT 1 BY (tenant_id,
+  idempotency_key)` collapses each key group to one deterministic winner, then
+  the outer query applies display ordering + pagination AFTER dedup). So even
+  if TWO physical rows exist for the same `(tenant_id, idempotency_key)`
+  (because a duplicate replay arrived beyond the physical window below), a
+  caller observes EXACTLY ONE. This holds for `get_observations`,
+  `get_citations`, and `get_experiment_registrations`, for all time-range and
+  pagination arguments (the pagination `limit` bounds distinct logical rows,
+  never physical duplicates).
+  - Winner rule (deterministic, wall-clock independent): the row with the
+    lexicographically-minimal `id` — a stable, unique, content-derived
+    tie-breaker (NOT `ingested_at`, a server-side `now64()` wall-clock).
+  - Same-key / DIFFERENT-payload collision (a producer contract violation):
+    resolved by the SAME deterministic rule — the minimal-`id` row is returned,
+    every time, on every replica. This is an explicit, fixed policy, not a
+    silent arbitrary pick.
+- PHYSICAL dedup: an OPTIMIZATION, not relied on for read correctness.
+  Guaranteed WITHIN `non_replicated_deduplication_window`
+  (`schema.DEFAULT_DEDUP_WINDOW` = 1000 most-recently-inserted blocks) —
+  ClickHouse retires the oldest tracked block hash once the window is
+  exceeded. A duplicate insert arriving after more than that many OTHER blocks
+  is NOT collapsed physically (no `non_replicated_deduplication_window_seconds`
+  variant in this ClickHouse version, confirmed live) — but the LOGICAL dedup
+  above still makes it invisible to every reader. `TTL`/retention is a separate
+  OPEN decision, orthogonal to the dedup window.
 
 Late/out-of-order tolerance is unchanged by this fix: an `occurred_at` older
 than already-ingested rows is still accepted unconditionally (no
@@ -551,7 +560,7 @@ class ClickHouseAnalyticsStore:
         )
         if limit is not None:
             query = query.with_limit(limit)
-        sql, params = query.to_select_sql(columns=_OBSERVATIONS_SELECT_COLUMNS)
+        sql, params = query.to_deduplicated_select_sql(columns=_OBSERVATIONS_SELECT_COLUMNS)
         return tuple(
             _observation_from_values(tuple(row)) for row in self._executor.query(sql, params)
         )
@@ -569,7 +578,7 @@ class ClickHouseAnalyticsStore:
         )
         if limit is not None:
             query = query.with_limit(limit)
-        sql, params = query.to_select_sql(columns=_CITATIONS_SELECT_COLUMNS)
+        sql, params = query.to_deduplicated_select_sql(columns=_CITATIONS_SELECT_COLUMNS)
         return tuple(_citation_from_values(tuple(row)) for row in self._executor.query(sql, params))
 
     def get_experiment_registrations(
@@ -585,7 +594,9 @@ class ClickHouseAnalyticsStore:
         )
         if limit is not None:
             query = query.with_limit(limit)
-        sql, params = query.to_select_sql(columns=_EXPERIMENT_REGISTRATIONS_SELECT_COLUMNS)
+        sql, params = query.to_deduplicated_select_sql(
+            columns=_EXPERIMENT_REGISTRATIONS_SELECT_COLUMNS
+        )
         return tuple(
             _experiment_registration_from_values(tuple(row))
             for row in self._executor.query(sql, params)

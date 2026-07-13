@@ -89,9 +89,11 @@ vector-concurrency:
     uv run pytest -q -m integration tests/integration/vector -p no:cacheprovider
 
 # r4-02: ClickHouse distributed idempotency (server-side dedup token, multi-writer)
+# + query-time LOGICAL dedup independent of the physical window (get_* returns
+# one row per (tenant_id, idempotency_key) even when a duplicate lands physically).
 analytics-idempotency:
     uv run pytest tests/unit/analytics_clickhouse -q
-    uv run pytest -q -m integration tests/integration/clickhouse/test_idempotency_distributed.py -p no:cacheprovider
+    uv run pytest -q -m integration tests/integration/clickhouse/test_idempotency_distributed.py tests/integration/clickhouse/test_logical_dedup_beyond_window.py -p no:cacheprovider
 
 # r4-03: experiment ledger chain-entry hash commits previous_hash (reorder/relink adversarial)
 experiment-chain-adversarial:

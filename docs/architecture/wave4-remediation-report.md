@@ -52,14 +52,31 @@ them to the author, and re-verified the round-2 fix (see below).
   column lets `append_*` report `True`/`False` honestly (never gating the
   insert). No `saena_domain` import (package is a standalone leaf); reuses the
   ON-CONFLICT *principle*, not the code.
-- **Physical vs logical (disclosed)**: physical dedup holds within the 1000-block
-  window (no non-replicated `_seconds` variant in this CH version); outside it a
-  sufficiently delayed duplicate is not guaranteed. `append_*`'s bool return is
-  documented as "was I the first-observed writer," not a relational-unique claim.
+- **Physical vs logical (corrected in round 2 — see below)**: physical dedup
+  holds within the 1000-block window; the read paths now perform their OWN
+  query-time LOGICAL dedup, so a duplicate delayed beyond the window is still
+  observed exactly once.
+- **Round-2 MUST-FIX (query-time logical dedup)**: the round-1 store/report
+  CLAIMED a beyond-window duplicate would still be logically observed once, but
+  `get_observations`/`get_citations`/`get_experiment_registrations` used a plain
+  `SELECT` with NO dedup — the claim was false. Fixed: `query.py`'s
+  `to_deduplicated_select_sql` wraps each read in `... ORDER BY id LIMIT 1 BY
+  (tenant_id, idempotency_key)` (inner) + display-order + pagination (outer), so
+  every read returns exactly one deterministic row per key. Winner rule:
+  lexicographically-minimal `id` (stable, content-derived, NOT wall-clock
+  `ingested_at`). Pagination limit applies AFTER dedup. Same-key/different-payload
+  collision (a producer contract violation) resolves deterministically to the
+  minimal-`id` row — a fixed, explicit policy, never a silent arbitrary pick.
 - **Adversarial evidence** (real clickhouse:24.8): 20 concurrent → exactly 1
   physical row (tally True=1/False=19); all 3 tables; cross-tenant non-collision;
-  crash/retry/resend. 19 integration (stable 5×) + 109 unit.
-- **Lead verification**: PASS — re-ran the live distributed-idempotency suite (8 passed).
+  crash/retry/resend (`test_idempotency_distributed.py`). Round-2 logical-dedup
+  proof (`test_logical_dedup_beyond_window.py`, window shrunk to 1): a replay
+  delayed past the window lands as a 2nd PHYSICAL row (`count()==2`) yet `get_*`
+  returns exactly 1 — for all 3 tables + cross-tenant + time-range + pagination +
+  deterministic collision resolution. 46 clickhouse integration + 156 unit.
+- **Lead verification**: PASS — re-ran the live distributed-idempotency + the new
+  logical-dedup-beyond-window suites (all passed); confirmed `count()==2` physical
+  vs 1 logical directly.
 
 ### r4-03 — experiment ledger chain integrity (integration SHA `dd82859`)
 - **Root cause**: `compute_experiment_hash` excluded `previous_hash`, and that
@@ -132,9 +149,11 @@ them to the author, and re-verified the round-2 fix (see below).
 
 ## Residual / OPEN (not packaged as PASS)
 - r4-02 physical exactly-once is **window-bounded** (1000 blocks), not
-  unconditional — a duplicate delayed beyond the window is caught logically
-  (query-time), not physically. Disclosed in the store docstring + API return
-  semantics.
+  unconditional. This is no longer a correctness gap for readers: query-time
+  LOGICAL dedup (`to_deduplicated_select_sql`) is UNCONDITIONAL, so a duplicate
+  delayed beyond the physical window is still observed exactly once by every
+  `get_*`. The physical window is now purely a storage optimization (fewer
+  duplicate rows on disk), not a read-correctness dependency.
 - r4-04 `query_digest` is an optional, keyed, deliberately tenant-global
   correlation primitive (unused by the pipeline). A signing-key holder can
   correlate the same query across tenants via the digest; without the key it is

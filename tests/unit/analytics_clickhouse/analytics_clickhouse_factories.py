@@ -57,6 +57,14 @@ _EQ_PARAM_RE = re.compile(r"^eq_(.+)_(\d+)$")
 _FROM_RE = re.compile(r"FROM\s+(\w+)", re.IGNORECASE)
 _SELECT_RE = re.compile(r"SELECT\s+(.+?)\s+FROM", re.IGNORECASE)
 _LIMIT_RE = re.compile(r"LIMIT\s+(\d+)", re.IGNORECASE)
+# r4-02 follow-on: the dedup SELECT nests `... ORDER BY <winner> LIMIT 1 BY
+# <dedup cols>` inside an outer `... ORDER BY <display> [LIMIT <pagination>]`.
+# This fake must simulate ClickHouse's `LIMIT 1 BY` LOGICAL dedup (one row per
+# BY-group, the winner-order-minimal), then apply the OUTER pagination limit —
+# matching what the real server does (verified by the live integration suite).
+_LIMIT_1_BY_RE = re.compile(r"LIMIT\s+1\s+BY\s+([\w,\s]+?)\s*\)", re.IGNORECASE)
+_INNER_WINNER_ORDER_RE = re.compile(r"ORDER BY\s+([\w,\s]+?)\s+LIMIT\s+1\s+BY", re.IGNORECASE)
+_OUTER_LIMIT_RE = re.compile(r"LIMIT\s+(\d+)\s*$", re.IGNORECASE)
 _DDL_TABLE_RE = re.compile(
     r"(?:CREATE|DROP)\s+TABLE\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(\w+)", re.IGNORECASE
 )
@@ -108,9 +116,34 @@ class FakeClickHouseExecutor:
         with self._lock:
             rows = list(self.tables.get(table, []))
         filtered = [row for row in rows if _matches(row, params)]
-        limit_match = _LIMIT_RE.search(sql)
-        if limit_match is not None:
-            filtered = filtered[: int(limit_match.group(1))]
+        dedup_match = _LIMIT_1_BY_RE.search(sql)
+        if dedup_match is not None:
+            # Simulate `ORDER BY <winner> LIMIT 1 BY <cols>`: one row per BY
+            # group, the winner-order-minimal (stable, deterministic).
+            dedup_cols = [c.strip() for c in dedup_match.group(1).split(",") if c.strip()]
+            winner_m = _INNER_WINNER_ORDER_RE.search(sql)
+            winner_cols = (
+                [c.strip().split()[0] for c in winner_m.group(1).split(",") if c.strip()]
+                if winner_m is not None
+                else ["id"]
+            )
+            winners: dict[tuple[Any, ...], tuple[tuple[Any, ...], dict[str, Any]]] = {}
+            for row in filtered:
+                group_key = tuple(row.get(c) for c in dedup_cols)
+                winner_key = tuple(row.get(c) for c in winner_cols)
+                current = winners.get(group_key)
+                if current is None or winner_key < current[0]:
+                    winners[group_key] = (winner_key, row)
+            filtered = [row for _, row in winners.values()]
+            # Outer display order (deterministic): occurred_at, id.
+            filtered.sort(key=lambda r: (r.get("occurred_at"), r.get("id")))
+            outer_match = _OUTER_LIMIT_RE.search(sql)
+            if outer_match is not None:
+                filtered = filtered[: int(outer_match.group(1))]
+        else:
+            limit_match = _LIMIT_RE.search(sql)
+            if limit_match is not None:
+                filtered = filtered[: int(limit_match.group(1))]
         columns = _select_columns(sql)
         return [tuple(row.get(column) for column in columns) for row in filtered]
 
