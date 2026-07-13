@@ -85,18 +85,107 @@ def _docker_available() -> bool:
 _DOCKER_AVAILABLE = _docker_available()
 
 
+#: The container-free guard self-test module — it spawns pytest subprocesses
+#: and asserts exit codes, needs NO Docker, and must run on every host to prove
+#: the required-lane guard. EXEMPT from the Docker-absent skip below and from
+#: the sessionfinish container accounting.
+_CONTAINER_FREE_GUARD_MODULE = "test_failure_required_guard.py"
+
+
+def _is_guard_selftest(item: pytest.Item) -> bool:
+    return Path(str(item.fspath)).name == _CONTAINER_FREE_GUARD_MODULE
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     if _DOCKER_AVAILABLE:
         return
     skip_marker = pytest.mark.skip(reason="Docker daemon not reachable — honest skip (ADR-0017)")
     for item in items:
-        if "integration" in item.keywords:
+        if "integration" in item.keywords and not _is_guard_selftest(item):
             item.add_marker(skip_marker)
 
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "integration: real-I/O test requiring a reachable Docker daemon (ADR-0017)"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Required-mode fail-closed guard (MUST-FIX B). The honest Docker-absent skip
+# above must NOT let this required failure-mode lane pass without running the
+# real-Postgres failure/replay/rollback/conflict rows. When
+# `SAENA_MEASUREMENT_FAILURE_REQUIRED=1` (set only by the
+# `just measurement-failure-modes` named gate + its CI job), ANY skipped
+# integration test in this directory — or ZERO passed — is a HARD FAILURE
+# (non-zero, non-5 exit). Optional/local invocation (flag unset) keeps the
+# honest skip. Same mechanism as the E2E lane's required guard.
+_FAILURE_REQUIRED_ENV_VAR = "SAENA_MEASUREMENT_FAILURE_REQUIRED"
+_FAILURE_HARD_FAIL_EXIT = 6
+_FAILURE_OUTCOMES: dict[str, set[str]] = {"passed": set(), "skipped": set(), "failed": set()}
+
+
+def _this_dir_integration_nodes(session: pytest.Session) -> set[str]:
+    return {
+        item.nodeid
+        for item in session.items
+        if _THIS_DIR in Path(str(item.fspath)).resolve().parents
+        and "integration" in item.keywords
+        and not _is_guard_selftest(item)
+    }
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    if report.when == "setup" and report.outcome == "skipped":
+        _FAILURE_OUTCOMES["skipped"].add(report.nodeid)
+    elif report.when == "call":
+        _FAILURE_OUTCOMES.setdefault(report.outcome, set()).add(report.nodeid)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    if os.environ.get(_FAILURE_REQUIRED_ENV_VAR) != "1":
+        return
+    nodes = _this_dir_integration_nodes(session)
+    if not nodes:
+        session.exitstatus = _FAILURE_HARD_FAIL_EXIT
+        _report_hard_fail(
+            session,
+            [
+                f"ZERO required failure-mode integration tests collected while "
+                f"{_FAILURE_REQUIRED_ENV_VAR}=1 (naming typo / -k/-m mismatch / "
+                "import error)"
+            ],
+        )
+        return
+    skipped = nodes & _FAILURE_OUTCOMES["skipped"]
+    passed = nodes & _FAILURE_OUTCOMES["passed"]
+    reasons: list[str] = []
+    if skipped:
+        reasons.append(
+            f"{len(skipped)} of {len(nodes)} REQUIRED failure-mode integration test(s) "
+            "were SKIPPED (Docker/Postgres absent or a fixture turned an infra failure "
+            "into a skip)"
+        )
+    if not passed:
+        reasons.append("ZERO required failure-mode integration tests PASSED")
+    if reasons:
+        session.exitstatus = _FAILURE_HARD_FAIL_EXIT
+        _report_hard_fail(session, reasons)
+
+
+def _report_hard_fail(session: pytest.Session, reasons: list[str]) -> None:
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is None:
+        return
+    sep = "\n  - "
+    reporter.write_line(
+        f"\n{_FAILURE_REQUIRED_ENV_VAR}=1 HARD FAILURE (exit {_FAILURE_HARD_FAIL_EXIT}):{sep}"
+        + sep.join(reasons)
+        + "\n  A required failure-mode lane must actually RUN its real-Postgres "
+        "failure/replay/rollback/conflict rows — never a green '0 passed, N skipped'. "
+        "Run on a host with Docker present, or invoke without "
+        f"{_FAILURE_REQUIRED_ENV_VAR} for the optional/local lane.",
+        red=True,
     )
 
 

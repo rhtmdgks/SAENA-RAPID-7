@@ -234,6 +234,64 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_marker)
 
 
+# --------------------------------------------------------------------------- #
+# Required-mode fail-closed guard (MUST-FIX A): in REQUIRED mode the honest
+# per-item skips above must NOT let the lane pass with the real-container
+# scenarios un-run. `pytest_collection_finish` only catches ZERO COLLECTED; it
+# does NOT catch "collected but all skipped" (infra absent → 24 collected, 19
+# skipped, exit 0 = fail-open). This guard closes that: after the session, when
+# `SAENA_MEASUREMENT_E2E_REQUIRED=1`, ANY skipped required container test — or
+# ZERO passed — is a HARD FAILURE (non-zero, non-5 exit). Docker/ClickHouse/
+# Temporal absence all surface as skips, so this one check covers every
+# infra-absence, dependency-missing, and partial-skip path uniformly.
+_HARD_FAIL_EXIT = 6
+_OUTCOMES: dict[str, set[str]] = {"passed": set(), "skipped": set(), "failed": set()}
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    # A setup-phase skip (fixture pytest.skip — how Docker/ClickHouse/Temporal
+    # absence surfaces) reports at when=="setup"; a pass/fail at when=="call".
+    if report.when == "setup" and report.outcome == "skipped":
+        _OUTCOMES["skipped"].add(report.nodeid)
+    elif report.when == "call":
+        _OUTCOMES.setdefault(report.outcome, set()).add(report.nodeid)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    if os.environ.get(_REQUIRED_ENV_VAR) != "1":
+        return
+    container_nodes = {
+        item.nodeid for item in _this_dir_items(session.items) if _needs_containers(item)
+    }
+    if not container_nodes:
+        # Zero required container items collected — already a hard failure via
+        # pytest_collection_finish (UsageError); nothing to add here.
+        return
+    skipped = container_nodes & _OUTCOMES["skipped"]
+    passed = container_nodes & _OUTCOMES["passed"]
+    reasons: list[str] = []
+    if skipped:
+        reasons.append(
+            f"{len(skipped)} of {len(container_nodes)} REQUIRED real-container E2E "
+            "test(s) were SKIPPED (infra absent: Docker/ClickHouse/Temporal, a missing "
+            "runtime dependency, or a fixture that turned an infra failure into a skip)"
+        )
+    if not passed:
+        reasons.append("ZERO required real-container E2E tests PASSED")
+    if reasons:
+        session.exitstatus = _HARD_FAIL_EXIT
+        sep = "\n  - "
+        session.config.pluginmanager.get_plugin("terminalreporter").write_line(
+            f"\nSAENA_MEASUREMENT_E2E_REQUIRED=1 HARD FAILURE (exit {_HARD_FAIL_EXIT}):{sep}"
+            + sep.join(reasons)
+            + "\n  A required real-container lane must actually RUN its Postgres 16 / "
+            "ClickHouse 24.8 / Temporal time-skipping scenarios — never a green "
+            "'0 passed, N skipped'. Run on a host with Docker present, or invoke "
+            "without SAENA_MEASUREMENT_E2E_REQUIRED for the optional/local lane.",
+            red=True,
+        )
+
+
 def run_async(coro):  # noqa: ANN001, ANN201
     """The `asyncio.run` driver every test in this suite uses, injected as a
     fixture below (never imported directly — see `measurement_pg/conftest.py`

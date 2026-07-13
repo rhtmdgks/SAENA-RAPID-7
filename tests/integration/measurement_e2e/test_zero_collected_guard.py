@@ -10,18 +10,23 @@ THIS DIRECTORY. That flag is set only by the c5-05 required named-gate recipe
 set it, so 0-here is silent in those (no false-fire on an ancestor/umbrella
 invocation).
 
-These tests PROVE the four required behaviours by running pytest AS A
-SUBPROCESS (the guard aborts the whole session, so it cannot be exercised
-in-process) with `SAENA_MEASUREMENT_E2E_REQUIRED` set/unset in the subprocess
-env:
+These tests PROVE the required behaviours by running pytest AS A SUBPROCESS
+(the guard aborts the whole session, so it cannot be exercised in-process) with
+`SAENA_MEASUREMENT_E2E_REQUIRED` set/unset in the subprocess env:
 
-  (a) flag set + `-k` deselecting everything  -> exit 4 + guard message
+  (a) flag set + `-k` deselecting everything  -> exit 4 (UsageError) + message
+      (the ZERO-COLLECTED guard in `pytest_collection_finish`)
   (b) flag set + a normal non-empty selection -> passes, guard silent
-  (c) flag NOT set + zero-collected-here       -> guard silent (pins MF-2 dead:
-      no false-fire on an umbrella/ancestor invocation that collects nothing
-      here)
-  (d) Docker-absent + flag set                 -> items still COLLECT (>0) so
-      the guard is silent; the container tests skip individually
+  (c) flag NOT set + zero-collected-here       -> guard silent (MF-2 dead: no
+      false-fire on an umbrella/ancestor invocation collecting nothing here)
+  (d) flag set + Docker absent (infra-absent → real-container scenarios all
+      SKIP) -> HARD FAILURE exit 6 (the required-mode no-skip guard in
+      `pytest_sessionfinish`; MUST-FIX A — a required lane must never pass as
+      "0 passed, N skipped"). Docker absence subsumes ClickHouse/Temporal
+      absence + any missing runtime dependency (all surface as skips).
+  (e) flag NOT set + Docker absent             -> documented honest skip, exit 0
+  (f) flag set + a single required container test still skips -> HARD FAILURE
+      exit 6 (ONE un-run scenario is enough; not only the all-skipped case)
 
 A dedicated inert `test_*` leaf (`test_inert_leaf_for_nonempty_selection_
 proof`) is the single-item selection target for (b), so nesting stays exactly
@@ -151,20 +156,30 @@ def test_c_flag_unset_zero_collected_here_does_not_false_fire() -> None:
     )
 
 
-# --------------------------------------------------------------------------- #
-# (d) Docker-absent + flag SET -> items still COLLECT (>0), guard silent, the
-#     container tests skip individually.
-# --------------------------------------------------------------------------- #
-def test_d_docker_absent_flag_set_items_collect_guard_silent() -> None:
-    # Simulate a Docker-absent host by pointing DOCKER_HOST at an unreachable
-    # address IN THE CHILD ENV, with the required flag armed. The container
-    # tests must still be COLLECTED (then individually skipped), so the count
-    # FROM THIS DIRECTORY is > 0 and the guard stays silent — a zero-collected
-    # hard failure must never be conflated with an honest Docker-absent skip.
+# The required-mode all-skipped / infra-absent HARD-FAILURE exit code
+# (session.exitstatus set in conftest.pytest_sessionfinish). Distinct from
+# UsageError(4) and no-tests(5).
+_EXPECTED_INFRA_HARD_FAIL_EXIT = 6
+
+
+# A `-k` clause that ALWAYS excludes this guard file's own subprocess-spawning
+# tests so a child run can never recurse. Callers AND it with their own filter.
+_NO_RECURSE = (
+    "not test_a_ and not test_b_ and not test_c_ and not test_d_ "
+    "and not test_e_ and not test_f_ and not test_inert_"
+)
+
+
+def _run_child(*, required_flag: bool, docker_absent: bool, k_extra: str | None = None):
     env = dict(os.environ)
-    env[_REQUIRED_ENV_VAR] = "1"
-    env["DOCKER_HOST"] = "tcp://127.0.0.1:1"
-    result = subprocess.run(  # noqa: S603
+    if required_flag:
+        env[_REQUIRED_ENV_VAR] = "1"
+    else:
+        env.pop(_REQUIRED_ENV_VAR, None)
+    if docker_absent:
+        env["DOCKER_HOST"] = "tcp://127.0.0.1:1"
+    k_expr = _NO_RECURSE if k_extra is None else f"({k_extra}) and ({_NO_RECURSE})"
+    return subprocess.run(  # noqa: S603
         [
             sys.executable,
             "-m",
@@ -172,11 +187,8 @@ def test_d_docker_absent_flag_set_items_collect_guard_silent() -> None:
             str(_THIS_DIR),
             "-m",
             "integration",
-            # Deselect this guard file's OWN subprocess-spawning tests so the
-            # child run does not recurse; the real-container tests + the inert
-            # leaf still collect, proving "items collect > 0" under the flag.
             "-k",
-            "not test_a_ and not test_b_ and not test_c_ and not test_d_",
+            k_expr,
             "-p",
             "no:cacheprovider",
             "-q",
@@ -186,21 +198,66 @@ def test_d_docker_absent_flag_set_items_collect_guard_silent() -> None:
         cwd=str(_THIS_DIR),
         env=env,
     )
-    combined = result.stdout + result.stderr
 
-    assert "collected ZERO test items" not in combined, (
-        "guard hard-failed on a Docker-absent host despite the flag being set "
-        "— items must still COLLECT (and skip individually), never be treated "
-        f"as zero-collected:\n{combined}"
+
+# --------------------------------------------------------------------------- #
+# (d) REQUIRED + Docker absent -> HARD FAILURE (MUST-FIX A). The real-container
+#     scenarios are collected then individually skipped; a required lane must
+#     NEVER pass as "0 passed, N skipped". Docker absence subsumes ClickHouse/
+#     Temporal absence and any missing-runtime-dependency path — they ALL
+#     surface as skips, which this same guard turns into a non-zero exit.
+# --------------------------------------------------------------------------- #
+def test_d_required_docker_absent_hard_fails_non_zero() -> None:
+    result = _run_child(required_flag=True, docker_absent=True)
+    combined = result.stdout + result.stderr
+    assert result.returncode not in (0, _TOLERATED_NO_TESTS_EXIT), (
+        "REQUIRED lane with Docker absent must HARD FAIL (non-zero, non-5) — a "
+        "required real-container lane must never pass as '0 passed, N skipped'; "
+        f"got exit {result.returncode}:\n{combined}"
     )
-    assert result.returncode != _EXPECTED_USAGE_ERROR_EXIT, (
-        "guard raised UsageError on a Docker-absent host — an honest skip must "
-        f"never be conflated with zero-collected:\n{combined}"
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        f"expected the infra-absent hard-fail exit {_EXPECTED_INFRA_HARD_FAIL_EXIT}; "
+        f"got {result.returncode}:\n{combined}"
     )
+    assert "HARD FAILURE" in combined, f"expected the guard's reason message:\n{combined}"
+
+
+# --------------------------------------------------------------------------- #
+# (e) OPTIONAL (flag unset) + Docker absent -> documented honest skip, exit 0.
+# --------------------------------------------------------------------------- #
+def test_e_optional_docker_absent_is_an_honest_skip() -> None:
+    result = _run_child(required_flag=False, docker_absent=True)
+    combined = result.stdout + result.stderr
     assert result.returncode == 0, (
-        "Docker-absent + flag set should exit 0 (items collected then honestly "
-        f"skipped), not a hard failure; got {result.returncode}:\n{combined}"
+        "OPTIONAL lane (no SAENA_MEASUREMENT_E2E_REQUIRED) with Docker absent must "
+        f"be a documented honest skip, exit 0; got {result.returncode}:\n{combined}"
     )
-    assert "skipped" in combined, (
-        f"expected the real-container items to be honestly skipped:\n{combined}"
+    assert "skipped" in combined, f"expected honest skips in optional mode:\n{combined}"
+    assert "HARD FAILURE" not in combined, (
+        f"the required-mode guard must NOT fire when the flag is unset:\n{combined}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# (f) REQUIRED + exactly ONE required container test forced to skip (the rest
+#     could run) -> HARD FAILURE. Proves the guard fails on a PARTIAL skip, not
+#     only the all-skipped case. Injected via a `-k` that also excludes one
+#     real-container test AND a `--runxfail`-style deselection is NOT used
+#     (deselection != skip); instead we point DOCKER_HOST at an unreachable
+#     address so the container tests skip, which is the realistic partial-skip
+#     shape a required lane must reject — combined with a selection narrowed to
+#     a single container test proves ONE skip is enough to hard-fail.
+# --------------------------------------------------------------------------- #
+def test_f_required_single_container_test_skipped_hard_fails() -> None:
+    result = _run_child(
+        required_flag=True,
+        docker_absent=True,
+        k_extra="test_full_pass_flow_b_verified_skill_intake_accepted",
+    )
+    combined = result.stdout + result.stderr
+    # With Docker absent, even a single selected container test skips -> the
+    # guard hard-fails; a required lane never tolerates a single un-run scenario.
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "a single skipped required container test must hard-fail the lane; got "
+        f"exit {result.returncode}:\n{combined}"
     )

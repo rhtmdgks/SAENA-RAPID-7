@@ -163,7 +163,11 @@ measurement-failure-modes:
     uv run pytest tests/unit/svc_experiment_attribution_pipeline -q
     # The completed failure-mode matrix (w5-20/c5-02): real Postgres crash/
     # replay/rollback/conflict + F-9 fraud repoint through the integrated engine.
-    uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
+    # SAENA_MEASUREMENT_FAILURE_REQUIRED=1 arms the conftest's required-lane
+    # guard: any skipped required integration test (Docker/Postgres absent) or
+    # zero passed is a HARD FAILURE (exit 6) — this required gate can never pass
+    # as a green "0 passed, N skipped".
+    SAENA_MEASUREMENT_FAILURE_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
 
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
