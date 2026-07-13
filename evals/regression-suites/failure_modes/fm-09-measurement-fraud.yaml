@@ -7,14 +7,27 @@ status: covered
 covering_axis: regression_suite_native
 covering_test: tests/unit/evals_harness/test_failure_mode_regression_suite.py::test_measurement_fraud_raw_lift_without_control_adjustment_rejected
 notes: >
-  Not one of the 9 mandatory eval axes, and — UNLIKE fm-01/02/03/04/06/07/08
-  — NOT backed by any existing repo module: no experiment-attribution /
-  measurement service code exists yet anywhere in this repo (services/
-  experimentation/experiment-attribution-service is an empty scaffold,
-  confirmed by directory search — no *.py under its src/). This check is a
-  harness-owned, spec-encoded rule (Algorithm §11.3 "business integrity:
-  원시 지표와 가중 종합 지표를 모두 표시") rather than a wrapper around real
-  production code, unlike every other covered mode in this mapping — flagged
-  honestly as a forward-looking regression check, to be superseded by a real
-  experiment-attribution-service check once that service lands (Wave 3+
-  "Learning Layer").
+  Not one of the 9 mandatory eval axes. `covering_test` (this file's own
+  mapping-completeness anchor) stays a harness-owned, spec-encoded rule
+  (Algorithm §11.3 "business integrity: 원시 지표와 가중 종합 지표를 모두
+  표시") unchanged — that check is intentionally independent of any specific
+  measurement-service implementation and is not repointed here.
+
+  W5 UPDATE (w5-20 F-9 repoint): the experiment-attribution-service now
+  EXISTS and owns the real B-layer gate (`saena_domain.measurement.did` +
+  `saena_domain.measurement.b_gate`, wired through
+  `services/experimentation/experiment-attribution-service`'s
+  `run_measurement` pipeline). `tests/security/measurement_fraud.py`
+  (the W3-era provisional evaluator this failure mode's
+  `wired_against`/`test` fields in `tests/security/failure_mode_matrix.json`
+  still name) is now a thin backward-compatible SHIM over that real engine
+  (see its own module docstring for the shim-vs-new-module decision and
+  rationale) rather than a second, divergent scalar reimplementation — its
+  public API (`evaluate_b_layer_success` et al.) is unchanged and every
+  existing importer (`tests/security/test_f9_measurement_fraud.py`) stays
+  green. The scenario is now ALSO proven end-to-end against the real,
+  integrated engine over real Postgres-backed ports at
+  `tests/integration/measurement_failure/test_f9_fraud_repoint.py::
+  test_fraud_signal_through_real_did_and_b_gate_never_passes` — the
+  production-path proof this mode's "forward-looking...to be superseded"
+  note anticipated.
