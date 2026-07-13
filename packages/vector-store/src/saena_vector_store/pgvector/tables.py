@@ -83,12 +83,45 @@ def create_index_sql() -> str:
     )
 
 
+def create_active_row_unique_index_sql() -> str:
+    """DB-ENFORCED active-row singularity invariant (r4-01 remediation).
+
+    A partial UNIQUE index — at most one `superseded = FALSE` row per
+    `(tenant_id, collection, record_id)` — is the actual invariant this
+    table must never violate; the pre-fix adapter relied SOLELY on an
+    application-level `SELECT ... FOR UPDATE` to serialize concurrent
+    upserts, but `FOR UPDATE` locks EXISTING rows only — on the first
+    upsert of a brand-new key there is no active row yet for it to lock,
+    so two concurrent first-upserts could both observe "no active row",
+    both proceed to INSERT, and both land as separate `superseded = FALSE`
+    rows for the same key. The `pg_advisory_xact_lock` serialization added
+    in `pgvector/adapter.py` (`_upsert_one`) closes the race for every
+    upsert that goes through THIS adapter; this partial unique index is
+    the independent, DB-level backstop that makes a duplicate active row
+    physically impossible regardless of the application path that
+    produced it (a second writer bypassing the advisory lock, a future
+    direct-SQL migration, etc.) — a violation raises Postgres's own
+    `UniqueViolation` rather than silently admitting two active rows.
+
+    Partial (`WHERE superseded = FALSE`) rather than a plain unique index
+    over the whole table: multiple `superseded = TRUE` historical rows for
+    the same key are the INTENDED version-history shape (see
+    `list_versions`) — only the ACTIVE row must be unique per key.
+    """
+    return (
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_vector_records_active_key "
+        f"ON {qualified_table()} (tenant_id, collection, record_id) "
+        "WHERE superseded = FALSE"
+    )
+
+
 __all__ = [
     "CREATE_EXTENSION_SQL",
     "CREATE_SCHEMA_SQL",
     "SCHEMA_NAME",
     "TABLE_NAME",
     "TRUNCATE_SQL",
+    "create_active_row_unique_index_sql",
     "create_index_sql",
     "create_table_sql",
     "qualified_table",

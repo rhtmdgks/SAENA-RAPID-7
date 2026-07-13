@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from testcontainers.postgres import PostgresContainer
 
@@ -49,6 +50,12 @@ if str(_VECTOR_STORE_SRC) not in sys.path:
     sys.path.insert(0, str(_VECTOR_STORE_SRC))
 
 from saena_vector_store.pgvector.adapter import PgVectorStore  # noqa: E402
+from saena_vector_store.pgvector.tables import (  # noqa: E402
+    CREATE_EXTENSION_SQL,
+    create_index_sql,
+    create_table_sql,
+    qualified_table,
+)
 
 # The dimension every fixture record/query in this suite is built against —
 # baked into the `vector(N)` column at `create_schema()` time (see
@@ -162,6 +169,83 @@ def engine(postgres_url: str, _create_schema: None) -> Iterator[AsyncEngine]:
         throwaway = create_async_engine(postgres_url)
         try:
             await PgVectorStore.truncate(throwaway)
+        finally:
+            await throwaway.dispose()
+
+    _run(_truncate())
+
+    eng = create_async_engine(postgres_url)
+    yield eng
+
+    eng.sync_engine.dispose()
+
+
+# --- r4-01 remediation: unconstrained-schema fixture for the defect reproducer ---
+
+_UNCONSTRAINED_SCHEMA_NAME = "saena_vector_unconstrained_repro"
+_UNCONSTRAINED_TABLE_NAME = "vector_records"
+
+
+def _unconstrained_qualified_table() -> str:
+    return f'"{_UNCONSTRAINED_SCHEMA_NAME}"."{_UNCONSTRAINED_TABLE_NAME}"'
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _create_unconstrained_schema(postgres_url: str, _create_schema: None) -> None:
+    """A SEPARATE schema/table, structurally identical to the real
+    `saena_vector.vector_records` table EXCEPT it deliberately does NOT
+    have the partial unique index (`create_active_row_unique_index_sql`,
+    `pgvector/tables.py`) this remediation adds. Exists ONLY so
+    `test_pgvector_concurrency.py`'s reproducer
+    (`test_old_impl_first_upsert_race_produces_duplicate_active_rows`) can
+    prove the OLD `_upsert_one` logic's race genuinely happens, without
+    that proof being masked/blocked by the very DB constraint the fix
+    introduces (against the real, fixed schema, the old racy INSERT logic
+    would simply raise `UniqueViolation` on the second concurrent writer
+    instead of demonstrating the ORIGINAL failure mode — a duplicate
+    active row silently committed with no error at all). This schema is
+    genuinely reachable, real Postgres/pgvector — not a mock — just
+    missing the one constraint under reproduction."""
+
+    async def _do() -> None:
+        eng = create_async_engine(postgres_url)
+        try:
+            async with eng.begin() as conn:
+                await conn.execute(text(CREATE_EXTENSION_SQL))
+                await conn.execute(
+                    text(f'CREATE SCHEMA IF NOT EXISTS "{_UNCONSTRAINED_SCHEMA_NAME}"')
+                )
+                create_sql = create_table_sql(TEST_DIMENSION).replace(
+                    qualified_table(), _unconstrained_qualified_table()
+                )
+                await conn.execute(text(create_sql))
+                index_sql = (
+                    create_index_sql()
+                    .replace(qualified_table(), _unconstrained_qualified_table())
+                    .replace("ix_vector_records_lookup", "ix_vector_records_unconstrained_lookup")
+                )
+                await conn.execute(text(index_sql))
+        finally:
+            await eng.dispose()
+
+    _run(_do())
+
+
+@pytest.fixture
+def unconstrained_engine(
+    postgres_url: str, _create_unconstrained_schema: None
+) -> Iterator[AsyncEngine]:
+    """Function-scoped fresh `AsyncEngine` per test, bound to the
+    UNCONSTRAINED reproduction schema/table above — mirrors the `engine`
+    fixture's own per-test-TRUNCATE + fresh-engine discipline, scoped to
+    `_UNCONSTRAINED_SCHEMA_NAME` instead of the real `saena_vector` schema.
+    """
+
+    async def _truncate() -> None:
+        throwaway = create_async_engine(postgres_url)
+        try:
+            async with throwaway.begin() as conn:
+                await conn.execute(text(f"TRUNCATE TABLE {_unconstrained_qualified_table()}"))
         finally:
             await throwaway.dispose()
 
