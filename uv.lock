@@ -7,6 +7,7 @@ members = [
     "saena-agent-runner",
     "saena-artifact-registry",
     "saena-audit-ledger",
+    "saena-chatgpt-observer",
     "saena-domain",
     "saena-engine-gateway",
     "saena-forge-console",
@@ -21,6 +22,7 @@ members = [
     "saena-repository-intake",
     "saena-schemas",
     "saena-shared",
+    "saena-site-discovery",
     "saena-tenant-control",
     "saena-testing",
 ]
@@ -1243,6 +1245,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "saena-chatgpt-observer"
+version = "0.1.0"
+source = { editable = "services/acquisition/chatgpt-observer-service" }
+dependencies = [
+    { name = "saena-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
+
+[[package]]
 name = "saena-domain"
 version = "0.1.0"
 source = { editable = "packages/domain" }
@@ -1362,6 +1375,7 @@ dev = [
     { name = "saena-agent-runner" },
     { name = "saena-artifact-registry" },
     { name = "saena-audit-ledger" },
+    { name = "saena-chatgpt-observer" },
     { name = "saena-domain" },
     { name = "saena-engine-gateway" },
     { name = "saena-forge-console" },
@@ -1375,6 +1389,7 @@ dev = [
     { name = "saena-repository-intake" },
     { name = "saena-schemas" },
     { name = "saena-shared" },
+    { name = "saena-site-discovery" },
     { name = "saena-tenant-control" },
     { name = "saena-testing" },
     { name = "testcontainers" },
@@ -1400,6 +1415,7 @@ dev = [
     { name = "saena-agent-runner", editable = "services/platform/agent-runner-service" },
     { name = "saena-artifact-registry", editable = "services/platform/artifact-registry-service" },
     { name = "saena-audit-ledger", editable = "services/foundation/audit-ledger-service" },
+    { name = "saena-chatgpt-observer", editable = "services/acquisition/chatgpt-observer-service" },
     { name = "saena-domain", editable = "packages/domain" },
     { name = "saena-engine-gateway", editable = "services/platform/engine-adapter-gateway" },
     { name = "saena-forge-console", editable = "services/platform/forge-console-api" },
@@ -1413,6 +1429,7 @@ dev = [
     { name = "saena-repository-intake", editable = "services/acquisition/repository-intake-service" },
     { name = "saena-schemas", editable = "packages/schemas" },
     { name = "saena-shared", editable = "packages/shared" },
+    { name = "saena-site-discovery", editable = "services/acquisition/site-discovery-service" },
     { name = "saena-tenant-control", editable = "services/foundation/tenant-control-service" },
     { name = "saena-testing", editable = "packages/testing" },
     { name = "testcontainers", specifier = ">=4.9,<5" },
@@ -1573,6 +1590,17 @@ requires-dist = [{ name = "pydantic", specifier = ">=2,<3" }]
 name = "saena-shared"
 version = "0.1.0"
 source = { editable = "packages/shared" }
+
+[[package]]
+name = "saena-site-discovery"
+version = "0.1.0"
+source = { editable = "services/acquisition/site-discovery-service" }
+dependencies = [
+    { name = "saena-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
 
 [[package]]
 name = "saena-tenant-control"
