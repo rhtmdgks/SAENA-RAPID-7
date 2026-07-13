@@ -18,6 +18,7 @@ members = [
     "packages/domain",
     "packages/observability",
     "packages/hooks-runtime",
+    "services/acquisition/repository-intake-service",
     "services/foundation/tenant-control-service",
     "services/foundation/policy-gate-service",
     "services/foundation/audit-ledger-service",
@@ -54,6 +55,7 @@ dev = [
     "saena-engine-gateway",
     "saena-forgectl",
     "saena-hooks-runtime",
+    "saena-repository-intake",
     "datamodel-code-generator>=0.26,<1",
     "openapi-spec-validator>=0.7,<1",
     "pyyaml>=6,<7",
@@ -78,6 +80,7 @@ saena-artifact-registry = { workspace = true }
 saena-engine-gateway = { workspace = true }
 saena-forgectl = { workspace = true }
 saena-hooks-runtime = { workspace = true }
+saena-repository-intake = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"

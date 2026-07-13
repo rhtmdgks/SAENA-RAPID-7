@@ -13,6 +13,7 @@ root_packages =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
     saena_forgectl
     saena_hooks_runtime
 
@@ -48,6 +49,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
 
 [importlinter:contract:schemas-is-a-leaf]
 name = saena_schemas must not import other saena packages
@@ -67,6 +69,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
     saena_forgectl
 
 [importlinter:contract:domain-below-services]
@@ -85,6 +88,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
     saena_forgectl
 
 [importlinter:contract:observability-below-services]
@@ -103,6 +107,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
     saena_forgectl
 
 [importlinter:contract:forgectl-is-a-standalone-leaf]
@@ -123,6 +128,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
 
 [importlinter:contract:nothing-imports-forgectl]
 name = domain, observability and services must not import saena_forgectl
@@ -139,6 +145,7 @@ source_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
 forbidden_modules =
     saena_forgectl
 
@@ -161,6 +168,7 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
     saena_forgectl
 
 [importlinter:contract:nothing-imports-hooks-runtime]
@@ -178,6 +186,7 @@ source_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
     saena_forgectl
 forbidden_modules =
     saena_hooks_runtime
@@ -194,3 +203,4 @@ modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
