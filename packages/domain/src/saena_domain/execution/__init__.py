@@ -77,8 +77,32 @@ from saena_domain.execution.protocols import (
     HeartbeatSink,
     ProgressReporter,
 )
+from saena_domain.execution.skill_bundle import (
+    SkillBundle,
+    SkillBundleHashMalformedError,
+    SkillBundleHashMismatchError,
+    SkillBundleHashMissingError,
+    SkillBundleIntegrityError,
+    SkillBundleMissingError,
+    SkillBundleUnreadableError,
+    SkillBundleVerification,
+    compute_skill_bundle_hash,
+    read_skill_bundle,
+    verify_skill_bundle,
+)
 
 __all__ = [
+    "SkillBundle",
+    "SkillBundleHashMalformedError",
+    "SkillBundleHashMismatchError",
+    "SkillBundleHashMissingError",
+    "SkillBundleIntegrityError",
+    "SkillBundleMissingError",
+    "SkillBundleUnreadableError",
+    "SkillBundleVerification",
+    "compute_skill_bundle_hash",
+    "read_skill_bundle",
+    "verify_skill_bundle",
     "ALLOWED_ENGINE_IDS",
     "DEFAULT_RESOURCE_LIMITS",
     "JOB_KIND_PROFILES",

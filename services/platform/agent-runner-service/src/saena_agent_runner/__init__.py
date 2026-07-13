@@ -70,6 +70,12 @@ from saena_agent_runner.runner import (
     PatchUnitRequest,
     PatchUnitRunner,
 )
+from saena_agent_runner.skill_bundle import (
+    InMemorySkillBundleSource,
+    RecordingSkillBundleSource,
+    SkillBundleSource,
+    enforce_skill_bundle_integrity,
+)
 from saena_agent_runner.worktree import (
     CommandExecutor,
     CommandResult,
@@ -117,6 +123,10 @@ __all__ = [
     "PatchUnitOutcome",
     "PatchUnitRequest",
     "PatchUnitRunner",
+    "InMemorySkillBundleSource",
+    "RecordingSkillBundleSource",
+    "SkillBundleSource",
+    "enforce_skill_bundle_integrity",
     "PathTraversalError",
     "ProtectedPathWriteError",
     "RegisteredArtifactRef",

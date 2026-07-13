@@ -35,3 +35,10 @@ a0d05f0b2d5f199cf3acb53440162c3adced7f2c:tests/unit/svc_quality_eval/test_covera
 9072c4c6063bc1b7f113f5a104101f4817761999:tests/unit/hooks_runtime/test_redaction.py:aws-access-token:30
 9072c4c6063bc1b7f113f5a104101f4817761999:tests/unit/hooks_runtime/test_redaction.py:aws-access-token:32
 9072c4c6063bc1b7f113f5a104101f4817761999:tests/unit/hooks_runtime/test_redaction.py:private-key:43
+
+# w3-12 verified false positives (2026-07-13): planted fake AWS-token-shaped
+# string in the F-5 skill-bundle redaction test — used only to assert the
+# verifier's mismatch error/context/audit never echo raw bundle content. No
+# real credential. Suppressed by exact fingerprint per ADR-0020.
+12e40411950d2a08077f51cf8209e0447bc0dce9:tests/unit/domain_execution/test_skill_bundle.py:aws-access-token:136
+12e40411950d2a08077f51cf8209e0447bc0dce9:tests/unit/domain_execution/test_skill_bundle.py:aws-access-token:138

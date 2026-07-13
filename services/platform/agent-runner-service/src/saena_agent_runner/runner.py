@@ -48,6 +48,7 @@ from saena_domain.execution import (
     transition,
 )
 from saena_domain.execution.protocols import CancellationSignal
+from saena_domain.execution.skill_bundle import SkillBundleIntegrityError
 
 from saena_agent_runner import audit as audit_mod
 from saena_agent_runner import commands as commands_mod
@@ -65,6 +66,10 @@ from saena_agent_runner.errors import (
     JobCancelledError,
     JobTimedOutError,
     PatchUnitNotApprovedError,
+)
+from saena_agent_runner.skill_bundle import (
+    SkillBundleSource,
+    enforce_skill_bundle_integrity,
 )
 from saena_agent_runner.worktree import CommandExecutor, WorktreeFactory
 
@@ -151,6 +156,11 @@ class PatchUnitRunner:
     audit_chain: InMemoryAuditChain
     cancellation_signal: CancellationSignal | None = None
     clock: Clock = field(default_factory=SystemClock)
+    #: F-5 skill-bundle integrity boundary. When a run is pinned to an
+    #: `expected_skill_bundle_hash`, this source is read (before any worktree)
+    #: and the bundle content is verified against the pin. Left None only for
+    #: runs that carry no skill-bundle pin at all.
+    skill_bundle_source: SkillBundleSource | None = None
 
     def run(
         self,
@@ -160,14 +170,23 @@ class PatchUnitRunner:
         expected_contract_hash: str,
         approval: ApprovalDecision,
         requests: Sequence[PatchUnitRequest],
+        expected_skill_bundle_hash: str | None = None,
     ) -> JobRunResult:
-        """Execute `requests` against `contract`, fail-closed on approval.
+        """Execute `requests` against `contract`, fail-closed on approval AND
+        on skill-bundle integrity.
 
         Raises the underlying `ApprovalRequiredError` subclass (NEVER
         returns a partial `JobRunResult`) if `approval` does not authorize
         executing `contract` at all — this is the ADR-0003 boundary: no
         patch unit is ever attempted, no worktree is ever created, if
         approval verification itself fails.
+
+        Then, when `expected_skill_bundle_hash` is pinned, raises a
+        `SkillBundleIntegrityError` subclass (F-5, k3s §10) if the actual
+        skill bundle's content hash does not match — again BEFORE any worktree
+        is created or executor invoked. The whole-contract `contract_hash`
+        check inside `verify_approval` is the complementary defense; it does
+        not, and cannot, prove the bundle files themselves are unaltered.
         """
         try:
             approved_ids = verify_approval(
@@ -185,6 +204,25 @@ class PatchUnitRunner:
                 recorded_at=self.clock.now_iso(),
             )
             raise
+
+        # F-5 skill-bundle integrity — fail-closed, BEFORE any worktree /
+        # executor. Only enforced when the run carries a pin (a run with no
+        # skill bundle at all passes None and is not gated here).
+        if expected_skill_bundle_hash is not None:
+            try:
+                enforce_skill_bundle_integrity(
+                    expected_skill_bundle_hash=expected_skill_bundle_hash,
+                    source=self.skill_bundle_source,
+                    job_context=job_context,
+                )
+            except SkillBundleIntegrityError as exc:
+                audit_mod.record_skill_bundle_refused(
+                    self.audit_chain,
+                    job_context=job_context,
+                    error_code=exc.error_code,
+                    recorded_at=self.clock.now_iso(),
+                )
+                raise
 
         deadline_seconds = resource_limits_for(JobKind.AGENT_RUNNER).active_deadline_seconds
         start_time = self.clock.monotonic()

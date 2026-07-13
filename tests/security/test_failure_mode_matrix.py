@@ -124,6 +124,10 @@ def test_every_modes_primary_and_recovery_test_actually_exists() -> None:
     for mode in matrix["modes"]:
         _assert_test_node_exists(mode["test"])
         _assert_test_node_exists(mode["recovery_test"])
+        # complementary_tests (optional; F-5 lists the retained contract_hash
+        # defense) must also resolve if present — no dangling references.
+        for node in mode.get("complementary_tests", []):
+            _assert_test_node_exists(node)
 
 
 def test_rollback_verification_gate_section_is_present_and_every_listed_test_exists() -> None:
@@ -164,6 +168,11 @@ def test_no_test_security_python_module_is_left_out_of_every_matrix_reference() 
         node_id.split("::", 1)[0]
         for mode in matrix["modes"]
         for node_id in (mode["test"], mode["recovery_test"])
+    }
+    referenced_modules |= {
+        node_id.split("::", 1)[0]
+        for mode in matrix["modes"]
+        for node_id in mode.get("complementary_tests", [])
     }
     referenced_modules |= {
         node_id.split("::", 1)[0] for node_id in matrix["rollback_verification_gate"]["tests"]

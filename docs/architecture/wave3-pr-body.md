@@ -10,11 +10,13 @@ Wave 3 (Execution) delivers the FORGE execution runtime on top of the Wave 2
 approval/orchestration/bus core: the **5 execution Jobs** (repository-intake,
 agent-runner, quality-eval, chatgpt-observer, site-discovery) on a shared
 `saena_domain.execution` layer, the **5-hook FORGE runtime ladder**, **ADR-0004
-ServiceAccount 3-separation** in the chart, a **synthetic-tenant Plan→approval→
-patch→verify→handoff E2E** against real Temporal/Redpanda/Postgres, the
-**9-mode failure matrix** (k3s §10) with a **rollback verification gate**, and a
-**deterministic 9-axis eval suite** with the extraction-architecture test — all
-CI-wired with stable required-check names.
+ServiceAccount 3-separation** in the chart, a **14-step composite E2E**
+(application-chain synthetic E2E + separate real-container integration proofs on
+real Temporal/Redpanda/Postgres — not a single all-real transaction), the
+**9-mode failure matrix** (k3s §10, now **9/9** — F-5 resolved by a dedicated
+skill-bundle content-integrity verifier, w3-12) with a **rollback verification
+gate**, and a **deterministic 9-axis eval suite** with the extraction-architecture
+test — all CI-wired with stable required-check names.
 
 Every W3 exit condition is PASS with directly-executed test evidence:
 `docs/architecture/wave3-exit-report.md`.
@@ -34,14 +36,17 @@ Every W3 exit condition is PASS with directly-executed test evidence:
 | w3-09-failure | failure-mode 9종 matrix + rollback gate | `fcf60df` |
 | w3-10-evals | 9-axis eval harness + extraction-architecture test | `31c624e` |
 | w3-11-exit | CI named checks + exit report + PR body | `56c8138` |
+| w3-12-f5-integrity | dedicated skill-bundle content-integrity verifier + report/PR corrections | (this unit) |
 
 ## Exit evidence
 
 Full condition-by-condition mapping (test `path::name`, integrating SHA,
 verdict): `docs/architecture/wave3-exit-report.md`. Includes Job 5종 table,
-Hook 5종 table, ServiceAccount permission table, failure-mode 9종 matrix, E2E
-14-step evidence, rollback evidence, eval results, CI results, Lead independent
-verification, and production-only remainder.
+Hook 5종 table, ServiceAccount permission table, failure-mode 9종 matrix, the
+14-step composite E2E evidence, rollback evidence, eval results, CI results, the
+verification-method account (per-unit Lead adversarial verification + a final
+author-separated independent critic on the integration diff), and production-only
+remainder.
 
 ## CI
 
@@ -60,6 +65,9 @@ unchanged so the ci_identity lockstep invariant holds.
   identical runs.
 - Real-container execution E2E: 7/7 (Temporal + Redpanda + Postgres).
 
+(Totals move with each commit; the exact-HEAD CI result is authoritative on the
+PR #4 check-runs view, not frozen here.)
+
 ## Real defects found & fixed
 
 - **Orchestrator pre-run signal race** (pre-existing, mis-attributed as flake in
@@ -67,6 +75,19 @@ unchanged so the ci_identity lockstep invariant holds.
   code asserted on unset `_input`. Fixed (Activity scheduling moved to `run()`),
   deterministic regression test added (verified failing on old code).
 - **w3-06 coverage gap**: +58 branch tests to hold the 99% ratchet.
+- **F-5 was reported as covered without a dedicated verifier** (w3-12): added a
+  real skill-bundle content-integrity verifier (`saena_domain.execution.
+  skill_bundle`) enforced fail-closed at the session_start and agent-runner
+  boundaries; the failure-mode set is now genuinely 9/9. contract_hash retained
+  as a complementary defense.
+
+## Verification method (accurate)
+
+Each unit was authored in an isolated worktree by a separate agent. The per-unit
+critic agents did not return structured verdicts over the bus; the Lead did
+per-unit adversarial integration verification, and a final **author-separated
+independent critic** reviews the w3-12 remediation diff. No "critic PASS" is
+claimed ahead of that verdict (recorded in the handoff).
 
 ## Process note
 

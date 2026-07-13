@@ -84,23 +84,29 @@
     {
       "id": "F-5",
       "name": "Skill compromise",
-      "fixture": "a third-party skill silently changes a patch unit's allowed commands after the contract was hashed/approved",
-      "injection_point": "ActionContract.patch_units[].allowed_transformations mutated post-hash / ApprovalDecision.contract_hash left stale",
-      "expected_state_transition": "no-op — session_start/pre_tool_use DENY before any tool call; runner.run raises before any worktree is created",
-      "expected_event": "session_start HookDecision(decision=DENY) / ApprovalContractHashMismatchError raised",
-      "expected_audit_record": "AuditRecord(reason_code=CONTRACT_HASH_MISMATCH) / AuditEntry(action=agent_runner.approval.refused.v1, error_code=saena.agent_runner.approval_contract_hash_mismatch)",
+      "fixture": "a pinned skill bundle's file content is silently altered (byte change / file add / delete / rename) after approval",
+      "injection_point": "skill bundle files mutated post-pin while ActionContract.contract_hash stays identical (a change the contract-hash gate cannot see)",
+      "expected_state_transition": "no-op — dedicated skill-bundle verifier DENIES at hooks-runtime session_start AND at agent-runner before any worktree is created",
+      "expected_event": "session_start HookDecision(decision=DENY, reason=SKILL_BUNDLE_INTEGRITY) / SkillBundleHashMismatchError raised by runner.run before execution",
+      "expected_audit_record": "AuditRecord(reason_code=SKILL_BUNDLE_INTEGRITY) / AuditEntry(action=agent_runner.skill_bundle.refused.v1, error_code=saena.policy_denied.skill_bundle_hash_mismatch)",
       "retryable": false,
       "rollback_required": false,
-      "operator_visible_error": "HookDecision.detail / AgentRunnerError message (hash mismatch named, no raw contract content)",
-      "redaction_verified": "n/a",
+      "operator_visible_error": "hash-mismatch named (expected vs actual digest); no raw bundle content",
+      "redaction_verified": "yes — mismatch surfaces only the two sha256 digests; raw bundle content never enters the error/audit (test_bundle_content_never_echoed_in_denial, test_mismatch_error_never_echoes_bundle_content)",
       "partial_state_absent": true,
-      "recovery_test": "tests/security/test_f5_skill_compromise.py::test_agent_runner_blocks_execution_when_skill_tampered_contract_hash_is_stale",
-      "test": "tests/security/test_f5_skill_compromise.py::test_hooks_runtime_contract_hash_pin_blocks_skill_tampered_commands",
+      "recovery_test": "tests/security/test_f5_skill_bundle_integrity.py::test_agent_runner_recovers_to_a_clean_pinned_bundle",
+      "test": "tests/security/test_f5_skill_bundle_integrity.py::test_agent_runner_blocks_tampered_bundle_before_worktree",
       "wired_against": [
-        "saena_hooks_runtime.contract.validate_contract",
-        "saena_agent_runner.approval.verify_approval"
+        "saena_domain.execution.skill_bundle.verify_skill_bundle (dedicated content-integrity verifier)",
+        "saena_agent_runner.skill_bundle.enforce_skill_bundle_integrity (runner boundary, before worktree)",
+        "saena_hooks_runtime.hooks.session_start.check_skill_bundle_integrity (session_start boundary, injected Port)",
+        "saena_agent_runner.approval.verify_approval (complementary contract_hash gate — retained, does NOT replace the bundle gate)"
       ],
-      "missing_owner_note": "no dedicated skill_bundle_hash validator service exists yet (k3s §9.1 field only) — this mode is wired against the real, already-implemented ActionContract/ApprovalDecision contract_hash pin mechanism, which is the same class of guarantee (content-derived hash → mismatch → fail-closed deny)."
+      "missing_owner_note": "RESOLVED (w3-12): a dedicated skill-bundle content-integrity verifier now exists (saena_domain.execution.skill_bundle) and is enforced fail-closed at both the session_start and agent-runner boundaries. The whole-ActionContract contract_hash pin is retained as a complementary defense but no longer stands in for bundle verification. The k3s §9.1 skill_bundle_hash field is the pinned value (sha256:<hex>).",
+      "complementary_tests": [
+        "tests/security/test_f5_skill_compromise.py::test_hooks_runtime_contract_hash_pin_blocks_skill_tampered_commands",
+        "tests/security/test_f5_skill_compromise.py::test_agent_runner_blocks_execution_when_skill_tampered_contract_hash_is_stale"
+      ]
     },
     {
       "id": "F-6",

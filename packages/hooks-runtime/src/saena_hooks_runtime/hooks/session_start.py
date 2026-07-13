@@ -11,7 +11,8 @@ timeout budget -> `verify_run_context` (contract presence/hash/engine-scope
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
 from ..contract import ActionContract, validate_contract
 from ..models import Decision, HookDecision, ReasonCode, TimeoutBudget
@@ -19,6 +20,49 @@ from ..redact import redact_known
 from ._common import build_decision
 
 HOOK_NAME = "session_start"
+
+
+@dataclass(frozen=True, slots=True)
+class SkillBundleIntegrityResult:
+    """Outcome of the injected F-5 skill-bundle integrity check. `ok=False`
+    denies session start. `redacted_detail` MUST already be free of any raw
+    bundle content (the adapter is responsible for redaction — the pure
+    `saena_domain.execution.skill_bundle` verifier only ever surfaces
+    digests, never file bytes)."""
+
+    ok: bool
+    redacted_detail: str = ""
+
+
+@runtime_checkable
+class SkillBundleIntegrityPort(Protocol):
+    """Injected F-5 boundary. hooks-runtime is a stdlib-only leaf and cannot
+    import the concrete verifier (`saena_domain.execution.skill_bundle`); the
+    runtime host wraps that verifier as this Port. `verify` returns a result,
+    never raises — a raising adapter is treated as fail-closed by
+    `check_skill_bundle_integrity` below."""
+
+    def verify(self, *, expected_skill_bundle_hash: str | None) -> SkillBundleIntegrityResult: ...
+
+
+@dataclass(slots=True)
+class AllowingSkillBundlePort:
+    """Reference fake for callers/tests with no bundle to check (returns ok)."""
+
+    def verify(self, *, expected_skill_bundle_hash: str | None) -> SkillBundleIntegrityResult:
+        return SkillBundleIntegrityResult(ok=True)
+
+
+@dataclass(slots=True)
+class StubSkillBundlePort:
+    """Test fake with a fixed verdict, recording whether it was consulted."""
+
+    result: SkillBundleIntegrityResult
+    consulted: bool = field(default=False)
+
+    def verify(self, *, expected_skill_bundle_hash: str | None) -> SkillBundleIntegrityResult:
+        self.consulted = True
+        return self.result
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +88,12 @@ class SessionStartInput:
     policy_signature_valid: bool
     secret_findings: tuple[SecretFinding, ...]
     budget: TimeoutBudget
+    #: F-5 pin for this run, or None if the run carries no skill bundle.
+    expected_skill_bundle_hash: str | None = None
+    #: Injected verifier (wraps saena_domain.execution.skill_bundle). When a
+    #: skill-bundle hash is pinned but no port is wired, session_start
+    #: fail-closed denies (cannot prove integrity).
+    skill_bundle_port: SkillBundleIntegrityPort | None = None
 
 
 def verify_run_context(input: SessionStartInput) -> ReasonCode | None:
@@ -63,6 +113,35 @@ def verify_policy_signature(input: SessionStartInput) -> ReasonCode | None:
     if not input.policy_signature_valid:
         return ReasonCode.POLICY_SIGNATURE_INVALID
     return None
+
+
+def check_skill_bundle_integrity(input: SessionStartInput) -> tuple[ReasonCode | None, str]:
+    """F-5 dedicated skill-bundle integrity gate (fail-closed). Only enforced
+    when the run pins an `expected_skill_bundle_hash`; a run with no pin is
+    not gated here (nothing to verify). A pinned run with no wired port, or a
+    port that raises, is a DENY (cannot prove integrity)."""
+    if input.expected_skill_bundle_hash is None:
+        return None, ""
+    port = input.skill_bundle_port
+    if port is None:
+        return (
+            ReasonCode.SKILL_BUNDLE_INTEGRITY,
+            "skill_bundle_hash pinned but no integrity verifier is wired — fail-closed",
+        )
+    try:
+        result = port.verify(expected_skill_bundle_hash=input.expected_skill_bundle_hash)
+    except Exception:
+        # A raising adapter is fail-closed; never surface its message (may
+        # embed bundle content) — a fixed, content-free reason only.
+        return (
+            ReasonCode.SKILL_BUNDLE_INTEGRITY,
+            "skill-bundle integrity verification errored — fail-closed",
+        )
+    if not result.ok:
+        return ReasonCode.SKILL_BUNDLE_INTEGRITY, (
+            result.redacted_detail or "skill bundle failed integrity verification — run blocked"
+        )
+    return None, ""
 
 
 def secret_scan(input: SessionStartInput) -> tuple[ReasonCode | None, str]:
@@ -121,18 +200,19 @@ def session_start(input: SessionStartInput) -> HookDecision:
                 trace_id=input.trace_id,
             )
 
-    reason, detail = secret_scan(input)
-    if reason is not None:
-        return build_decision(
-            ts=input.ts,
-            hook=HOOK_NAME,
-            decision=Decision.DENY,
-            reason_code=reason,
-            detail=detail,
-            tenant_id=input.tenant_id,
-            run_id=input.run_id,
-            trace_id=input.trace_id,
-        )
+    for scan in (check_skill_bundle_integrity, secret_scan):
+        reason, detail = scan(input)
+        if reason is not None:
+            return build_decision(
+                ts=input.ts,
+                hook=HOOK_NAME,
+                decision=Decision.DENY,
+                reason_code=reason,
+                detail=detail,
+                tenant_id=input.tenant_id,
+                run_id=input.run_id,
+                trace_id=input.trace_id,
+            )
 
     return build_decision(
         ts=input.ts,
@@ -147,8 +227,13 @@ def session_start(input: SessionStartInput) -> HookDecision:
 
 
 __all__ = [
+    "AllowingSkillBundlePort",
     "SecretFinding",
     "SessionStartInput",
+    "SkillBundleIntegrityPort",
+    "SkillBundleIntegrityResult",
+    "StubSkillBundlePort",
+    "check_skill_bundle_integrity",
     "secret_scan",
     "session_start",
     "verify_policy_signature",

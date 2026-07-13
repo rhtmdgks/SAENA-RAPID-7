@@ -118,6 +118,34 @@ identity/lifecycle/errors/limits/events look like"; a later Wave 3 unit owns
 "how a job kind's service actually launches and runs the k3s Job."** None of
 those three concerns collapse into another.
 
+## Skill-bundle content integrity (F-5, k3s §10) — the two-boundary gate
+
+`saena_domain.execution.skill_bundle` is the dedicated, pure skill-bundle
+content-integrity verifier (distinct from the whole-ActionContract
+`contract_hash` pin, which cannot see individual skill-file tampering). It
+computes a deterministic `sha256:<hex>` over the bundle's framed manifest — the
+k3s §9.1 run-trace `skill_bundle_hash` field / Helm `skillBundle.digest` — and
+fails closed on byte change / file add / delete / rename / missing bundle /
+missing-or-malformed pin / symlink / traversal.
+
+It is enforced at **two boundaries**, each fail-closed and BEFORE any tool /
+worktree / executor:
+
+- **agent-runner** (`saena_agent_runner.skill_bundle.enforce_skill_bundle_
+  integrity`, called inside `PatchUnitRunner.run` after approval, before the
+  first worktree). agent-runner imports the pure verifier directly (services →
+  `saena_domain` is allowed).
+- **hooks-runtime `session_start`** — via an injected `SkillBundleIntegrityPort`.
+  hooks-runtime is a stdlib-only leaf and CANNOT import `saena_domain`, so the
+  concrete adapter (wrapping `verify_skill_bundle`) is supplied by the runtime
+  host; hooks-runtime only defines the Port + the fail-closed enforcement (a
+  pinned run with no wired port, or a raising adapter, denies).
+
+The `contract_hash` pin is retained as a complementary defense; it does not
+substitute for bundle verification. Wiring the two independent implementations
+of the same house canonicalization (contract-hash vs bundle-hash) is proven
+connected by `tests/unit/domain_execution/test_skill_bundle_hooks_wiring.py`.
+
 ## Dependency / import policy
 
 `saena_domain.execution` may import, within `saena_domain`, only:

@@ -13,9 +13,12 @@ See ../README.md. Scaffold approved 2026-07-12 (ADR-0007 D-7).
   `failure_modes/fm-01..09.yaml`, one file per k3s §10 row: `status`
   (`covered`/`gap`) + `covering_axis` (one of the 9 mandatory axes, or
   `regression_suite_native` for a dedicated non-axis check) +
-  `covering_fixture_ids`/`covering_test`. 8/9 `covered`; `fm-05-skill-
-  compromise` is an honestly-reported `gap` (no pinned-skill-hash
-  verification primitive exists anywhere in this repo yet). Verified by
+  `covering_fixture_ids`/`covering_test`. **9/9 `covered`** (w3-12 resolved
+  the former `fm-05-skill-compromise` gap: a dedicated skill-bundle
+  content-integrity verifier — `saena_domain.execution.skill_bundle` —
+  now exists and is enforced fail-closed at both the session_start and
+  agent-runner boundaries; the regression check exercises the real verifier).
+  Verified by
   `tests/unit/evals_harness/test_failure_mode_regression_suite.py::
   test_all_nine_k3s_failure_modes_are_mapped`.
 - **추출 아키텍처 테스트 (ADR-0002 rev.3 규칙 12)**: worker-hosted 모듈을 독립 배포로
