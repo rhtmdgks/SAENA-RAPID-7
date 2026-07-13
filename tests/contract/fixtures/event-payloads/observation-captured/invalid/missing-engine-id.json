@@ -1,0 +1,5 @@
+{
+  "observation_id": "obs-0001",
+  "artifact_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "_expected_violation": "engine_id is required (ADR-0013 'observation\u00b7citation\u00b7experiment \uacc4\uc5f4' engine_required_payload activation fragment); this instance omits it."
+}

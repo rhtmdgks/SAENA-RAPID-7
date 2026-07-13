@@ -1,0 +1,7 @@
+{
+  "project_id": "proj-0001",
+  "ledger_version": "v1",
+  "evidence_count": 21,
+  "provenance_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "_expected_violation": "claim_count is required (contract-catalog.md ExtractedClaim count); this instance omits it."
+}

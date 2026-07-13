@@ -51,7 +51,13 @@ class TestHelmTemplateRendersCleanly:
         result = _run_helm_template(chart_dir)
         docs = [d for d in yaml.safe_load_all(result.stdout) if d]
         deployments = [d for d in docs if d.get("kind") == "Deployment"]
-        assert len(deployments) == 8
+        # 8 pre-Wave-4 independent-deployment services + 2 w4-14 intelligence
+        # workloads (intelligence-worker, chatgpt-observer coordinator) = 10
+        # — service-catalog.md v1 topology: "total Deployment 10 = independent
+        # 8 + worker host 2 (compute pool)". Detailed per-workload assertions
+        # for the 2 new Deployments live in
+        # tests/unit/deploy/test_intelligence_workloads.py (w4-14).
+        assert len(deployments) == 10
 
     def test_renders_8_services_and_8_pdbs_and_13_service_accounts(self, chart_dir: Path) -> None:
         result = _run_helm_template(chart_dir)
@@ -59,17 +65,27 @@ class TestHelmTemplateRendersCleanly:
         kinds: dict[str, int] = {}
         for d in docs:
             kinds[d["kind"]] = kinds.get(d["kind"], 0) + 1
-        assert kinds["Service"] == 8
-        assert kinds["PodDisruptionBudget"] == 8
-        # 8 services + agent-runner + ADR-0004 SA 3-separation (quality-eval,
-        # repository-intake) + browser pool (chatgpt-observer, site-discovery)
-        # — see tests/unit/deploy/test_service_accounts.py (w3-07) for the
-        # detailed per-SA assertions this count summarizes.
-        assert kinds["ServiceAccount"] == 13
-        # Role/RoleBinding count is UNCHANGED at 9 (8 services + agent-runner)
-        # — the 4 new w3-07 SAs render zero Role/RoleBinding by default
-        # (empty `rbac.rules`), which is the correct least-privilege outcome,
-        # not an oversight (templates/rbac/execution-jobs-roles.yaml).
+        # 8 pre-Wave-4 + 2 w4-14 (intelligence-worker, chatgpt-observer) = 10
+        # (this test's name keeps its original w2-23 title for history/diff
+        # continuity; the counts below are the current, w4-14-updated ones —
+        # see test_intelligence_workloads.py for the itemized w4-14 proof).
+        assert kinds["Service"] == 10
+        assert kinds["PodDisruptionBudget"] == 10
+        # 10 service SAs + agent-runner + ADR-0004 SA 3-separation
+        # (quality-eval, repository-intake) + browser pool (chatgpt-observer
+        # Job SA, site-discovery) = 15 — see
+        # tests/unit/deploy/test_service_accounts.py (w3-07) and
+        # test_intelligence_workloads.py (w4-14) for the detailed per-SA
+        # assertions this count summarizes.
+        assert kinds["ServiceAccount"] == 15
+        # Role/RoleBinding count is UNCHANGED at 9 — neither w4-14 workload
+        # adds a new Role: intelligenceWorker has empty rbac.rules (zero K8s
+        # API need) and chatgptObserver's coordinator SA is deliberately
+        # READ-ONLY (rbac.rules: [] — Job launch/poll/cleanup stays solely
+        # on agentOrchestrator's existing Role). Least-privilege-by-omission
+        # (templates/rbac/execution-jobs-roles.yaml's convention, extended
+        # by w4-14 to templates/rbac/service-roles.yaml too), not an
+        # oversight.
         assert kinds["Role"] == 9
         assert kinds["RoleBinding"] == 9
 
@@ -129,7 +145,7 @@ class TestHelmTemplateRendersCleanly:
         result = _run_helm_template(chart_dir)
         docs = [d for d in yaml.safe_load_all(result.stdout) if d]
         deployments = [d for d in docs if d.get("kind") == "Deployment"]
-        assert len(deployments) == 8
+        assert len(deployments) == 10  # 8 pre-Wave-4 + 2 w4-14
         for dep in deployments:
             for container in dep["spec"]["template"]["spec"]["containers"]:
                 sc = container["securityContext"]

@@ -18,8 +18,14 @@ root_packages =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
     saena_forgectl
     saena_hooks_runtime
+    saena_analytics_clickhouse
+    saena_vector_store
 
 ; dependency-policy Allowed directions (W0 minimal form, extended by w2-00).
 ; Allowed import directions (ADR-0002 rule 11 / dependency-policy):
@@ -58,6 +64,10 @@ forbidden_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
 
 [importlinter:contract:schemas-is-a-leaf]
 name = saena_schemas must not import other saena packages
@@ -82,6 +92,10 @@ forbidden_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
     saena_forgectl
 
 [importlinter:contract:domain-below-services]
@@ -105,6 +119,10 @@ forbidden_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
     saena_forgectl
 
 [importlinter:contract:observability-below-services]
@@ -128,6 +146,10 @@ forbidden_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
     saena_forgectl
 
 [importlinter:contract:forgectl-is-a-standalone-leaf]
@@ -153,6 +175,10 @@ forbidden_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
 
 [importlinter:contract:nothing-imports-forgectl]
 name = domain, observability and services must not import saena_forgectl
@@ -174,6 +200,10 @@ source_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
 forbidden_modules =
     saena_forgectl
 
@@ -201,6 +231,10 @@ forbidden_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
     saena_forgectl
 
 [importlinter:contract:nothing-imports-hooks-runtime]
@@ -223,8 +257,67 @@ source_modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
     saena_forgectl
 forbidden_modules =
+    saena_hooks_runtime
+
+[importlinter:contract:vector-store-below-services]
+name = saena_vector_store must not import services or testing (infra store adapter, w4-07)
+type = forbidden
+source_modules =
+    saena_vector_store
+forbidden_modules =
+    saena_testing
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
+    saena_forgectl
+    saena_hooks_runtime
+    saena_analytics_clickhouse
+
+[importlinter:contract:analytics-clickhouse-below-services]
+name = saena_analytics_clickhouse must not import services or testing (infra store adapter, w4-06)
+type = forbidden
+source_modules =
+    saena_analytics_clickhouse
+forbidden_modules =
+    saena_testing
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence
+    saena_forgectl
     saena_hooks_runtime
 
 [importlinter:contract:services-are-independent]
@@ -244,3 +337,7 @@ modules =
     saena_agent_runner
     saena_chatgpt_observer
     saena_site_discovery
+    saena_demand_graph
+    saena_entity_resolution
+    saena_claim_evidence
+    saena_citation_intelligence

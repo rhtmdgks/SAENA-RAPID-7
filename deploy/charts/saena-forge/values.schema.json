@@ -147,6 +147,42 @@
     "objectStorage": {
       "$ref": "#/$defs/externalDataDependency"
     },
+    "clickhouse": {
+      "$ref": "#/$defs/externalDataDependency"
+    },
+    "vectorStore": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/noPlaintextSecretFields"
+        }
+      ],
+      "type": "object",
+      "description": "w4-14 — Wave 4 vector-retrieval connection metadata (data-ownership.md 'Qdrant/pgvector ... 도입 = Wave 4'). The w4-07 adapter's pgvector backend runs as a Postgres extension, not a separate host/port — `usesPostgresConnection: true` documents that this block intentionally carries no `host`/`port`/`credentialsSecretRef` of its own for the pgvector backend; a future non-pgvector backend would add those fields (still governed by `noPlaintextSecretFields`).",
+      "properties": {
+        "backend": {
+          "type": "string"
+        },
+        "usesPostgresConnection": {
+          "type": "boolean"
+        },
+        "indexPrefix": {
+          "type": "string"
+        },
+        "tenantPartitioned": {
+          "type": "boolean"
+        },
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "credentialsSecretRef": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
     "eventBus": {
       "allOf": [
         {

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/extracted-claim/v1/extracted-claim.schema.json",
+  "title": "ExtractedClaim",
+  "description": "A claim extracted from approved first-party site/product content, owned by claim-evidence-service. Effective-date versioned (superseded claims are retained, not deleted).",
+  "$comment": "compat_class: closed, signed: false (non-signed closed contract, ADR-0024(b) family). Authority: docs/architecture/contract-catalog.md P1 table row 'ExtractedClaim | claim-evidence | claim_id; 유효일 버전 보존' (idempotency key claim_id; effective-date versioning preserved, not overwritten); docs/architecture/wave4-plan.md domain-contract candidate list; services/intelligence/claim-evidence-service/README.md ('claim extraction, evidence ledger'). entity_id is a plain opaque string reference to domain/entity-record.entity_id, NOT a cross-file $ref — this catalog's cross-file $ref convention restricts $ref targets to the common/ category only (tests/contract/validate/test_schema_conventions.py 'cross-file refs common-only'), so cross-domain linkage is carried as an opaque identifier value, not a schema reference. claim_text is bounded (maxLength) to avoid an unbounded raw-content field, consistent with the catalog's 'no raw content' security posture (cf. SourceSnapshot/PatchArtifact).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "project_id",
+    "claim_id",
+    "entity_id",
+    "claim_text",
+    "status",
+    "effective_from",
+    "created_at"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Single-authority identifier convention (ADR-0011/ADR-0014)."
+    },
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "Project-scoped, consuming entity-resolution's project-scoped output (services/intelligence/claim-evidence-service/README.md upstream: entity-resolution-service)."
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "contract-catalog.md:39 idempotency key 'claim_id'. Opaque, mirrors common/identifiers/v1 opaque-id shape."
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque reference to domain/entity-record.entity_id (plain string value, not a cross-file $ref — see $comment above on the common-only $ref convention)."
+    },
+    "claim_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "$comment": "Extracted claim text from approved first-party content (public site content, not raw customer source). Bounded length — no unbounded raw-document field."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "superseded", "retracted"],
+      "$comment": "contract-catalog.md:39 '유효일 버전 보존' — superseded/retracted claims are retained (status transition), not deleted."
+    },
+    "effective_from": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "Effective-date version start, per contract-catalog.md:39 '유효일 버전 보존'."
+    },
+    "created_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "Extraction record timestamp."
+    }
+  }
+}

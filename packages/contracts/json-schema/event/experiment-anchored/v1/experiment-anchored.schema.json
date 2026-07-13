@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/experiment-anchored/v1/experiment-anchored.schema.json",
+  "title": "experiment.anchored.v1 payload",
+  "description": "Payload of the experiment.anchored.v1 event — hash-anchor notification for a previously-registered QueryExperiment (domain/experiment-registration), reusing the audit-ledger hash-chain pattern (docs/architecture/wave4-plan.md 'Reuse saena_domain.audit hash chain + canonicalization (no new hashing rule)'). Registration ONLY — NO outcome/DiD/causal/lift fields.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: docs/architecture/wave4-plan.md 'Existing vs new events' (w4-10 Contracts Steward deliverable — team-lead field list 'hash-anchor notification (experiment id, canonical hash, previous hash/anchor)'). NEW AsyncAPI channel, same wave4-plan.md authorizing-document rationale as experiment.registered.v1 (see that schema's $comment for the full citation). Producer experiment-attribution-service. engine_id REQUIRED — same ADR-0013 'experiment 계열' rule as experiment.registered.v1 (allOf $ref to common/engine-id/v1's engine_required_payload fragment). previous_hash's anyOf[null, sha256_ref] shape is verbatim-mirrored from domain/audit-event/v1#/properties/prev_event_hash (genesis anchor in an experiment's hash chain uses null when this IS the first anchor entry — same rationale: 'genesis event uses null, chain head has no predecessor' — pre-included now rather than added later as a closed-class-adjacent widening).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../../../common/engine-id/v1/engine-id.schema.json#/$defs/engine_required_payload"
+    }
+  ],
+  "required": [
+    "experiment_id",
+    "canonical_hash",
+    "previous_hash"
+  ],
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque identifier for the registered experiment being anchored (domain/experiment-registration.experiment_id) — same identifier space as experiment.registered.v1."
+    },
+    "canonical_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "team-lead field list 'canonical hash' — the hash of the experiment state being anchored at this point in the chain."
+    },
+    "previous_hash": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref"
+        }
+      ],
+      "$comment": "team-lead field list 'previous hash/anchor' — verbatim-mirrors domain/audit-event/v1#/properties/prev_event_hash's anyOf[null, sha256_ref] shape and genesis-null rationale."
+    }
+  }
+}

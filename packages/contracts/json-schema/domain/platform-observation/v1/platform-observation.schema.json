@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/platform-observation/v1/platform-observation.schema.json",
+  "title": "PlatformObservation",
+  "description": "Engine-neutral record of a single observation captured from an AEO engine (v1: ChatGPT Search only). chatgpt-observer-service is the first implementation (ADR-0007) — a second engine reuses this same contract with a different engine_id value, no core rework. Raw response/screenshot content is never carried inline, only an object reference.",
+  "$comment": "compat_class: closed, signed: false (non-signed closed contract, ADR-0024(b) family). Authority: docs/architecture/contract-catalog.md P1 table row 'PlatformObservation | chatgpt-observer (첫 구현체 — 계약은 엔진 중립, engine_id 필수, ADR-0007) | raw는 object ref만; customer+ToS, encrypted'; ADR-0007 (engine-neutral contract, chatgpt-observer first implementation); ADR-0013 (engine_id v1 closed enum, chatgpt-search only); services/acquisition/chatgpt-observer-service/README.md ('PlatformObservation (observation.py): ... raw_object_ref (never raw captured content) and citation_refs (zero citations is a valid signal, never rejected) — this service's own engine-neutral capture shape ..., not the eventual formal P1 PlatformObservation contract itself (no packages/contracts schema exists for it yet)' — this unit lands that formal contract). Field names (raw_object_ref, citation_refs) are chosen to match the service's own existing local model verbatim, per the README's own field-naming precedent, easing the service's eventual migration onto this formal contract. artifact_hash is the sole ledger anchor tying this record back to event/observation-captured.artifact_hash (same event/domain split as repo.intaken.v1 vs domain/source-snapshot). citation_refs uses uri_ref (query/fragment forbidden) and minItems:0 (zero citations is schema-valid, never rejected, per the README precedent). Encryption-at-rest (contract-catalog.md 'encrypted') is a runtime/storage-layer obligation, not schema-expressible from field shapes alone (same pattern as SourceSnapshot's secret-scan gate).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "run_id",
+    "engine_id",
+    "observation_id",
+    "raw_object_ref",
+    "artifact_hash",
+    "citation_refs",
+    "captured_at"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Single-authority identifier convention (ADR-0011/ADR-0014)."
+    },
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "Run-scoped observation capture."
+    },
+    "engine_id": {
+      "$ref": "../../../common/engine-id/v1/engine-id.schema.json",
+      "$comment": "ADR-0007/ADR-0013 — engine-neutral contract, engine_id required, v1 closed enum ['chatgpt-search']. References the engine-id root type directly (this field IS the engine_id value), mirrors context/run-context-experiment/v1#/properties/engine_id usage."
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque identifier for this observation capture, mirrors common/identifiers/v1 opaque-id shape but not promoted there."
+    },
+    "raw_object_ref": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "services/acquisition/chatgpt-observer-service/README.md 'raw_object_ref (never raw captured content)' — object reference only, query/fragment forbidden (ADR-0024(f))."
+    },
+    "artifact_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Content-addressed hash of the captured artifact/snapshot — the same hash event/observation-captured.artifact_hash carries as its sole ledger anchor (event/domain split mirrors repo.intaken.v1 vs domain/source-snapshot)."
+    },
+    "citation_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref"
+      },
+      "minItems": 0,
+      "$comment": "services/acquisition/chatgpt-observer-service/README.md 'citation_refs (zero citations is a valid signal, never rejected)' — minItems:0 allows an empty array, always present (required)."
+    },
+    "captured_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "Observation capture timestamp."
+    }
+  }
+}

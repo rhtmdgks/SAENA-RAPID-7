@@ -1,0 +1,11 @@
+{
+  "tenant_id": "acme-corp",
+  "project_id": "proj-0001",
+  "entity_id": "entity-0001",
+  "graph_version": "v1",
+  "entity_type": "brand",
+  "canonical_name": "Acme Widgets",
+  "updated_at": "2026-07-13T09:14:32Z",
+  "raw_source_dump": "unexpected raw content field",
+  "_expected_violation": "closed-class contract (additionalProperties:false) rejects the undeclared 'raw_source_dump' property."
+}

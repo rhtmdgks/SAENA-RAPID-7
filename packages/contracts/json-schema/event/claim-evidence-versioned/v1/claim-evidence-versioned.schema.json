@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/claim-evidence-versioned/v1/claim-evidence-versioned.schema.json",
+  "title": "claim.evidence.versioned.v1 payload",
+  "description": "Payload of the claim.evidence.versioned.v1 event — notification that a claim/evidence ledger version was produced by claim-evidence-service. Thin notification projection; the full claim/evidence graph itself is owned/stored by claim-evidence-service (see domain/extracted-claim, domain/evidence-record), not carried here.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: docs/architecture/wave4-plan.md 'Existing vs new events' (w4-10 Contracts Steward deliverable — 'claim.evidence.versioned.v1' listed as NEW), satisfying events/catalog/README.md's 'Finalize PROPOSED topics via ADR before implementation' obligation via the Wave 4 authority doc. Producer claim-evidence-service (services/intelligence/claim-evidence-service/README.md 'Published events: claim.evidence.versioned.v1 (PROPOSED)'); consumes site.inventory.completed.v1, demand.graph.versioned.v1, entity.graph.versioned.v1. Shape mirrors the demand/entity '<domain>.graph.versioned.v1' notification family, adapted to the claim-evidence ledger's two owned counts (claim_count, evidence_count) per contract-catalog.md P1 rows 'ExtractedClaim'/'EvidenceRecord'.",
+  "type": "object",
+  "required": [
+    "project_id",
+    "ledger_version",
+    "claim_count",
+    "evidence_count",
+    "provenance_ref"
+  ],
+  "properties": {
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "core business identifier (api-event-contracts.md); claim/evidence ledger is project-scoped, consuming demand-graph/entity-graph's project-scoped output."
+    },
+    "ledger_version": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Opaque version token for this claim/evidence ledger snapshot — named ledger_version (not graph_version) per services/intelligence/claim-evidence-service/README.md 'Bounded context: Claim–evidence ledger'."
+    },
+    "claim_count": {
+      "type": "integer",
+      "minimum": 0,
+      "$comment": "Number of extracted claims (contract-catalog.md 'ExtractedClaim') in this ledger version."
+    },
+    "evidence_count": {
+      "type": "integer",
+      "minimum": 0,
+      "$comment": "Number of evidence records (contract-catalog.md 'EvidenceRecord') in this ledger version."
+    },
+    "provenance_ref": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Content-addressed hash anchoring the ledger version's build provenance (sole ledger anchor, mirrors repo-intaken.content_hash / demand-graph-versioned.provenance_ref)."
+    }
+  }
+}

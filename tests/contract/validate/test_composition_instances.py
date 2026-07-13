@@ -1,7 +1,8 @@
 """AsyncAPI channel composition instance proof (w1-11, approved plan §2
 "asyncapi" gate + ADR-0013 appendix 3 instances vs their channels).
 
-For each of the 12 confirmed channels: builds the channel's allOf-overlay
+For each of the 16 channels (12 CONFIRMED-v1 + 4 Wave 4 NEW, w4-10
+Contracts Steward): builds the channel's allOf-overlay
 schema (envelope + event_type/context_type const pins + payload
 substitution), resolves it (jsonschema + referencing.Registry, same
 proven local-resolution pattern as test_envelope_fixtures.py /
@@ -19,7 +20,7 @@ and asserts:
     required:[failures] overlay) and vice versa for a failed instance.
   - ADR-0013 appendix's 3 example instances validate against their
     documented channels (patch.unit.completed.v1 / adapter.config.updated.v1
-    [envelope-only system channel, not one of the 12 -- validated against
+    [envelope-only system channel, not one of the 16 -- validated against
     the bare envelope only] / strategy.card.eligible.v1).
 """
 
@@ -55,7 +56,7 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def _resolve_yaml_refs(node: Any, base_dir: Path) -> Any:
+def _resolve_yaml_refs(node: Any, base_dir: Path, doc_root: Any = None) -> Any:
     """Recursively resolve every {'$ref': '<relative-path>[#<pointer>]'}
     node in a parsed AsyncAPI YAML fragment into its target JSON Schema
     document's content, inlining `#/$defs/...`-style fragments via a
@@ -63,6 +64,25 @@ def _resolve_yaml_refs(node: Any, base_dir: Path) -> Any:
     ("#/channels/...") are left untouched (out of scope -- only the
     embedded JSON Schema $refs inside `payload.schema` need resolving
     for this module's purpose).
+
+    `doc_root` tracks the root of whichever cross-file document is
+    currently "active" (the most recently `$ref`-loaded external JSON
+    Schema file) so that a bare same-document self-ref inside that
+    document -- `{"$ref": "#"}` (root) or `{"$ref": "#/$defs/..."}`
+    (pointer) -- resolves against THAT document's own root, not against
+    whatever unrelated top-level object happens to currently be under
+    construction. Needed for common/engine-id/v1's own
+    `$defs.engine_required_payload.properties.engine_id` field, which is
+    `{"$ref": "#"}` pointing back at engine-id.schema.json's OWN root
+    (the closed string enum) -- when this fragment is pointer-walked out
+    of engine-id.schema.json (only `$defs/engine_required_payload` is
+    extracted, not the whole document), that root type:string+enum
+    information is otherwise lost, and jsonschema would instead resolve
+    the un-substituted "#" against the top of the WHOLE composed overlay
+    schema (type:object) -- exactly backward. Verified via w4-10's
+    citation-normalized/observation-captured/experiment-registered/
+    experiment-anchored channels, the first real users of the
+    engine_required_payload fragment in this catalog.
     """
     if isinstance(node, dict):
         ref = node.get("$ref")
@@ -79,11 +99,38 @@ def _resolve_yaml_refs(node: Any, base_dir: Path) -> Any:
                     pointed: Any = target_doc
                     for part in pointer_parts:
                         pointed = pointed[part]
-                    return _resolve_yaml_refs(pointed, target_path.parent)
-                return _resolve_yaml_refs(target_doc, target_path.parent)
-        return {k: _resolve_yaml_refs(v, base_dir) for k, v in node.items()}
+                    return _resolve_yaml_refs(pointed, target_path.parent, doc_root=target_doc)
+                return _resolve_yaml_refs(target_doc, target_path.parent, doc_root=target_doc)
+            if doc_root is not None:
+                # Bare same-document self-ref ("#" or "#/$defs/...") --
+                # resolve against the currently-active cross-file
+                # document's own root, not leave it un-substituted.
+                pointer_parts = [p for p in fragment.split("/") if p]
+                pointed = doc_root
+                for part in pointer_parts:
+                    pointed = pointed[part]
+                if not pointer_parts and isinstance(pointed, dict) and "$defs" in pointed:
+                    # Bare "#" (whole-document root self-ref, e.g.
+                    # common/engine-id/v1's own
+                    # $defs.engine_required_payload.properties.engine_id
+                    # pointing back at the enclosing document's root):
+                    # drop "$defs" before recursing. $defs is a pure
+                    # reference-target bag -- it contributes no validation
+                    # constraint to the node itself -- and re-descending
+                    # into it here would re-encounter the very same "#"
+                    # self-ref inside $defs.engine_required_payload,
+                    # producing unbounded structural recursion (a
+                    # genuinely cyclic schema that eager physical inlining
+                    # cannot fully expand; jsonschema's own lazy
+                    # registry-based $ref resolution has no such problem,
+                    # but this module's ad-hoc inliner does). Safe: no
+                    # other branch of this recursion still needs to reach
+                    # this document's $defs after this substitution.
+                    pointed = {k: v for k, v in pointed.items() if k != "$defs"}
+                return _resolve_yaml_refs(pointed, base_dir, doc_root=doc_root)
+        return {k: _resolve_yaml_refs(v, base_dir, doc_root) for k, v in node.items()}
     if isinstance(node, list):
-        return [_resolve_yaml_refs(item, base_dir) for item in node]
+        return [_resolve_yaml_refs(item, base_dir, doc_root) for item in node]
     return node
 
 
@@ -135,6 +182,11 @@ ALL_CHANNEL_NAMES = [
     "quality.gate.failed.v1",
     "experiment.outcome.observed.v1",
     "strategy.card.eligible.v1",
+    # Wave 4 NEW channels (w4-10 Contracts Steward).
+    "entity.graph.versioned.v1",
+    "claim.evidence.versioned.v1",
+    "experiment.registered.v1",
+    "experiment.anchored.v1",
 ]
 
 TENANT_ENVELOPE_COMMON: dict[str, Any] = {
@@ -180,9 +232,75 @@ _CHANNEL_INSTANCE_SPECS: dict[str, tuple[dict[str, Any], str, dict[str, Any]]] =
         "site.inventory.completed.v1",
         {"site_id": "site-0001", "inventory_version": "v1"},
     ),
-    "demand.graph.versioned.v1": (TENANT_ENVELOPE_COMMON, "demand.graph.versioned.v1", {}),
-    "observation.captured.v1": (TENANT_ENVELOPE_COMMON, "observation.captured.v1", {}),
-    "citation.normalized.v1": (TENANT_ENVELOPE_COMMON, "citation.normalized.v1", {}),
+    "demand.graph.versioned.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "demand.graph.versioned.v1",
+        {
+            "project_id": "proj-0001",
+            "graph_version": "v1",
+            "cluster_count": 42,
+            "provenance_ref": "sha256:" + "a" * 64,
+        },
+    ),
+    "observation.captured.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "observation.captured.v1",
+        {
+            "engine_id": "chatgpt-search",
+            "observation_id": "obs-0001",
+            "artifact_hash": "sha256:" + "e" * 64,
+        },
+    ),
+    "citation.normalized.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "citation.normalized.v1",
+        {
+            "engine_id": "chatgpt-search",
+            "citation_id": "cite-0001",
+            "normalized_uri": "https://example.com/product/widget",
+            "content_hash": "sha256:" + "d" * 64,
+        },
+    ),
+    "entity.graph.versioned.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "entity.graph.versioned.v1",
+        {
+            "project_id": "proj-0001",
+            "graph_version": "v1",
+            "entity_count": 17,
+            "provenance_ref": "sha256:" + "b" * 64,
+        },
+    ),
+    "claim.evidence.versioned.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "claim.evidence.versioned.v1",
+        {
+            "project_id": "proj-0001",
+            "ledger_version": "v1",
+            "claim_count": 8,
+            "evidence_count": 21,
+            "provenance_ref": "sha256:" + "c" * 64,
+        },
+    ),
+    "experiment.registered.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "experiment.registered.v1",
+        {
+            "engine_id": "chatgpt-search",
+            "experiment_id": "exp-0001",
+            "canonical_hash": "sha256:" + "f" * 64,
+        },
+    ),
+    "experiment.anchored.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "experiment.anchored.v1",
+        {
+            "engine_id": "chatgpt-search",
+            "experiment_id": "exp-0001",
+            "canonical_hash": "sha256:" + "f" * 64,
+            "previous_hash": None,
+        },
+    ),
     "plan.contract.proposed.v1": (
         TENANT_ENVELOPE_COMMON,
         "plan.contract.proposed.v1",
@@ -331,7 +449,7 @@ def test_appendix_aggregate_example_validates_against_strategy_card_eligible_cha
 
 def test_appendix_system_example_validates_against_bare_envelope_only() -> None:
     """adapter.config.updated.v1 is the SystemContext appendix example but
-    is NOT one of the 12 confirmed AsyncAPI channels (it predates the
+    is NOT one of the 16 confirmed AsyncAPI channels (it predates the
     CONFIRMED v1 catalog) -- validated against the bare envelope schema
     only, not any channel overlay, documenting that distinction rather
     than silently assuming it has a channel.

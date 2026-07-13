@@ -1,0 +1,10 @@
+{
+  "tenant_id": "acme-corp",
+  "project_id": "proj-0001",
+  "claim_id": "claim-0001",
+  "entity_id": "entity-0001",
+  "claim_text": "Acme Widgets reduces setup time by 30%.",
+  "status": "active",
+  "effective_from": "2026-07-01T00:00:00Z",
+  "created_at": "2026-07-13T09:14:32Z"
+}

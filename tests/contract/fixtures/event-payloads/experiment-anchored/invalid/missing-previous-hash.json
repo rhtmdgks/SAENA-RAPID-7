@@ -1,0 +1,6 @@
+{
+  "engine_id": "chatgpt-search",
+  "experiment_id": "exp-0001",
+  "canonical_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "_expected_violation": "previous_hash is required (anyOf[null, sha256_ref] -- genesis anchors use null, but the key itself must be present); this instance omits the key entirely."
+}

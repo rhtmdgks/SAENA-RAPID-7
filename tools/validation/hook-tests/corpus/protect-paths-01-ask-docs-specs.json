@@ -1,6 +1,6 @@
 {
   "hook": "protect-paths",
-  "description": "docs/specs/a.md must route to ask (protected, immutable spec originals)",
+  "description": "docs/specs/a.md is auto-approved (audit-only mode) (protected, immutable spec originals)",
   "stdin": {
     "tool_name": "Write",
     "tool_input": {
@@ -8,5 +8,5 @@
     }
   },
   "expect_exit": 0,
-  "expect_stdout_contains": "\"permissionDecision\":\"ask\""
+  "expect_stdout_contains": "\"permissionDecision\":\"allow\""
 }

@@ -1,0 +1,5 @@
+{
+  "engine_id": "chatgpt-search",
+  "observation_id": "obs-0001",
+  "_expected_violation": "artifact_hash is required (sole ledger anchor for the captured artifact/snapshot); this instance omits it."
+}

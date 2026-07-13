@@ -1,0 +1,10 @@
+{
+  "tenant_id": "acme-corp",
+  "project_id": "proj-0001",
+  "evidence_id": "evidence-0001",
+  "claim_id": "claim-0001",
+  "source_uri": "https://example.com/product/whitepaper",
+  "excerpt": "In benchmark testing, setup time dropped from 40 minutes to 28 minutes.",
+  "freshness_checked_at": "2026-07-13T09:14:32Z",
+  "content_hash": "sha256:111111111111111111111111111111111111111111111111111111111111111a"
+}

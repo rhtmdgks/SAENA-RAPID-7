@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/entity-graph-versioned/v1/entity-graph-versioned.schema.json",
+  "title": "entity.graph.versioned.v1 payload",
+  "description": "Payload of the entity.graph.versioned.v1 event — notification that an entity-canonicalization graph version was produced by entity-resolution-service. Thin notification projection; the full entity graph itself is owned/stored by entity-resolution-service, not carried here.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: docs/architecture/wave4-plan.md 'Existing vs new events' (w4-10 Contracts Steward deliverable — 'entity.graph.versioned.v1' listed as NEW); docs/architecture/api-event-contracts.md 'PROPOSED' topic promoted to Wave 4 CONFIRMED-for-implementation by wave4-plan.md (events/catalog/README.md 'Finalize PROPOSED topics via ADR before implementation' obligation satisfied by the Wave 4 authority doc, analogous to prior-wave plan-approval ADR citations). Producer entity-resolution-service (services/intelligence/entity-resolution-service/README.md 'Published events: entity.graph.versioned.v1 (PROPOSED)'); consumes demand.graph.versioned.v1. Shape mirrors demand.graph.versioned.v1 (sibling '<domain>.graph.versioned.v1' notification family — same project_id/graph_version/*_count/provenance_ref convention) per this catalog's established practice of reusing a shared shape across sibling events (cf. quality.gate.passed/failed sharing quality-gate-result.schema.json).",
+  "type": "object",
+  "required": [
+    "project_id",
+    "graph_version",
+    "entity_count",
+    "provenance_ref"
+  ],
+  "properties": {
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "core business identifier (api-event-contracts.md); entity graph is project-scoped, consuming demand-graph's project-scoped output."
+    },
+    "graph_version": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Opaque version token for this entity-graph build; idempotency key component (contract-catalog.md:40 EntityRecord 'entity_id+graph_version' precedent)."
+    },
+    "entity_count": {
+      "type": "integer",
+      "minimum": 0,
+      "$comment": "Number of canonical entities resolved in this graph version."
+    },
+    "provenance_ref": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Content-addressed hash anchoring the graph version's build provenance (sole ledger anchor, mirrors repo-intaken.content_hash / demand-graph-versioned.provenance_ref)."
+    }
+  }
+}

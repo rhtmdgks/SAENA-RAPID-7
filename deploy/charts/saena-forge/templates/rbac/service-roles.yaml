@@ -5,10 +5,18 @@ k3s spec §8.1 condition 5: "runner service account has cluster-admin or
 production deploy permission" MUST fail preflight/install). Each rule list
 comes from `services.<key>.rbac.rules` in values.yaml — no wildcard
 apiGroups/resources/verbs are declared by this chart's defaults.
+
+A service whose `rbac.rules` is empty (e.g. `intelligenceWorker`, which
+needs zero Kubernetes API access — it only reads Postgres/ClickHouse/
+vectorStore) gets NO Role/RoleBinding rendered at all — least privilege
+means omitting the Role entirely, not binding an empty one (same
+least-privilege-by-omission convention as
+templates/rbac/execution-jobs-roles.yaml's header comment, w4-14 applies it
+here too).
 */ -}}
 {{- range $key, $svc := .Values.services }}
 {{- if $svc.enabled }}
-{{- if $svc.rbac }}
+{{- if and $svc.rbac $svc.rbac.rules }}
 {{- $saName := include "saena-forge.serviceAccountName" (dict "root" $ "service" $svc.nameSuffix) }}
 {{- $fullname := include "saena-forge.serviceFullname" (dict "root" $ "service" $svc.nameSuffix) }}
 {{- $labels := include "saena-forge.serviceLabels" (dict "root" $ "service" $svc.nameSuffix) }}

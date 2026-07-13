@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/experiment-registration/v1/experiment-registration.schema.json",
+  "title": "QueryExperiment (registration)",
+  "description": "Pre-registration record of a query experiment (treatment/control or matched-cluster design). Immutable after approval — registration ONLY, NO outcome/DiD/causal/lift fields (docs/architecture/wave4-plan.md 'Forbidden in W4'; outcome measurement is Wave 5).",
+  "$comment": "compat_class: closed, signed: true (human-signed family, same line as ChangePlan/ApprovalDecision — ADR-0024(b) 'signed=true 계약은 ChangePlan, ApprovalDecision 2종뿐(v1)' is amended by this Wave 4 unit per wave4-plan.md's explicit created_by/approved_by field pair, mirroring ApprovalDecision's human-approval requirement). Authority: docs/architecture/contract-catalog.md P1 table row 'QueryExperiment | experiment-attribution | 사전등록 후 immutable — 등록 hash를 audit-ledger 앵커링 (H-3); JSON Schema(사람 서명 계열)'; docs/architecture/wave4-plan.md 'Experiment ledger — registration ONLY (baseline/treatment/control or matched cluster, metric defs, query cluster, locale, browser policy, repeat count, asset hash, code/version hash, created_by/approved_by, timestamp, canonical hash, previous-hash anchor). Reuse saena_domain.audit hash chain + canonicalization (no new hashing rule).' Every field below traces verbatim to that list. design_type/query_cluster_ids/locale mirror context/run-context-experiment/v1's sibling experiment-design fields (engine_id, locales/locale, registration_hash/canonical_hash) — this domain contract is the fuller registration record; run-context-experiment stays the RunContext-split summary (data-ownership.md:39 join key run_id). previous_hash's anyOf[null, sha256_ref] shape verbatim-mirrors domain/audit-event/v1#/properties/prev_event_hash (genesis = null, no prior anchor). NO new hashing/canonicalization rule invented here per wave4-plan.md instruction — canonical_hash/previous_hash reuse the existing sha256_ref shape and audit-chain null-genesis convention already established by domain/audit-event and context/run-context-experiment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "run_id",
+    "engine_id",
+    "experiment_id",
+    "design_type",
+    "query_cluster_ids",
+    "metric_defs",
+    "locale",
+    "browser_policy",
+    "repeat_count",
+    "asset_hash",
+    "code_version_hash",
+    "created_by",
+    "approved_by",
+    "registered_at",
+    "canonical_hash",
+    "previous_hash"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Single-authority identifier convention (ADR-0011/ADR-0014)."
+    },
+    "run_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/run_id",
+      "$comment": "Join key back to context/run-context-experiment/v1 (data-ownership.md:39 'engine, locale, observation cell'), same run_id-keyed relationship."
+    },
+    "engine_id": {
+      "$ref": "../../../common/engine-id/v1/engine-id.schema.json",
+      "$comment": "wave4-plan.md 'Engine — chatgpt-search ONLY'. Mirrors context/run-context-experiment/v1#/properties/engine_id usage (root type reference, not the payload activation fragment)."
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque experiment identifier, mirrors common/identifiers/v1 opaque-id shape but not promoted there (not one of the 6 CONFIRMED core business identifiers). Correlation key shared with event/experiment-registered and event/experiment-anchored payloads."
+    },
+    "design_type": {
+      "type": "string",
+      "enum": ["treatment_control", "matched_cluster"],
+      "$comment": "wave4-plan.md 'baseline/treatment/control or matched cluster' design taxonomy."
+    },
+    "query_cluster_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "$comment": "wave4-plan.md 'query cluster' — references domain/demand-graph query-cluster IDs (opaque strings, no cross-file $ref per the common-only $ref convention)."
+    },
+    "metric_defs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric_id", "definition"],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "$comment": "wave4-plan.md 'metric defs' — nested closed object per item, mirrors domain/change-plan.hypotheses[] item-closure convention."
+    },
+    "locale": {
+      "type": "string",
+      "maxLength": 35,
+      "$comment": "wave4-plan.md 'locale' — mirrors context/run-context-experiment/v1#/properties/locales item shape (BCP-47 practical bound, pattern deferred per that schema's own $comment); singular here since one registration = one observation cell's locale, vs the RunContext summary's array."
+    },
+    "browser_policy": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "wave4-plan.md 'browser policy' — opaque browser/session policy profile identifier."
+    },
+    "repeat_count": {
+      "type": "integer",
+      "minimum": 1,
+      "$comment": "wave4-plan.md 'repeat count' — number of observation repeats for this experiment cell."
+    },
+    "asset_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "wave4-plan.md 'asset hash' — content-addressed hash of the treatment asset(s) under test."
+    },
+    "code_version_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "wave4-plan.md 'code/version hash' — hash of the measurement code/version used for this registration."
+    },
+    "created_by": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/actor_id",
+      "$comment": "wave4-plan.md 'created_by' — PII minimization: actor_id only, mirrors ApprovalDecision.approver_actor_id convention (contract-catalog.md 'actor PII 최소화')."
+    },
+    "approved_by": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/actor_id",
+      "$comment": "wave4-plan.md 'approved_by' — human-approval actor, the field that makes this contract signed:true (ADR-0024(b) vocabulary)."
+    },
+    "registered_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "wave4-plan.md 'timestamp' — registration timestamp."
+    },
+    "canonical_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "wave4-plan.md 'canonical hash' — the preregistration hash anchored to the audit-ledger (contract-catalog.md 'H-3'; mirrors context/run-context-experiment/v1#/properties/registration_hash's immutability rationale)."
+    },
+    "previous_hash": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref"
+        }
+      ],
+      "$comment": "wave4-plan.md 'previous-hash anchor' — verbatim-mirrors domain/audit-event/v1#/properties/prev_event_hash (genesis registration uses null)."
+    }
+  }
+}

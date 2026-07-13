@@ -67,6 +67,70 @@ denylist_patterns:
       (observability.md constraint: "Audit completeness 100%" is a separate
       channel from telemetry, k3s §9.3), not general telemetry.
 
+  # -------------------------------------------------------------------
+  # Wave 4 (Intelligence, w4-15) additions: customer-source-bearing field
+  # names from the intelligence services (demand-graph, claim-evidence,
+  # citation-intelligence, chatgpt-observer) that must never be attached as
+  # a telemetry attribute KEY at all — mirrors the existing secret-keyword
+  # denylist shape (match on key, defense-in-depth against a producer bug
+  # that accidentally passes raw customer-source content as an attribute).
+  # These are never allowlisted in attributes.yaml either (see w4-15
+  # additions above: only *_id/*_version/*_hash/boolean/closed-enum
+  # entries were added, never claim_text/excerpt/source_uri/query_text/
+  # normalized_uri themselves) — this denylist is defense-in-depth for the
+  # case a caller mistakenly reuses one of these raw field names as a
+  # telemetry attribute key anyway.
+  # -------------------------------------------------------------------
+  - id: R-CUSTOMER-SOURCE-CLAIM-TEXT
+    pattern: '(?i)claim_text'
+    applies_to: [key]
+    description: >
+      Matches an attribute key containing "claim_text" (mirrors
+      services/intelligence/claim-evidence-service `ExtractedClaim.
+      claim_text`, w4-04) — a claim's extracted text is customer-source
+      content and must never be a telemetry attribute; only saena.claim_id
+      (an opaque identifier) is registered for this purpose.
+
+  - id: R-CUSTOMER-SOURCE-EXCERPT
+    pattern: '(?i)excerpt'
+    applies_to: [key]
+    description: >
+      Matches an attribute key containing "excerpt" (mirrors
+      services/intelligence/claim-evidence-service `EvidenceRecord.excerpt`,
+      w4-04) — an evidence excerpt is customer-source content and must
+      never be a telemetry attribute.
+
+  - id: R-CUSTOMER-SOURCE-URI
+    pattern: '(?i)(source_uri|normalized_uri(?!_hash)|raw_object_ref|citation_ref)'
+    applies_to: [key]
+    description: >
+      Matches an attribute key containing "source_uri", "normalized_uri",
+      "raw_object_ref", or "citation_ref" (mirrors
+      services/intelligence/claim-evidence-service `EvidenceRecord.
+      source_uri`, services/intelligence/citation-intelligence-service
+      `normalize_url`'s output field, and
+      services/acquisition/chatgpt-observer-service `PlatformObservation.
+      raw_object_ref`/`citation_refs`, w4-04/w4-05/w4-08) — a raw or
+      normalized URL/object reference is customer-source-adjacent and must
+      never be a telemetry attribute value. The `normalized_uri` alternative
+      uses a negative lookahead (`(?!_hash)`) so it does NOT match the
+      registered, safe `saena.citation_normalized_uri_hash` attribute (a
+      HASH of the normalized URI, never the URI itself) — that attribute is
+      the intentional, allowlisted replacement for a raw normalized_uri
+      value, not a leak this rule should flag.
+
+  - id: R-CUSTOMER-SOURCE-QUERY-TEXT
+    pattern: '(?i)query_text'
+    applies_to: [key]
+    description: >
+      Matches an attribute key containing "query_text" (mirrors
+      services/acquisition/chatgpt-observer-service
+      `PlatformObservation.query_text` and
+      services/intelligence/demand-graph-service
+      `FirstPartyMaterial.text`-derived query content, w4-02/w4-08) — a
+      raw search query is customer-source content and must never be a
+      telemetry attribute.
+
 violation_rules:
   # Structural (context x attribute) violations, independent of the regex
   # denylist above. These encode the ADR-0013 context_type table's
@@ -87,3 +151,22 @@ violation_rules:
       target (ADR-0016 "Context별 요구 규칙" row); this rule is the
       registry-level source of truth that exporter config and CI lint must
       implement against.
+
+  - id: V-AGG-INTELLIGENCE-IDENTIFIER
+    context: aggregate
+    forbidden_attributes:
+      - saena.claim_id
+      - saena.evidence_id
+      - saena.citation_normalized_uri_hash
+      - saena.experiment_id
+    description: >
+      AggregateContext telemetry (saena.context=aggregate) MUST NOT contain
+      the Wave-4-intelligence high-cardinality identifiers
+      saena.claim_id, saena.evidence_id, saena.citation_normalized_uri_hash,
+      or saena.experiment_id (w4-15) — same re-identification-prevention
+      rationale as V-AGG-TENANT, applied to the new intelligence-workload
+      identifiers registered in attributes.yaml (each already marked
+      aggregate=forbidden there; this rule is the registry-level runtime
+      enforcement source of truth `decide_redaction` actually evaluates —
+      matching V-AGG-TENANT's own division of labor between the
+      documentation-only `contexts` column and this executable rule).

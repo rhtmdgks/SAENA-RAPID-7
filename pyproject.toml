@@ -17,10 +17,16 @@ members = [
     "packages/schemas",
     "packages/domain",
     "packages/observability",
+    "packages/analytics-clickhouse",
+    "packages/vector-store",
     "packages/hooks-runtime",
     "services/acquisition/repository-intake-service",
     "services/acquisition/chatgpt-observer-service",
     "services/acquisition/site-discovery-service",
+    "services/intelligence/demand-graph-service",
+    "services/intelligence/entity-resolution-service",
+    "services/intelligence/claim-evidence-service",
+    "services/intelligence/citation-intelligence-service",
     "services/platform/quality-eval-service",
     "services/foundation/tenant-control-service",
     "services/foundation/policy-gate-service",
@@ -60,6 +66,12 @@ dev = [
     "saena-agent-runner",
     "saena-forgectl",
     "saena-hooks-runtime",
+    "saena-analytics-clickhouse",
+    "saena-vector-store",
+    "saena-demand-graph",
+    "saena-entity-resolution",
+    "saena-claim-evidence",
+    "saena-citation-intelligence",
     "saena-repository-intake",
     "saena-quality-eval",
     "saena-chatgpt-observer",
@@ -89,6 +101,12 @@ saena-engine-gateway = { workspace = true }
 saena-agent-runner = { workspace = true }
 saena-forgectl = { workspace = true }
 saena-hooks-runtime = { workspace = true }
+saena-analytics-clickhouse = { workspace = true }
+saena-vector-store = { workspace = true }
+saena-demand-graph = { workspace = true }
+saena-entity-resolution = { workspace = true }
+saena-claim-evidence = { workspace = true }
+saena-citation-intelligence = { workspace = true }
 saena-repository-intake = { workspace = true }
 saena-quality-eval = { workspace = true }
 saena-chatgpt-observer = { workspace = true }
@@ -115,6 +133,13 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = true
 files = ["packages", "services", "tools/forgectl/src"]
+
+[[tool.mypy.overrides]]
+# clickhouse-connect ships no py.typed marker / stubs (w4-06). The
+# saena_analytics_clickhouse adapter isolates it behind the ClickHouseExecutor
+# Protocol; treat the driver as untyped at its import boundary only.
+module = "clickhouse_connect.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "tests"]
@@ -169,4 +194,25 @@ source = ["packages", "services", "tests/contract/harness", "tools/forgectl/src"
 omit = [
     "packages/schemas/saena_schemas/*",
     "packages/domain/src/saena_domain/persistence/postgres/adapters.py",
+    # packages/vector-store/src/saena_vector_store/pgvector/** (w4-07): the
+    # real pgvector adapter (Postgres `vector` extension) is MEANINGFULLY
+    # exercisable only against a live pgvector database — a mock would test
+    # the mock, not the SQL/ANN this adapter emits. NO unit-lane behavior
+    # coverage of its own; 100% covered by the real-container
+    # tests/integration/vector/** suite (16 tests incl. cross-tenant NN
+    # leakage). Same documented, non-silent ratchet treatment as the w2-13
+    # postgres adapter above (integration lane runs its OWN coverage; this
+    # omit only affects the blocking unit-lane ratchet).
+    "packages/vector-store/src/saena_vector_store/pgvector/*",
+    # services/.../chatgpt-observer-service/.../playwright_driver.py (w4-08):
+    # the real Playwright/Chromium browser driver. Its `import playwright...`
+    # is guarded so the module imports without the package installed, but its
+    # actual session/render/close methods are MEANINGFULLY exercisable only
+    # against a live headless browser — a fake would test the fake, not the
+    # real driver. The unit lane instead drives the pool through the
+    # deterministic `FixtureBrowserSessionFactory` (pool.py, 98% unit cov);
+    # the real driver is integration-lane only (tests/integration/
+    # browser_observer/**, browser-gated). Same documented, non-silent ratchet
+    # treatment as the w2-13 postgres / w4-07 pgvector real adapters above.
+    "services/acquisition/chatgpt-observer-service/src/saena_chatgpt_observer/playwright_driver.py",
 ]

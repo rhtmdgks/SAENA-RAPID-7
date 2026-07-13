@@ -111,6 +111,51 @@ eventBus:
     - redpanda-2.saena-data.svc.cluster.local:9092
   credentialsSecretRef: saena-redpanda-credentials
 
+# clickhouse — Wave 4 introduction (data-ownership.md: "도입 시점 = Wave 4
+# (인프라 스테이징)", ADR-0007). CONNECTION config only, same
+# external/managed-not-bundled-subchart discipline as postgres/objectStorage
+# above — no ClickHouse subchart is ever rendered by this chart. Tables are
+# owned per-service (chatgpt-observer ROL, citation-intelligence,
+# experiment-attribution, observability stack — data-ownership.md), all
+# append-only, all partitioned by TIME + `ORDER BY (tenant_id, ...)` prefix
+# (ADR-0007 rev.2 — tenant-per-partition is explicitly forbidden; tenant_id
+# is a leading ORDER BY column, not a partition key). Retention/TTL policy
+# (`system.parts` TTL clause, S3/object-storage tiering, etc.) is a
+# PRODUCTION-ONLY operational decision, OPEN per data-ownership.md "Managed
+# vs in-cluster data services per profile — see deployment-profiles.md" —
+# this chart does not encode a retention product decision, only a safe
+# connection default an operator points at whatever ClickHouse deployment
+# (managed service or in-cluster, per deployment-profiles.md profile) they
+# have staged. `credentialsSecretRef` is a name only, never a value
+# (ADR-0020) — see externalSecrets below.
+clickhouse:
+  external: true
+  host: clickhouse.saena-data.svc.cluster.local
+  port: 8443
+  useTLS: true
+  database: saena_analytics
+  credentialsSecretRef: saena-clickhouse-credentials
+  # retention/TTL is intentionally NOT set here — OPEN DECISION, production-
+  # only (see comment above); a profile-specific values overlay
+  # (deploy/profiles/**) sets an actual TTL once that decision is made.
+
+# vectorStore — Wave 4 introduction (data-ownership.md: "Qdrant/pgvector ...
+# 도입 = Wave 4 (ADR-0007)"). The w4-07 adapter unit (`saena-vector-store`,
+# `VectorStore` port) implements the pgvector backend — pgvector runs AS AN
+# EXTENSION inside the existing `postgres` connection above, not as a
+# separate database process, so this block is index/partition metadata only,
+# no new host/port. `indexPrefix` gives demand-graph/claim-evidence/
+# entity-resolution (their owned partition split — data-ownership.md)
+# deterministic, non-colliding index namespaces without a second credential.
+# A future non-pgvector backend (e.g. a dedicated Qdrant service) would add
+# its own `external`/`host`/`port`/`credentialsSecretRef` fields here without
+# changing this key's shape for pgvector-backend consumers.
+vectorStore:
+  backend: pgvector
+  usesPostgresConnection: true
+  indexPrefix: saena_vec
+  tenantPartitioned: true
+
 # externalSecrets — every entry's `valueFrom` MUST be a real external-secrets.io
 # `secretStoreRef.kind` (SecretStore or ClusterSecretStore — a provider such
 # as Vault is configured INSIDE one of those two objects, never a `kind`
@@ -124,6 +169,9 @@ externalSecrets:
     source: external-secrets-operator
     valueFrom: SecretStore
   - name: saena-redpanda-credentials
+    source: external-secrets-operator
+    valueFrom: ClusterSecretStore
+  - name: saena-clickhouse-credentials
     source: external-secrets-operator
     valueFrom: ClusterSecretStore
   - name: saena-temporal-credentials
@@ -431,6 +479,105 @@ services:
           resources: ["configmaps"]
           verbs: ["get", "list", "watch"]
 
+  # --- Wave 4 intelligence workloads (w4-14) ---------------------------------
+  # intelligence-worker — Worker-hosted module Deployment (service-catalog.md
+  # "Worker-hosted module" rendering class, 1 of the 2 actual worker-host
+  # Deployments): a single compute pool hosting the 4 P0 intelligence
+  # capabilities (demand-graph, entity-resolution, claim-evidence,
+  # citation-intelligence — service-catalog.md "intelligence-worker: ...
+  # own schema + 모듈별 DB credential"; absorption-analysis is P1/flag-off,
+  # not hosted here). Each module keeps its own Postgres schema/credential
+  # (data-ownership.md "own-schema GRANT") — this Deployment's pod is a
+  # single process/container hosting all 4 modules (ADR-0002 rev.2 module
+  # consolidation), not 4 separate containers, so RBAC/NetworkPolicy/SA
+  # governs the POD, while schema-level isolation is enforced at the
+  # Postgres GRANT layer (out of this chart's scope — data-ownership.md
+  # "보안 경계 아님", isolation unit = process/Pod, which this Deployment IS).
+  # No Kubernetes API access needed (reads ClickHouse/vectorStore/Postgres
+  # only, never the K8s API) — `rbac.rules: []` renders zero Role/
+  # RoleBinding, same least-privilege-by-omission convention as
+  # executionJobs.* in templates/rbac/execution-jobs-roles.yaml.
+  intelligenceWorker:
+    enabled: true
+    nameSuffix: intelligence-worker
+    namespace: saena-system
+    domain: intelligence
+    image:
+      repository: intelligence-worker
+      digest: "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+      signature: "cosign-bundle:intelligence-worker@sha256:aaaa999999999999999999999999999999999999999999999999999999"
+    replicaCount: 2
+    resources:
+      # Wider than serviceDefaults — hosts 4 modules doing graph/entity/
+      # retrieval workloads (ClickHouse query + pgvector similarity search),
+      # not a thin API-only service like the 8 control-plane services above.
+      requests: { cpu: 500m, memory: 1Gi }
+      limits: { cpu: "2", memory: 2Gi }
+    rbac:
+      rules: []
+    # ClickHouse/vectorStore connection refs surface into this Deployment's
+    # env via templates/services/deployments.yaml's per-service env block
+    # (see that template's `{{- if eq $svc.nameSuffix "intelligence-worker"
+    # }}` guard) — no new template file needed for a single extra service's
+    # extra env vars.
+
+  # chatgpt-observer — the k3s-Deployment half of "Planned runtime | k3s
+  # Deployment + browser Jobs" (services/acquisition/chatgpt-observer-
+  # service/README.md, execution-runtime.md JobKind.CHATGPT_OBSERVER row).
+  # This Deployment is the browser-POOL OBSERVER/coordinator (health/
+  # readiness API + status/metrics surface for the browser pool) — it is
+  # NOT the browser session itself. The actual ChatGPT Search observation
+  # session runs as a separate, already-rendered Job identity
+  # (`executionJobs.browserPool.chatgptObserver` above, ServiceAccount
+  # `saena-chatgpt-observer`, `automountServiceAccountToken: false`, zero
+  # Role/RoleBinding) — Job launch/poll/cleanup for ALL job kinds (including
+  # this one) stays the SOLE responsibility of `agentOrchestrator`'s SA
+  # (already granted `batch/jobs` above — execution-runtime.md: "the
+  # orchestrator (W2B) owns 'when to start a job and how to wait for it'").
+  # This coordinator Deployment's OWN ServiceAccount
+  # (`saena-forge-chatgpt-observer-sa`, distinct name, no collision with the
+  # Job SA) is therefore READ-ONLY — `rbac.rules: []` renders NO Role/
+  # RoleBinding at all (least-privilege-by-omission, same as
+  # `intelligenceWorker` above), enforcing the explicit w4-14 constraint:
+  # "browser-pool observer SA MUST carry NO Git credentials and be
+  # READ-ONLY (no write RBAC to any cluster resource)". Duplicating
+  # agentOrchestrator's batch/jobs grant here would both violate that
+  # constraint and widen the Job-launcher surface beyond its single owner.
+  #   - NO Git credential ExternalSecret/volume is ever wired to this
+  #     Deployment or its SA anywhere in this chart (mirrors the "browser
+  #     pool 권한 차등" decision already enforced for the Job SA).
+  #   - ZERO Kubernetes API access — no secrets, no configmaps write, no
+  #     pods/exec, no batch/jobs, no cluster-scope of any kind
+  #     (ClusterRole/ClusterRoleBinding are never rendered by this chart,
+  #     for ANY ServiceAccount — templates/rbac/service-roles.yaml).
+  #   - READ-ONLY toward customer data: this coordinator only observes
+  #     ChatGPT Search responses (ADR-0004 "No Git credential issued at
+  #     all — observation only") and exposes its own health/status; it
+  #     never has a write path to a customer repository/site or to the
+  #     Kubernetes API.
+  chatgptObserver:
+    enabled: true
+    nameSuffix: chatgpt-observer
+    namespace: saena-system
+    domain: acquisition
+    image:
+      repository: chatgpt-observer-service
+      digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      signature: "cosign-bundle:chatgpt-observer@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    replicaCount: 2
+    resources:
+      requests: { cpu: 250m, memory: 256Mi }
+      limits: { cpu: "1", memory: 512Mi }
+    rbac:
+      rules: []
+    # No Role is ever bound to this SA (rbac.rules is empty above), so
+    # mounting its token would grant nothing — disable the automount
+    # entirely rather than leave an unused (if harmless) token mounted into
+    # a pod that observes untrusted third-party (ChatGPT Search) content.
+    serviceAccount:
+      create: true
+      automountServiceAccountToken: false
+
 # images[] — flat mirror list forgectl's image_digest_signature check reads
 # (k3s spec §7 skeleton shape / tests/unit/forgectl/fixtures/values-passing.yaml).
 # Kept in sync with `services.*.image` above; templates render from
@@ -462,3 +609,9 @@ images:
   - name: engine-adapter-gateway
     digest: "sha256:8888888888888888888888888888888888888888888888888888888888888888"
     signature: "cosign-bundle:engine-adapter-gateway@sha256:aaaa888888888888888888888888888888888888888888888888888888"
+  - name: intelligence-worker
+    digest: "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+    signature: "cosign-bundle:intelligence-worker@sha256:aaaa999999999999999999999999999999999999999999999999999999"
+  - name: chatgpt-observer-service
+    digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    signature: "cosign-bundle:chatgpt-observer@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

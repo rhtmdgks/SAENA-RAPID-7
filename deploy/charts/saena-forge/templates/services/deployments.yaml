@@ -2,8 +2,17 @@
 Deployment for each of the 8 independently-deployed services
 (service-catalog.md "Independent Deployment" rendering class: forge-console-api,
 plan-contract, policy-gate, agent-orchestrator, audit-ledger, tenant-control,
-artifact-registry, engine-adapter-gateway). Every field is parameterized from
-`.Values.services.<key>` merged over `.Values.serviceDefaults`.
+artifact-registry, engine-adapter-gateway) PLUS the Wave 4 intelligence
+workloads (w4-14): intelligence-worker (Worker-hosted module Deployment,
+service-catalog.md) and chatgpt-observer (the k3s-Deployment half of its
+"Deployment + browser Jobs" planned runtime — see
+services/acquisition/chatgpt-observer-service/README.md and
+`values.yaml`'s `services.chatgptObserver` comment for the pool-coordinator
+vs browser-session-Job split). Every field is parameterized from
+`.Values.services.<key>` merged over `.Values.serviceDefaults` — this
+template is intentionally service-agnostic (no per-service `if` branches);
+adding a new `services.<key>` entry in values.yaml is sufficient to render
+its Deployment, exactly like the 8 pre-Wave-4 entries already do.
 */ -}}
 {{- range $key, $svc := .Values.services }}
 {{- if $svc.enabled }}
@@ -73,6 +82,16 @@ spec:
               value: {{ $.Values.objectStorage.credentialsSecretRef | quote }}
             - name: EVENT_BUS_CREDENTIALS_SECRET_REF
               value: {{ $.Values.eventBus.credentialsSecretRef | quote }}
+            {{- if $.Values.clickhouse }}
+            - name: CLICKHOUSE_CREDENTIALS_SECRET_REF
+              value: {{ $.Values.clickhouse.credentialsSecretRef | quote }}
+            {{- end }}
+            {{- if $.Values.vectorStore }}
+            - name: VECTOR_STORE_BACKEND
+              value: {{ $.Values.vectorStore.backend | quote }}
+            - name: VECTOR_STORE_INDEX_PREFIX
+              value: {{ $.Values.vectorStore.indexPrefix | quote }}
+            {{- end }}
           resources:
             {{- $resources | toYaml | nindent 12 }}
           livenessProbe:

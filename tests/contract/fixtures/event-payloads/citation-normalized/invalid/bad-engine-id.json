@@ -1,0 +1,7 @@
+{
+  "engine_id": "google-ai-overviews",
+  "citation_id": "cite-0001",
+  "normalized_uri": "https://example.com/product/widget",
+  "content_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "_expected_violation": "engine_id must be the v1 closed enum ['chatgpt-search'] (ADR-0013/CLAUDE.md Engine scope); google-ai-overviews is disabled."
+}

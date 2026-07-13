@@ -1,0 +1,7 @@
+{
+  "project_id": "proj-0001",
+  "ledger_version": "v1",
+  "claim_count": 8,
+  "evidence_count": 21,
+  "provenance_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

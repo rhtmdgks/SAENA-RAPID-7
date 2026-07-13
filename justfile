@@ -56,6 +56,28 @@ test-execution-e2e:
     uv run pytest tests/e2e/execution -q
     uv run pytest -q -m integration tests/integration/execution_e2e -p no:cacheprovider
 
+# W4 named required-check recipes (ADR-0018 stable check names; wave4-plan §99).
+# Same belt-and-suspenders shape as the W3 named checks above: targeted subsets
+# used as their own CI jobs; the `test`/`test-integration` umbrellas still run
+# the same tests. Container legs honest-skip when Docker/driver is absent.
+test-intelligence-e2e:
+    uv run pytest tests/e2e/intelligence -q
+    uv run pytest -q -m integration tests/integration/intelligence_e2e -p no:cacheprovider
+
+test-storage-integration:
+    uv run pytest -q -m integration tests/integration/clickhouse tests/integration/vector tests/integration/intelligence_pipeline -p no:cacheprovider
+
+test-browser-observer:
+    uv run pytest tests/unit/svc_chatgpt_observer -q
+
+test-qeeg-replay:
+    uv run pytest tests/unit/domain_qeeg tests/unit/svc_claim_evidence -q
+    uv run pytest -q -m integration tests/integration/intelligence_failure -p no:cacheprovider
+
+test-experiment-integrity:
+    uv run pytest tests/unit/domain_experiment -q
+    uv run pytest -q -m integration tests/integration/intelligence_failure/test_experiment_ledger_tamper.py -p no:cacheprovider
+
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
 helm-smoke:
@@ -114,7 +136,7 @@ contracts-validate:
 codegen:
     #!/bin/sh
     set -eu
-    OPEN_CONTRACTS="context/workspace_context_v1 context/project_context_v1 context/site_context_v1 context/run_context_lifecycle_v1 domain/verification_result_v1 event/patch_unit_completed_v1 event/quality_gate_result_v1 event/plan_contract_proposed_v1 event/plan_contract_approved_v1 event/repo_intaken_v1 event/site_inventory_completed_v1"
+    OPEN_CONTRACTS="context/workspace_context_v1 context/project_context_v1 context/site_context_v1 context/run_context_lifecycle_v1 domain/verification_result_v1 event/patch_unit_completed_v1 event/quality_gate_result_v1 event/plan_contract_proposed_v1 event/plan_contract_approved_v1 event/repo_intaken_v1 event/site_inventory_completed_v1 event/demand_graph_versioned_v1 event/entity_graph_versioned_v1 event/claim_evidence_versioned_v1 event/citation_normalized_v1 event/observation_captured_v1 event/experiment_registered_v1 event/experiment_anchored_v1"
     NESTED_ALLOW="envelope/event_envelope_v1:Payload"
     PKG_ROOT=packages/schemas/saena_schemas
     rm -rf "$PKG_ROOT"/context "$PKG_ROOT"/domain "$PKG_ROOT"/event "$PKG_ROOT"/envelope "$PKG_ROOT"/common

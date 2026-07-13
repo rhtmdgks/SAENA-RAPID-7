@@ -27,9 +27,13 @@ def test_real_catalog_contains_patch_unit_completed() -> None:
     assert info.expected_producer == "agent-runner-service"
 
 
-def test_real_catalog_has_twelve_channels() -> None:
+def test_real_catalog_has_sixteen_channels() -> None:
+    # 12 CONFIRMED-v1 channels + 4 Wave 4 intelligence channels carrying a
+    # message overlay (w4-10: entity.graph / claim.evidence / experiment.
+    # registered / experiment.anchored; the other 3 W4 events — demand.graph,
+    # citation.normalized, observation.captured — were already catalog names).
     catalog = load_topic_catalog()
-    assert len(catalog) == 12
+    assert len(catalog) == 16
 
 
 def test_real_catalog_every_entry_has_a_producer() -> None:
@@ -37,10 +41,13 @@ def test_real_catalog_every_entry_has_a_producer() -> None:
     assert all(info.expected_producer for info in catalog.values())
 
 
-def test_real_catalog_engine_id_required_flag_exactly_three_channels() -> None:
-    """ADR-0013: engine_id required for observation/citation/experiment
-    event families -- exactly 3 CONFIRMED v1 channels carry
-    x-saena-engine-id-required: true.
+def test_real_catalog_engine_id_required_flag_for_observation_citation_experiment() -> None:
+    """ADR-0013: engine_id required for the observation/citation/experiment
+    event families. The two Wave 4 experiment-registration events (w4-10)
+    join that set — every experiment-family event must declare which engine
+    it targets (chatgpt-search only in v1), so the engine-scope guard holds
+    at the contract boundary. Demand/entity/claim-evidence graphs are
+    first-party-derived (not engine-observed) and carry no engine_id flag.
     """
     catalog = load_topic_catalog()
     required = {event_type for event_type, info in catalog.items() if info.engine_id_required}
@@ -48,6 +55,8 @@ def test_real_catalog_engine_id_required_flag_exactly_three_channels() -> None:
         "observation.captured.v1",
         "citation.normalized.v1",
         "experiment.outcome.observed.v1",
+        "experiment.registered.v1",
+        "experiment.anchored.v1",
     }
 
 

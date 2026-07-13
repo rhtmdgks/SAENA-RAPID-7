@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/experiment-registered/v1/experiment-registered.schema.json",
+  "title": "experiment.registered.v1 payload",
+  "description": "Payload of the experiment.registered.v1 event — notification that experiment-attribution-service pre-registered a QueryExperiment (domain/experiment-registration). Registration ONLY — NO outcome/DiD/causal/lift fields (docs/architecture/wave4-plan.md 'Forbidden in W4').",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: docs/architecture/wave4-plan.md 'Existing vs new events' (w4-10 Contracts Steward deliverable — team-lead field list 'experiment registration notification (experiment id, canonical hash, tenant/run). NO outcome fields.') and 'Experiment ledger — registration ONLY ... Reuse saena_domain.audit hash chain + canonicalization'. This is a NEW AsyncAPI channel (not one of the CONFIRMED-v1 12; wave4-plan.md's 'NEW (Contracts Steward, w4-10)' list is this channel's authorizing document, satisfying events/catalog/README.md's 'Finalize PROPOSED topics via ADR before implementation' obligation the same way prior-wave plan-approval docs authorized new fields — see ADR-0013 rev.3 §출처 for the precedent pattern of a Wave planning-approval doc as ADR-equivalent authority). Producer experiment-attribution-service. tenant_id/run_id are NOT re-projected into payload (ADR-0024(e) — envelope already carries both for this tenant-scoped run event); 'tenant/run' in the team-lead field list is satisfied by the envelope, not duplicated here. engine_id REQUIRED — ADR-0013's 'engine_id: observation·citation·experiment 계열 이벤트 payload에 필수' rule covers the whole 'experiment 계열' (family), which includes this registration notification, not only experiment.outcome.observed.v1; composed via allOf $ref to common/engine-id/v1's engine_required_payload fragment. canonical_hash mirrors context/run-context-experiment/v1#/properties/registration_hash's sha256_ref shape and preregistration-immutability rationale (same $comment pattern: hash anchors the exact byte serialization of the registered experiment design at registration time).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../../../common/engine-id/v1/engine-id.schema.json#/$defs/engine_required_payload"
+    }
+  ],
+  "required": [
+    "experiment_id",
+    "canonical_hash"
+  ],
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque identifier for the registered experiment (domain/experiment-registration.experiment_id), mirrors common/identifiers/v1 opaque-id shape but not promoted there (not a CONFIRMED core business identifier)."
+    },
+    "canonical_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "team-lead field list 'canonical hash' — the preregistration hash anchored to the audit-ledger at registration time (mirrors context/run-context-experiment/v1#/properties/registration_hash; sole ledger anchor for the registered design)."
+    }
+  }
+}

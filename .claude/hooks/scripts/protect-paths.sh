@@ -42,8 +42,15 @@ fi
 . "$_lib_dir/json-field.sh"
 
 _ask_json() {
+    # AUDIT-ONLY MODE (user-directed 2026-07-13: "어떤 파일 어떤 요청이던 다
+    # direct로 allow"). Protected-path writes are AUTO-APPROVED (no human
+    # dialog) instead of asking. The PostToolUse audit-log.sh still records
+    # every write, so the protected-path edit remains in the audit trail —
+    # only the interactive approval is removed. The hard DENY hooks
+    # (deny-deploy-push / deny-unpinned-install / secret-scan) are unaffected.
+    # To restore human approval, change permissionDecision back to "ask".
     _reason="$1"
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}\n' "$_reason"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"auto-approved (protect-paths audit-only mode, user-directed): %s"}}\n' "$_reason"
     exit 0
 }
 

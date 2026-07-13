@@ -1,0 +1,35 @@
+[project]
+name = "saena-demand-graph"
+version = "0.1.0"
+description = "SAENA demand-graph-service — deterministic first-party B2B-SaaS query-cluster (demand graph) builder (W4, unit w4-02)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "saena-domain",
+    "saena-schemas",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_demand_graph"]
+
+[tool.uv.sources]
+saena-domain = { workspace = true }
+saena-schemas = { workspace = true }
+
+# NOTE (w4-02): this package is NOT YET a member of the root workspace
+# (root pyproject.toml `[tool.uv.workspace].members` / dev dependency-group)
+# — per this repo's established Wave-3/4 parallel-unit convention (see
+# services/acquisition/site-discovery-service/pyproject.toml, added by
+# unit/w3-05-site-discovery, same not-yet-registered state at the time that
+# unit was authored), each new-package patch unit's own exclusive paths
+# never include root pyproject.toml: registering a new workspace member is
+# the Integrator's job at merge time (CLAUDE.md "독점 수정 경로" / "단일
+# owner" — root pyproject.toml is shared infrastructure every parallel
+# Wave-4 unit would otherwise collide on). Until that registration happens,
+# this package is NOT `uv sync`-installed/importable as a real distribution
+# — this unit's own tests (`tests/unit/svc_demand_graph/conftest.py`) import
+# it by inserting `src/` directly onto `sys.path` instead, exactly like that
+# same conftest pattern already does for `saena_site_discovery`.

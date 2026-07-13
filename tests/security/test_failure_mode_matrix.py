@@ -159,10 +159,11 @@ def test_rollback_verification_gate_section_is_present_and_every_listed_test_exi
 
 def test_no_test_security_python_module_is_left_out_of_every_matrix_reference() -> None:
     """A softer completeness check in the OTHER direction: every
-    `test_f*.py`/`test_rollback_*.py` module under this directory
-    contributes at least one node referenced somewhere in the matrix — a
-    new failure-mode/rollback test file added here without ever being
-    wired into the matrix would otherwise go unnoticed."""
+    `test_f*.py`/`test_rollback_*.py`/`test_intel_*.py` module under this
+    directory contributes at least one node referenced somewhere in the
+    matrix — a new failure-mode/rollback/intelligence-adversarial test
+    file added here without ever being wired into the matrix would
+    otherwise go unnoticed."""
     matrix = _load_matrix()
     referenced_modules = {
         node_id.split("::", 1)[0]
@@ -177,6 +178,7 @@ def test_no_test_security_python_module_is_left_out_of_every_matrix_reference() 
     referenced_modules |= {
         node_id.split("::", 1)[0] for node_id in matrix["rollback_verification_gate"]["tests"]
     }
+    referenced_modules |= set(matrix["intelligence_adversarial_suite"]["test_modules"])
 
     this_dir = Path(__file__).resolve().parent
     fixture_modules = sorted(
@@ -186,3 +188,56 @@ def test_no_test_security_python_module_is_left_out_of_every_matrix_reference() 
     )
     unreferenced = [m for m in fixture_modules if m not in referenced_modules]
     assert not unreferenced, f"module(s) not referenced anywhere in the matrix: {unreferenced}"
+
+
+def test_intelligence_adversarial_suite_section_is_present_and_every_module_exists() -> None:
+    """Completeness gate for the NEW `intelligence_adversarial_suite`
+    top-level section (w4-16) — mirrors
+    `test_rollback_verification_gate_section_is_present_and_every_listed_test_exists`'s
+    shape for `rollback_verification_gate`, applied to this sibling
+    section instead. Deliberately does NOT touch/extend the 9-mode
+    `modes[]` array or `_EXPECTED_MODE_IDS` (k3s §10 stays exactly
+    F-1..F-9); this is a structurally separate section, same precedent as
+    `rollback_verification_gate` itself.
+    """
+    matrix = _load_matrix()
+    section = matrix.get("intelligence_adversarial_suite")
+    assert section is not None, "matrix is missing the intelligence_adversarial_suite section"
+
+    guards = section["guards_covered"]
+    assert guards, "intelligence_adversarial_suite.guards_covered must not be empty"
+    for guard in guards:
+        for key in ("id", "name", "fixture", "expected_state_transition", "test_module"):
+            assert guard.get(key), f"{guard.get('id', '<unknown>')}.{key} must not be empty"
+        module_path = _REPO_ROOT / guard["test_module"]
+        assert module_path.is_file(), (
+            f"referenced test module does not exist: {guard['test_module']!r}"
+        )
+
+    test_modules = section["test_modules"]
+    assert test_modules, "intelligence_adversarial_suite.test_modules must not be empty"
+    for module_rel_path in test_modules:
+        module_path = _REPO_ROOT / module_rel_path
+        assert module_path.is_file(), f"referenced test module does not exist: {module_rel_path!r}"
+
+    # Every guard's own test_module must also appear in the flat test_modules list.
+    guard_modules = {guard["test_module"] for guard in guards}
+    assert guard_modules <= set(test_modules), (
+        f"guard test_module(s) missing from test_modules list: {guard_modules - set(test_modules)}"
+    )
+
+
+def test_matrix_has_exactly_the_9_authoritative_failure_modes_no_gaps_is_unaffected_by_intelligence_section() -> (  # noqa: E501
+    None
+):
+    """Adversarial regression pin: adding `intelligence_adversarial_suite`
+    must NEVER cause `modes[]` to silently grow past 9 or renumber — this
+    duplicates (deliberately) the core assertion of
+    `test_matrix_has_exactly_the_9_authoritative_failure_modes_no_gaps`
+    from THIS new section's own vantage point, so a future edit that
+    merged the two sections by mistake (e.g. appending intelligence guards
+    into `modes[]`) is caught here too, independent of that other test."""
+    matrix = _load_matrix()
+    assert len(matrix["modes"]) == 9
+    assert [mode["id"] for mode in matrix["modes"]] == list(_EXPECTED_MODE_IDS)
+    assert "intelligence_adversarial_suite" not in {mode["id"] for mode in matrix["modes"]}
