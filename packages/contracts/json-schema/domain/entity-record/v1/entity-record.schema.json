@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/entity-record/v1/entity-record.schema.json",
+  "title": "EntityRecord",
+  "description": "Canonical entity (brand/product/integration/competitor) record owned by entity-resolution-service. Public business-name content, not customer source or PII.",
+  "$comment": "compat_class: closed, signed: false (non-signed closed contract, same family as SourceSnapshot/PatchArtifact/AuditEvent per ADR-0024(b) '비서명 closed 계약'). Authority: docs/architecture/contract-catalog.md P1 table row 'EntityRecord | entity-resolution | entity_id+graph_version' (idempotency key); docs/architecture/wave4-plan.md 'Existing vs new events' domain-contract candidate list; services/intelligence/entity-resolution-service/README.md ('Primary responsibility: brand/product/integration/competitor canonicalization', 'Owned data: entity graph'). project_id (not a raw customer identifier) reflects data-ownership.md cross-cutting rule that entity-resolution consumes demand-graph's project-scoped output. entity_id/graph_version together are the idempotency key per the catalog row; entity_id is an opaque local identifier (mirrors common/identifiers/v1 opaque-id shape, e.g. workspace_id/project_id/site_id) not promoted to the shared common file since it is not one of the 6 CONFIRMED core business identifiers (docs/architecture/api-event-contracts.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "project_id",
+    "entity_id",
+    "graph_version",
+    "entity_type",
+    "canonical_name",
+    "updated_at"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Single-authority identifier convention (ADR-0011/ADR-0014)."
+    },
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "data-ownership.md cross-cutting rule — entity-resolution consumes demand-graph's project-scoped output."
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "contract-catalog.md:40 idempotency key component 'entity_id+graph_version'. Opaque, mirrors common/identifiers/v1 opaque-id shape."
+    },
+    "graph_version": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "contract-catalog.md:40 idempotency key component 'entity_id+graph_version'. Opaque version token, mirrors event/site-inventory-completed inventory_version shape."
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": ["brand", "product", "integration", "competitor"],
+      "$comment": "services/intelligence/entity-resolution-service/README.md 'brand/product/integration/competitor canonicalization'."
+    },
+    "canonical_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "$comment": "Canonicalized public business name — not customer source content or PII (bounded length, no free-form document)."
+    },
+    "updated_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "Last canonicalization update timestamp."
+    }
+  }
+}

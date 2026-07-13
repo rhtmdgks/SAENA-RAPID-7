@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/demand-graph-versioned/v1/demand-graph-versioned.schema.json",
+  "title": "demand.graph.versioned.v1 payload",
+  "description": "Payload of the demand.graph.versioned.v1 event — notification that a demand/query-cluster graph version was produced by demand-graph-service. Thin notification projection; the full query-cluster graph itself is owned/stored by demand-graph-service, not carried here.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: docs/architecture/wave4-plan.md 'Existing vs new events' (w4-10 Contracts Steward deliverable, team message field list: 'version id, tenant/workspace/project, cluster count, provenance ref hash'); docs/architecture/api-event-contracts.md CONFIRMED topic list (demand.graph.versioned.v1); packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml (channel already CONFIRMED envelope-only P1-deferred — this schema fills the payload). Producer demand-graph-service (services/intelligence/demand-graph-service/README.md 'Published events'); consumes site.inventory.completed.v1. project_id (not tenant_id/run_id — ADR-0024(e) forbids re-projecting envelope identifiers into payload) per docs/architecture/contract-catalog.md:22 'ProjectContext ... tenant-control → demand-graph, experiment-attr' — demand-graph is project-scoped. provenance_ref is the sole content-addressed ledger anchor for the graph version's build provenance, mirroring repo-intaken.content_hash's 'hash만 ledger' pattern (contract-catalog.md:25).",
+  "type": "object",
+  "required": [
+    "project_id",
+    "graph_version",
+    "cluster_count",
+    "provenance_ref"
+  ],
+  "properties": {
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "contract-catalog.md:22 ProjectContext -> demand-graph flow; core business identifier (api-event-contracts.md 'Core business identifiers')."
+    },
+    "graph_version": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Opaque version token for this demand-graph build, mirrors event/site-inventory-completed/v1#/properties/inventory_version shape (opaque, no fixed grammar)."
+    },
+    "cluster_count": {
+      "type": "integer",
+      "minimum": 0,
+      "$comment": "team-lead field list 'cluster count' — number of query clusters in this graph version."
+    },
+    "provenance_ref": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "team-lead field list 'provenance ref hash' — content-addressed hash anchoring the graph version's build provenance (sole ledger anchor, mirrors repo-intaken.content_hash)."
+    }
+  }
+}

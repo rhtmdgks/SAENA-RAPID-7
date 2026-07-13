@@ -1,0 +1,6 @@
+{
+  "engine_id": "chatgpt-search",
+  "citation_id": "cite-0001",
+  "normalized_uri": "https://example.com/product/widget",
+  "_expected_violation": "content_hash is required (sole ledger anchor for the fuller citation-record artifact); this instance omits it."
+}

@@ -85,6 +85,12 @@ CLOSED_CLASS_SCHEMA_RELPATHS: frozenset[str] = frozenset(
         "domain/source-snapshot/v1/source-snapshot.schema.json",
         "domain/patch-artifact/v1/patch-artifact.schema.json",
         "domain/audit-event/v1/audit-event.schema.json",
+        # w4-10 Contracts Steward (Wave 4).
+        "domain/entity-record/v1/entity-record.schema.json",
+        "domain/extracted-claim/v1/extracted-claim.schema.json",
+        "domain/evidence-record/v1/evidence-record.schema.json",
+        "domain/platform-observation/v1/platform-observation.schema.json",
+        "domain/experiment-registration/v1/experiment-registration.schema.json",
     }
 )
 

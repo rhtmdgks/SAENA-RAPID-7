@@ -1,0 +1,10 @@
+{
+  "tenant_id": "acme-corp",
+  "project_id": "proj-0001",
+  "entity_id": "entity-0001",
+  "graph_version": "v1",
+  "entity_type": "customer",
+  "canonical_name": "Acme Widgets",
+  "updated_at": "2026-07-13T09:14:32Z",
+  "_expected_violation": "entity_type must be one of ['brand','product','integration','competitor']; 'customer' is not a member."
+}

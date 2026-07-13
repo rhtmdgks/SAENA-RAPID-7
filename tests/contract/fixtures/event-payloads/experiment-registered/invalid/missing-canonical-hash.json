@@ -1,0 +1,5 @@
+{
+  "engine_id": "chatgpt-search",
+  "experiment_id": "exp-0001",
+  "_expected_violation": "canonical_hash is required (preregistration hash anchored to the audit-ledger, H-3); this instance omits it."
+}
