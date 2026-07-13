@@ -55,3 +55,16 @@ a0d05f0b2d5f199cf3acb53440162c3adced7f2c:tests/unit/svc_quality_eval/test_covera
 7100d9c53d53be3a509990613d2becf0241b6419:tests/integration/intelligence_failure/test_rollback_fail_closed.py:aws-access-token:208
 7100d9c53d53be3a509990613d2becf0241b6419:tests/integration/intelligence_failure/test_rollback_fail_closed.py:aws-access-token:226
 be36856f81c68c479e49ddcfa537a524518c4067:tests/unit/analytics_clickhouse/test_guard.py:jwt:44
+
+# Wave 4 remediation verified false positives (2026-07-13): planted synthetic
+# secret-shaped query strings in the r4-04 query-privacy tests — their whole
+# purpose is to prove the privacy boundary strips/keys a raw customer query
+# (with an email/phone/API-token) so it never reaches ClickHouse. No real
+# credentials (_PLANTED_SECRET_QUERY / _observation_with_secret_query fixtures).
+# Suppressed by exact fingerprint per ADR-0020 (path allowlisting stays FORBIDDEN).
+21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/unit/analytics_clickhouse/test_rows.py:generic-api-key:82
+21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/unit/analytics_clickhouse/test_rows.py:generic-api-key:96
+21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:160
+21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:177
+21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:197
+21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:223
