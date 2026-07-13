@@ -85,3 +85,10 @@ d82c3bd9a6a16468658cfba7f24be47a22feab8e:tests/unit/svc_experiment_attribution_b
 d82c3bd9a6a16468658cfba7f24be47a22feab8e:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:51
 4e9c116c606010b0fb08c154f174a1b1d50ee99f:tests/unit/analytics_clickhouse_outcome/test_guard.py:jwt:28
 7545c19a0bc75558a03007fc8f89db438ee29fbe:tests/unit/domain_measurement_evidence/test_guard_mutation.py:stripe-access-token:65
+# Same 4 fixtures, fingerprints as attributed to the author-worktree commits
+# (reachable from local agent-* refs during local dev scans; CI clones only
+# wave5-measurement and sees the integration-commit fingerprints above):
+4c9c55a285299d6b1e11bfc11576408526a19bb2:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:48
+4c9c55a285299d6b1e11bfc11576408526a19bb2:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:51
+7e56df614a6857e58124c2d9f6c385a585e44404:tests/unit/analytics_clickhouse_outcome/test_guard.py:jwt:28
+916043d0b8b587c805880bddd0ce7daeefe35bc2:tests/unit/domain_measurement_evidence/test_guard_mutation.py:stripe-access-token:65
