@@ -8,15 +8,22 @@ triggered it.
 
 ## Uniform non-leaking error surface (deliverable #4)
 
-`BoundaryLookupAbsent` is the ONE shape used for every cross-tenant lookup
-miss and every "not found" outcome at this boundary. A caller presenting a
-real `registration_hash` under the WRONG `tenant_id` and a caller presenting
-a `registration_hash` that never existed at all receive the *identical*
-exception type, message shape, and context keys — there is no oracle signal
-(timing, distinguishing error subtype, or distinguishing field) that lets an
-unauthorized caller tell "wrong tenant" apart from "no such record". This is
-the boundary-layer resolution of the w5-18 `cross_tenant_replay` finding
-(also see `tenancy.RegistrationLookup` docstring).
+The property that matters is *non-leakage*: at every absent-lookup path a
+caller presenting a real `registration_hash` under the WRONG `tenant_id` and
+a caller presenting a `registration_hash` that never existed receive the
+*identical* observable outcome — no oracle signal (timing, distinguishing
+subtype, or distinguishing field) tells "wrong tenant" apart from "no such
+record". This is the boundary-layer resolution of the w5-18
+`cross_tenant_replay` finding (also see `tenancy.RegistrationLookup`).
+
+Note (w5-12 critic SF-2): the two live absent paths achieve this WITHOUT
+raising `BoundaryLookupAbsent` — the consumer surfaces a `RejectionRecord`
+and the publisher a `PublishRefusedError` whose `context` carries only
+caller-supplied / non-tenant-identifying keys. Both were verified
+independently non-leaking. `BoundaryLookupAbsent` is the shared *shape* for
+call sites that need to RAISE a bare absent result (currently none in this
+unit); it is retained as the canonical non-leaking exception rather than
+wired into a path that already has a non-raising signal.
 """
 
 from __future__ import annotations
@@ -39,16 +46,17 @@ class BoundaryError(Exception):
 
 
 class BoundaryLookupAbsent(BoundaryError):
-    """Uniform "absent" result for every cross-tenant / not-found lookup at
-    this boundary.
+    """Canonical non-leaking "absent" exception shape for this boundary.
 
     Deliberately carries ONLY the fields the caller already supplied (never
     which tenant was "actually" expected, never a hint distinguishing
     "wrong tenant" from "never existed") — see module docstring. Callers
     that want a non-raising absent signal should prefer
-    `tenancy.RegistrationLookup.lookup` returning `None`; this exception
-    exists for call sites that need to raise (mirrors
-    `saena_domain.measurement.errors.NotFoundError`'s non-leaking shape).
+    `tenancy.RegistrationLookup.lookup` returning `None` (the live paths do);
+    this exception exists for call sites that need to RAISE a bare absent
+    result and mirrors `saena_domain.measurement.errors.NotFoundError`'s
+    non-leaking shape. Not currently raised by any call site in this unit
+    (w5-12 critic SF-2) — retained as the shared shape, not dead-wired.
     """
 
     error_code = "saena.experiment_attribution.boundary.not_found"

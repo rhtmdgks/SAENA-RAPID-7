@@ -80,6 +80,20 @@ def test_caller_cannot_assert_an_arbitrary_basis_id():
     assert "basis_id" not in to_cell_params
 
 
+def test_captured_observation_has_no_caller_basis_id_field():
+    """w5-12 critic SF-1: guard the INPUT dataclass's field set, not only the
+    adapter method signatures. A future PR adding a caller-asserted basis id
+    directly onto CapturedObservation (which the adapter might then prefer over
+    derivation) would otherwise ship undetected. basis id must ALWAYS be
+    derived from artifact_hash (w5-06 trust-boundary obligation)."""
+    import dataclasses
+
+    field_names = {f.name for f in dataclasses.fields(CapturedObservation)}
+    assert field_names == {"observation_id", "artifact_hash", "value", "observed_at"}
+    assert "evidence_basis_id" not in field_names
+    assert "basis_id" not in field_names
+
+
 def test_to_cell_observation_builds_expected_shape():
     observations = (
         _observation(observation_id="o1", value=1.0),
