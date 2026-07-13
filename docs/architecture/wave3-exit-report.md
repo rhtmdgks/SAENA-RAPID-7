@@ -213,5 +213,10 @@ docstring-only.
 ## Final verdict
 
 **Wave 3: PASS.** All exit conditions met with executed evidence; no BLOCKED or
-NOT IMPLEMENTED remaining. `main` merge / tag / release / production deploy NOT
-performed (human-gated). PR draft prepared: `docs/architecture/wave3-pr-body.md`.
+NOT IMPLEMENTED remaining. PR #4 (`wave3-execution` → `main`) open at HEAD
+`3ac817e` with **all 16 required checks green** (lint, schema-validate,
+boundaries, unit, integration, contract-compat, contract-lint, evals,
+failure-modes, execution-e2e, helm-smoke, guards, secret-scan, sbom, vuln-scan,
+actions-lint), mergeable/CLEAN. `main` merge / tag / release / production deploy
+NOT performed (human-gated per Wave 3 spec §12). PR body:
+`docs/architecture/wave3-pr-body.md`.
