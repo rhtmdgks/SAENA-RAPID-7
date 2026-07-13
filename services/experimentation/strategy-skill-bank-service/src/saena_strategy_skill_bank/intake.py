@@ -301,7 +301,18 @@ def _guard_value(name: str, value: Any, offenders: set[IntakeRejectReason]) -> N
     """Recursively scan one (name, value) pair, accumulating reject reasons
     rather than raising — this guard NEVER echoes an offending value back
     (mirrors ``saena_domain.measurement.evidence.guard_evidence_fields``'s
-    redaction discipline), it only records WHICH reason category fired."""
+    redaction discipline), it only records WHICH reason category fired.
+
+    HEURISTIC, defense-in-depth — NOT a content-scanning oracle (c5-06 audit
+    A-2). It catches forbidden FIELD NAMES, oversize blobs, and values matching
+    a curated ``_SECRET_SHAPED_PATTERNS`` set. The residual channel it cannot
+    close is a free-form string under an innocuous field name that matches no
+    known secret shape (e.g. raw customer query text / a PII email). The
+    AUTHORITATIVE control for the ``strategy.card.eligible.v1`` open-class
+    payload's "aggregate-only, no raw customer content" invariant is the
+    upstream w5-12 publisher boundary (which builds the candidate from
+    aggregate outcome fields, never raw content); this intake guard is a
+    fail-closed backstop, not the primary allow-list."""
     normalized_name = _normalize_field_name(name)
     if any(marker in normalized_name for marker in _NORMALIZED_FORBIDDEN_MARKERS):
         if (
