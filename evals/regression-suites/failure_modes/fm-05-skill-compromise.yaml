@@ -3,16 +3,20 @@ k3s_section: "10"
 name: "Skill compromise"
 example: "third-party skill changes commands"
 expected_system_behavior: "pinned hash mismatch -> run blocked"
-status: gap
-covering_axis: null
-covering_fixture_ids: []
+status: covered
+covering_axis: regression_suite_native
+covering_test: tests/unit/evals_harness/test_failure_mode_regression_suite.py::test_skill_compromise_dedicated_bundle_verifier_blocks_tamper
 notes: >
-  GAP (reported, not fabricated): no pinned-skill-hash verification
-  primitive exists anywhere in this repo yet (searched
-  packages/hooks-runtime/**, services/**, packages/domain/** for
-  "pinned_hash"/skill-hash-mismatch logic — none found). SAENA FORGE runtime
-  hook ladder itself is documented NOT IMPLEMENTED beyond W0 safety hooks
-  (CLAUDE.md Status: "FORGE runtime hook ladder는 W3 NOT IMPLEMENTED"). This
-  harness cannot honestly claim coverage for a check that does not exist in
-  the codebase — flagged for whichever future unit implements Strategy
-  Skill Bank pinning (Algorithm §8.3 "Ponytail의 강제 이식 원칙").
+  RESOLVED (w3-12): a dedicated skill-bundle content-integrity verifier now
+  exists — saena_domain.execution.skill_bundle.verify_skill_bundle — enforced
+  fail-closed at both the hooks-runtime session_start boundary and the
+  agent-runner (before any worktree/executor). It computes a deterministic
+  sha256:<hex> over the bundle's framed manifest (the k3s §9.1
+  skill_bundle_hash field) and denies on byte-change / file add / delete /
+  rename / missing bundle / missing-or-malformed pin / symlink / traversal —
+  cases the whole-ActionContract contract_hash gate cannot see. This
+  regression-suite check exercises that REAL verifier and proves a one-byte
+  bundle tamper is blocked while the contract_hash stays identical. The
+  contract_hash pin is retained as a complementary defense, not a substitute
+  (tests/security/test_f5_skill_bundle_integrity.py; the F-5 row of
+  tests/security/failure_mode_matrix.json).

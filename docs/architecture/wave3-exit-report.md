@@ -92,34 +92,61 @@ on the guarded path, `forgectl preflight` service_account_permissions PASS.
 | F-2 | Unsupported claim | `test_f2_unsupported_claim.py` | quality-eval content-fidelity gate | block public wording |
 | F-3 | Deployment pressure | `test_f3_deployment_pressure.py` | hooks-runtime deny_deploy_push + policy deny | policy deny, handoff only |
 | F-4 | Code conflict | `test_f4_code_conflict.py` | agent-runner worktree isolation | isolated worktrees, integrator only |
-| F-5 | Skill compromise | `test_f5_skill_compromise.py` | contract_hash / bundle-hash pin mismatch | run blocked |
+| F-5 | Skill compromise | `test_f5_skill_bundle_integrity.py` (primary, dedicated verifier); `test_f5_skill_compromise.py` (complementary contract_hash) | dedicated skill-bundle content-integrity verifier (`saena_domain.execution.skill_bundle`) at session_start + agent-runner boundaries; contract_hash retained as complementary | run blocked (fail-closed before any worktree) |
 | F-6 | Secret exposure | `test_f6_secret_exposure.py` | intake secret scan + quality-eval secret gate | redaction and stop |
 | F-7 | Quality manipulation | `test_f7_quality_manipulation.py` | quality-eval drift/test-deletion + diff-to-contract | critic rejects |
 | F-8 | Scope creep | `test_f8_scope_creep.py` | agent-runner approved_scope / diff-rationality | patch review rejects |
-| F-9 | Measurement fraud | `test_f9_measurement_fraud.py` + `measurement_fraud.py` | outcome-layer ≥2-signal evaluator | B-layer success not granted |
+| F-9 | Measurement fraud | `test_f9_measurement_fraud.py` + `measurement_fraud.py` | W3 deterministic outcome-layer ≥2-signal *evaluator* (fixture-level, test-only) | B-layer success not granted |
 
 CI-blocking completeness gate (`test_failure_mode_matrix.py`) fails if any mode
 loses its fixture or a referenced test node stops resolving.
 
-**Framing note (F-5)**: w3-09 marks F-5 "covered" via the `contract_hash`/
-bundle-hash mismatch mechanism that exists (hooks-runtime `compute_contract_hash`/
-`validate_contract`). The w3-10 eval regression suite (`fm-05-skill-compromise.yaml`)
-honestly flags that a *dedicated pinned-skill-bundle-hash verifier* does not yet
-exist in-repo (status `gap`, 1 of 9). Both statements are true and non-conflicting:
-the generic contract-hash pin is implemented and tested; a skill-specific hash
-verifier is a follow-up. Recorded here, not hidden.
+**F-5 (resolved, w3-12)**: a dedicated skill-bundle content-integrity verifier
+now exists — `saena_domain.execution.skill_bundle.verify_skill_bundle` — and is
+enforced fail-closed at BOTH the hooks-runtime `session_start` boundary
+(injected `SkillBundleIntegrityPort`) and the agent-runner (before any worktree
+or executor). It computes a deterministic `sha256:<hex>` over the bundle's
+framed manifest (the k3s §9.1 `skill_bundle_hash` field) and denies on byte
+change / file add / delete / rename / missing bundle / missing-or-malformed pin
+/ symlink / traversal — the exact cases the whole-ActionContract `contract_hash`
+gate cannot see (a tampered skill file inside an identical contract). The
+`contract_hash` pin is RETAINED as a complementary defense but no longer stands
+in for bundle verification. The former w3-10 eval `gap` (`fm-05-skill-compromise`)
+is now `covered` (9/9). This closes the earlier framing inconsistency where a
+run without a dedicated verifier was reported as if F-5 were fully implemented.
 
-## E2E 단계별 증거 (14 steps)
+**F-9 boundary (explicit)**: the measurement-fraud evaluator here is a Wave 3
+failure-mode *fixture + deterministic discrimination check* only. It is NOT a
+production B-layer measurement service — that owner/service is **Wave 5** scope.
+W3 verifies the failure-mode fixture and the evaluator's discrimination logic; a
+Wave 5 owner must adopt this evaluator or explicitly replace it. W3 does not
+implement, and this unit does not pre-implement, the Wave 5 production service.
 
-`test_synthetic_tenant_full_execution_e2e` covers steps 1-14 (tenant create →
-workspace/project/site context → source intake → PlanContract → Policy Gate →
-approval → [Temporal signal in the integration lane] → patch worktree → patch
-exec on a REAL git repo → quality eval → VerificationResult → handoff artifact →
-[event bus round-trip in the integration lane] → audit hash-chain verify →
-lineage → tenant isolation → cleanup). Real components exercised and directly
-run by the Lead (Docker present): pure-logic E2E 3 pass; **real-container lane
-7/7 pass** (Temporal time-skipping server, Redpanda publish/consume, Postgres
-durability + isolation) — NOT mock-only.
+## E2E 단계별 증거 — 14-step composite E2E evidence
+
+The 14-step Plan→approval→patch→verify→handoff chain is proven as a
+**composite**: an application-chain synthetic E2E PLUS separate real-container
+integration proofs for each external boundary. It is NOT a single transaction
+that threads every real component end-to-end, and this report does not claim
+that.
+
+- **Application-chain synthetic E2E** (`tests/e2e/execution/
+  test_synthetic_tenant_full_execution_e2e`): drives the REAL service apps via
+  HTTP requests and a REAL git repository + real diff (real `git worktree add`,
+  real commit) through tenant create → intake → PlanContract → Policy Gate →
+  approval → patch worktree → patch exec → quality eval → VerificationResult →
+  handoff → audit hash-chain → lineage → tenant isolation → cleanup. Some
+  adapters/stores and the command executor are in-memory/fake in this test.
+- **Separate real-container integration proofs** (`tests/integration/
+  execution_e2e/**`, run by the Lead with Docker present, 7/7 pass): the
+  ADR-0003 Temporal `approve` signal path on a REAL time-skipping test server;
+  the Redpanda publish/consume round-trip for every run event on a REAL
+  Redpanda container; PostgreSQL durability + tenant isolation on a REAL
+  postgres container.
+
+Together these give both the Plan→handoff application-chain evidence AND real
+integration evidence at each external boundary (Temporal, Redpanda, Postgres,
+real git). pure-logic E2E: 3 pass; container lane: 7/7 pass.
 
 ## Rollback 증거
 
@@ -146,12 +173,23 @@ proofs), **execution-e2e** (7 container pass), **helm-smoke** (helm lint/templat
 actions-lint (zizmor clean). Determinism: unit lane 3/3 identical, integration
 lane 2/2 identical (184 pass).
 
-## Critic 발견·수정 내역 (Lead independent verification)
+## Verification method (accurate account)
 
-The spawned critic agents did not deliver structured verdicts over the message
-bus (idle-pinged without reporting); the Lead therefore performed the required
-independent verification directly (CLAUDE.md principle 9), adversarially, per
-unit:
+Each unit was implemented in its own isolated worktree by a separate authoring
+agent. The spawned per-unit critic agents did NOT return structured verdicts
+over the message bus (they idle-pinged without reporting). This report therefore
+does NOT claim "every unit passed an independent critic." What actually happened:
+
+- **Per-unit adversarial integration verification by the Lead** — before
+  integrating each unit, the Lead ran the unit's gates and adversarial
+  spot-checks directly (per-unit detail below). This is Lead verification, not
+  an independent author-separated critic.
+- **Final independent critic on the integration diff** — a separate read-only
+  critic agent (author-separated) reviews the w3-12 remediation diff and, by
+  extension, the F-5 boundary. Its verdict is recorded in the handoff message.
+  No "critic PASS" is asserted anywhere in this report ahead of that verdict.
+
+Per-unit Lead adversarial verification:
 - **w3-01**: verified 4 payload builders reject malformed input via codegen
   models; engine guard denies case-variants/whitespace/google/gemini/empty/None;
   every terminal→active transition denied; SUCCEEDED→SUCCEEDED idempotent.
@@ -166,7 +204,13 @@ unit:
 - **w3-09**: verified the matrix completeness gate resolves all 9 primary+recovery
   test nodes.
 - **w3-10**: verified per-axis FP/FN discrimination is enforced and the single
-  honest gap is bounded to exactly one.
+  honest gap was bounded to exactly one (since resolved by w3-12 — 9/9 covered).
+- **w3-12 (F-5 remediation)**: verified the dedicated skill-bundle verifier
+  denies byte-change/add/delete/rename/symlink/traversal/missing/malformed; that
+  a tampered bundle under an IDENTICAL contract_hash is still denied at both the
+  session_start and agent-runner boundaries before any worktree; that raw bundle
+  content never reaches the error/audit; and that the domain verifier and
+  hooks-runtime Port are genuinely wired (end-to-end wiring test).
 
 ### Real defects Lead found and fixed during the wave
 - **Orchestrator pre-run signal race (pre-existing W2 bug, surfaced integrating
@@ -198,7 +242,14 @@ unit:
   dashboards-as-code are delivered and statically validated; live run needs a cluster.
 - Real browser pool / Playwright fleet for chatgpt-observer — explicitly Wave 4
   (W3 delivers only the read-only synthetic observer interface).
-- A dedicated pinned-skill-bundle-hash verifier (F-5 gap above) — follow-up.
+- A production skill-bundle SOURCE/mount + the runtime host that wires the
+  verifier's `SkillBundleSource`/`SkillBundleIntegrityPort` to a real deployed
+  bundle — the F-5 *verifier* is implemented and enforced (w3-12); the live
+  bundle-mounting wiring is a deploy/runtime-host concern, not code this Wave
+  produces. (The verifier is a pure, fully-tested library + two enforced
+  boundaries; only the concrete on-cluster bundle source remains ops.)
+- Production B-layer measurement service (F-9) — **Wave 5** scope; W3 ships only
+  the deterministic evaluator/fixture.
 - Production Temporal/Postgres/Redpanda/MinIO topology — infra decision; W3
   proves wiring against real ephemeral test instances only.
 
@@ -212,11 +263,17 @@ docstring-only.
 
 ## Final verdict
 
-**Wave 3: PASS.** All exit conditions met with executed evidence; no BLOCKED or
-NOT IMPLEMENTED remaining. PR #4 (`wave3-execution` → `main`) open at HEAD
-`3ac817e` with **all 16 required checks green** (lint, schema-validate,
-boundaries, unit, integration, contract-compat, contract-lint, evals,
-failure-modes, execution-e2e, helm-smoke, guards, secret-scan, sbom, vuln-scan,
-actions-lint), mergeable/CLEAN. `main` merge / tag / release / production deploy
-NOT performed (human-gated per Wave 3 spec §12). PR body:
-`docs/architecture/wave3-pr-body.md`.
+**Wave 3: PASS at the code level.** All exit conditions are met with directly-
+executed test evidence recorded against their integrating SHAs above; no BLOCKED
+or NOT IMPLEMENTED remains. F-5 is now a dedicated content-integrity verifier
+(w3-12), so the failure-mode set is genuinely 9/9.
+
+The required CI checks run on the PR `wave3-execution` → `main` (**#4**). The
+**authoritative, exact-HEAD check status is the GitHub PR #4 check-runs view** —
+this document deliberately does NOT freeze a specific HEAD SHA as "currently
+green," because any later commit moves HEAD and a stale SHA would misrepresent
+the live state. Integrating SHAs + test names above are the durable evidence;
+the live 16-check result for the current HEAD is read from PR #4.
+
+`main` merge / tag / release / production deploy NOT performed (human-gated per
+Wave 3 spec §12). PR body: `docs/architecture/wave3-pr-body.md`.

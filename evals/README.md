@@ -25,8 +25,10 @@ Prompt·skill·policy 회귀 평가 스위트 — k3s spec §2 요구 구획, Pr
 - patch minimality and rollback cases
 
 추가 (2026-07-12 감사): k3s §10 failure-mode 9종 ↔ fixture 1:1 매핑 필수 (sec F-8).
-→ w3-10 (2026-07-13): `regression-suites/failure_modes/fm-01..09.yaml` — 8/9 `covered`,
-1/9 (`fm-05-skill-compromise`, pinned-skill-hash 미구현) 정직하게 `gap` 보고.
+→ w3-10 (2026-07-13): `regression-suites/failure_modes/fm-01..09.yaml`.
+→ w3-12 (2026-07-13): **9/9 `covered`** — fm-05-skill-compromise gap 해소.
+전용 skill-bundle content-integrity verifier(`saena_domain.execution.skill_bundle`)
+실장, session_start·agent-runner 양 경계 fail-closed 강제.
 `tests/unit/evals_harness/test_failure_mode_regression_suite.py::
 test_all_nine_k3s_failure_modes_are_mapped`가 매핑 완결성을 검증.
 

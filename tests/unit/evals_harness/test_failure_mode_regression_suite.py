@@ -52,9 +52,10 @@ def test_all_nine_k3s_failure_modes_are_mapped() -> None:
     for mode in modes:
         assert mode["status"] in _VALID_STATUSES, f"{mode['mode_id']}: invalid status"
 
-    assert len(covered) == 8
-    assert len(gaps) == 1
-    assert gaps[0]["mode_id"] == "fm-05-skill-compromise"
+    # w3-12: fm-05 skill-compromise moved gap -> covered (dedicated
+    # skill-bundle content-integrity verifier now exists). All 9 covered.
+    assert len(covered) == 9
+    assert len(gaps) == 0
 
     for mode in covered:
         axis = mode["covering_axis"]
@@ -89,6 +90,34 @@ def _function_defined_in_module(module_path: Path, function_name: str) -> bool:
 
 # --- regression_suite_native checks (k3s §10 modes not covered by one of ---
 # --- the 9 mandatory eval axes) ---------------------------------------------
+
+
+def test_skill_compromise_dedicated_bundle_verifier_blocks_tamper() -> None:
+    """fm-05: the REAL dedicated skill-bundle verifier
+    (`saena_domain.execution.skill_bundle.verify_skill_bundle`) blocks a
+    one-byte skill-file tamper while the whole-ActionContract contract_hash
+    is unchanged — proving F-5 coverage is a real content-integrity gate, not
+    the contract-hash gate standing in for it. Also asserts determinism."""
+    from saena_domain.execution import compute_skill_bundle_hash
+    from saena_domain.execution.skill_bundle import (
+        SkillBundleHashMismatchError,
+        verify_skill_bundle,
+    )
+
+    bundle = {
+        "claude/skill.md": b"run approved-command\n",
+        "third-party/ponytail-pinned/tool.py": b"print('pinned')\n",
+    }
+    pin = compute_skill_bundle_hash(dict(bundle))
+    # deterministic
+    assert compute_skill_bundle_hash(dict(bundle)) == pin
+    # clean bundle allows
+    assert verify_skill_bundle(expected_hash=pin, bundle=dict(bundle)) == pin
+    # one-byte tamper blocks
+    tampered = dict(bundle)
+    tampered["third-party/ponytail-pinned/tool.py"] = b"print('BACKDOOR')\n"
+    with pytest.raises(SkillBundleHashMismatchError):
+        verify_skill_bundle(expected_hash=pin, bundle=tampered)
 
 
 def test_code_conflict_isolated_worktrees() -> None:

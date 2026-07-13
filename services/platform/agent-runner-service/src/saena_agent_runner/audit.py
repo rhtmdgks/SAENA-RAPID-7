@@ -36,6 +36,7 @@ from saena_domain.execution import JobContext
 #: Both actions below are 4 dot-segments (`agent_runner.<subject>.<verb>.v1`),
 #: safely inside the `{2,3}` middle-group bound.
 _APPROVAL_ACTION = "agent_runner.approval.refused.v1"
+_SKILL_BUNDLE_ACTION = "agent_runner.skill_bundle.refused.v1"
 _PATCH_UNIT_ACTION = "agent_runner.patch_unit.decision.v1"
 
 
@@ -49,6 +50,28 @@ def record_approval_refused(
     """Record a whole-run ADR-0003 approval refusal (before any execution)."""
     return chain.append(
         action=_APPROVAL_ACTION,
+        recorded_at=recorded_at,
+        scope="tenant",
+        trace_id=job_context.trace_id,
+        tenant_id=job_context.tenant_id,
+        run_id=job_context.run_id,
+        actor={"actor_id": job_context.actor_id},
+        error_code=error_code,
+        payload={"decision": "refused", "error_code": error_code},
+    )
+
+
+def record_skill_bundle_refused(
+    chain: InMemoryAuditChain,
+    *,
+    job_context: JobContext,
+    error_code: str,
+    recorded_at: str,
+) -> AuditEntry:
+    """Record a whole-run F-5 skill-bundle integrity refusal (before any
+    execution). Carries only the error_code — never bundle content."""
+    return chain.append(
+        action=_SKILL_BUNDLE_ACTION,
         recorded_at=recorded_at,
         scope="tenant",
         trace_id=job_context.trace_id,
