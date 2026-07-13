@@ -11,8 +11,9 @@ pins this as an executable assertion.
 
 Reuses `saena_domain.audit.canonical.canonical_json`/`sha256_hex` for
 hashing rather than inventing a second canonicalization rule — see
-`ledger.py`'s module docstring for the exact reuse and the one deliberate
-divergence from `saena_domain.audit.hashing.compute_entry_hash`.
+`ledger.py`'s module docstring for the exact reuse, the content-fingerprint
+vs. chain-entry-hash split (r4-03), and the shape it shares with
+`saena_domain.audit.hashing.compute_entry_hash`.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from saena_domain.experiment.errors import (
 from saena_domain.experiment.ledger import (
     GENESIS,
     LedgerState,
+    compute_content_fingerprint,
     compute_experiment_hash,
     register,
     verify_ledger,
@@ -48,6 +50,7 @@ __all__ = [
     "LedgerState",
     "MetricDefinition",
     "RejectedError",
+    "compute_content_fingerprint",
     "compute_experiment_hash",
     "register",
     "verify_ledger",
