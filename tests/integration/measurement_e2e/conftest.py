@@ -272,7 +272,7 @@ def _apply_migrations(postgres_url: str) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _truncate_postgres_before_each_test(postgres_url: str, _apply_migrations: None) -> None:
+def _truncate_postgres_before_each_test(request: pytest.FixtureRequest) -> None:
     """Autouse, function-scoped: TRUNCATE every w5-10-owned table before EACH
     test in this directory — the session-scoped Postgres container is shared
     across every scenario, and several scenarios deliberately reuse the SAME
@@ -282,9 +282,20 @@ def _truncate_postgres_before_each_test(postgres_url: str, _apply_migrations: No
     (a divergence a mock-only lane would never surface — the whole point of
     this real-container lane). Mirrors `measurement_pg/conftest.py::engine`'s
     own per-test TRUNCATE discipline, applied here as an autouse fixture so
-    every test benefits without each one explicitly depending on it."""
-    if not _DOCKER_AVAILABLE:
+    every test benefits without each one explicitly depending on it.
+
+    Resolves `postgres_url`/`_apply_migrations` LAZILY (via `request.get
+    fixturevalue`) rather than as direct parameters, and only for
+    container-backed tests: the container-free guard-mechanism module must NOT
+    pull the Postgres container (parameter resolution happens before the body,
+    so a direct `postgres_url` param would sweep the subprocess-based guard
+    tests into the Docker-absent skip — c5-06 audit RV-3). Those tests prove
+    the zero-collected guard via subprocess exit codes and need no Docker."""
+    if not _needs_containers(request.node) or not _DOCKER_AVAILABLE:
         return
+
+    postgres_url = request.getfixturevalue("postgres_url")
+    request.getfixturevalue("_apply_migrations")
 
     async def _truncate() -> None:
         throwaway = create_async_engine(postgres_url)
