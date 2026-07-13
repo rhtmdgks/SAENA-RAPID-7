@@ -1,0 +1,33 @@
+[project]
+name = "saena-vector-store"
+version = "0.1.0"
+description = "SAENA vector-store port + pgvector backend — VectorStore Protocol, per-tenant/per-product collection isolation, deterministic TestEmbedder (Wave 4, w4-07)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "sqlalchemy>=2.0.36,<3",
+    "asyncpg>=0.30,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_vector_store"]
+
+# Packaging note (mirrors tools/forgectl/README.md "Packaging note" — w2-19/
+# w2-20 precedent, cited by this unit's own task brief): this patch unit
+# (w4-07)'s exclusive write paths are packages/vector-store/**, tests/unit/
+# vector_store/**, tests/integration/vector/** ONLY. Registering this
+# package as a `uv` workspace member requires editing root `pyproject.toml`
+# (`[tool.uv.workspace] members`, `[dependency-groups] dev`,
+# `[tool.uv.sources]`, `[tool.mypy] files`, `[tool.coverage.run] source`,
+# `.importlinter`) — out of this unit's exclusive scope; that is the
+# Integrator's action (see this package's README "Integrator actions").
+# Until then, `tests/unit/vector_store/conftest.py` and `tests/integration/
+# vector/conftest.py` both insert `packages/vector-store/src` onto
+# `sys.path` directly (the same workaround `tools/forgectl` used pre-w2-20)
+# so `import saena_vector_store` resolves without an editable install.
+# `sqlalchemy`/`asyncpg` are already present in the shared workspace venv
+# as transitive dependencies of `saena-domain` — no new top-level
+# dependency had to be installed to verify this unit locally.
