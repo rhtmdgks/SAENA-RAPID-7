@@ -204,14 +204,37 @@ printf '%s\n' "$_segments" | while IFS= read -r _seg; do
                     ;;
             esac
             ;;
-        kubectl|helm)
+        helm)
+            _helm_sub="$(printf '%s' "$_seg" | awk '{print $2}')"
+            case "$_helm_sub" in
+                lint|template|version|show|dependency|package|env|schema)
+                    # Offline subcommands — render/validate local chart
+                    # sources, never contact a cluster (W3 chart gates:
+                    # helm lint / helm template | kubeconform). Cluster-
+                    # touching verbs (install/upgrade/rollback/uninstall/
+                    # list/get/...) still require a k3d-* context below.
+                    ;;
+                *)
+                    _kctx="$(_kctx_check)"
+                    case "$_kctx" in
+                        k3d-*)
+                            : # allowed — local k3d dev cluster
+                            ;;
+                        *)
+                            _deny "helm '$_helm_sub' is only allowed against a k3d-* context (current: '${_kctx:-<none>}')"
+                            ;;
+                    esac
+                    ;;
+            esac
+            ;;
+        kubectl)
             _kctx="$(_kctx_check)"
             case "$_kctx" in
                 k3d-*)
                     : # allowed — local k3d dev cluster
                     ;;
                 *)
-                    _deny "$_first is only allowed against a k3d-* context (current: '${_kctx:-<none>}')"
+                    _deny "kubectl is only allowed against a k3d-* context (current: '${_kctx:-<none>}')"
                     ;;
             esac
             ;;

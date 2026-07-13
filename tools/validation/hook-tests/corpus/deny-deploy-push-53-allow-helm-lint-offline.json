@@ -1,0 +1,14 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3: helm lint (offline chart validation, no cluster contact) allowed without k3d context",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "helm lint deploy/charts/saena-forge"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_CONTEXT": ""
+  },
+  "expect_exit": 0
+}
