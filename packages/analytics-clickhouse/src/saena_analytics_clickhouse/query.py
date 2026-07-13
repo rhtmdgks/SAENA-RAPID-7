@@ -37,6 +37,24 @@ from saena_analytics_clickhouse.errors import TenantIsolationError
 from saena_analytics_clickhouse.identifiers import validate_tenant_id
 from saena_analytics_clickhouse.schema import require_known_table
 
+#: The fixed column projection `TenantScopedQuery.to_raw_vs_adjusted_select_sql`
+#: selects — both lift figures side by side (k3s §9.2:485 dashboard
+#: obligation, w5-11). A MODULE-level constant (not a class attribute of the
+#: frozen `slots=True` `TenantScopedQuery` below) — a `slots=True` dataclass
+#: turns a class-body tuple assignment into a `member` descriptor rather than
+#: a plain class attribute, so accessing it via the class name does not yield
+#: the tuple itself; a module-level constant sidesteps that entirely and is
+#: also what `store.py`'s reconstructor names directly, rather than
+#: re-deriving the same column order a second time.
+RAW_VS_ADJUSTED_COLUMNS: tuple[str, ...] = (
+    "tenant_id",
+    "experiment_id",
+    "outcome_layer",
+    "b_verdict",
+    "raw_lift",
+    "net_of_control_lift",
+)
+
 
 @dataclass(frozen=True, slots=True)
 class TenantScopedQuery:
@@ -104,6 +122,7 @@ class TenantScopedQuery:
         columns: tuple[str, ...] = ("*",),
         dedup_by: tuple[str, ...] = ("tenant_id", "idempotency_key"),
         winner_order: tuple[str, ...] = ("id",),
+        display_order: tuple[str, ...] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Render a `(sql, params)` SELECT that collapses each `dedup_by`
         group to ONE deterministic logical row, THEN applies display ordering
@@ -136,6 +155,19 @@ class TenantScopedQuery:
         it bounds distinct logical rows, never physical duplicates. The
         `tenant_id` predicate + time-range are applied in the INNER query,
         BEFORE dedup, so dedup happens within the requested window.
+
+        `display_order` (w5-11 addition): the OUTER `ORDER BY` column list —
+        defaults to `(self.order_by, "id")` (`occurred_at, id`), the shape
+        every PRE-EXISTING caller here relies on. A caller whose own
+        `columns` projection does NOT include `self.order_by`'s column (e.g.
+        `to_raw_vs_adjusted_select_sql`'s fixed, narrower projection, which
+        never selects `occurred_at`) MUST override this — ClickHouse rejects
+        an outer `ORDER BY` referencing a column the outer SELECT did not
+        project (`UNKNOWN_IDENTIFIER`), a real-server-only failure mode the
+        deterministic unit lane's SQL-shape-blind fake executor cannot catch,
+        confirmed against a live container as part of this addition. Every
+        element of `display_order` MUST already be present in `columns` for
+        this reason.
         """
         column_sql = ", ".join(columns)
         where = " AND ".join(self.where_sql)
@@ -146,11 +178,42 @@ class TenantScopedQuery:
             f"ORDER BY {winner_sql} LIMIT 1 BY {dedup_cols}"
         )
         # Deterministic display order over the deduplicated set (occurred_at is
-        # the table's own time key; `id` breaks ties stably).
-        sql = f"SELECT {column_sql} FROM ({inner}) ORDER BY {self.order_by}, id"
+        # the table's own time key; `id` breaks ties stably) — unless the
+        # caller's own `columns` projection doesn't carry `occurred_at`, in
+        # which case `display_order` names a substitute that IS in `columns`.
+        order_cols = (
+            ", ".join(display_order) if display_order is not None else f"{self.order_by}, id"
+        )
+        sql = f"SELECT {column_sql} FROM ({inner}) ORDER BY {order_cols}"
         if self.limit is not None:
             sql += f" LIMIT {int(self.limit)}"
         return sql, dict(self.params)
+
+    def to_raw_vs_adjusted_select_sql(self) -> tuple[str, dict[str, Any]]:
+        """Render `(sql, params)` projecting BOTH the raw and control-adjusted
+        (`net_of_control_lift`) per-signal lift from `measurement_outcome`
+        (w5-11 dashboard obligation, k3s §9.2:485: "raw+weighted evidence
+        both retained" applied to the dashboard's own read side).
+
+        This is NOT a second table/materialized view — both figures are
+        columns of the SAME append-only row `to_deduplicated_select_sql`
+        already reads, so this method reuses that exact dedup mechanism
+        (unconditional, r4-02) rather than inventing a second query shape:
+        a physical duplicate beyond the physical dedup window is still
+        collapsed to one logical row here too, identically.
+
+        `display_order` is overridden to `(tenant_id, experiment_id,
+        outcome_layer, b_verdict)` — `RAW_VS_ADJUSTED_COLUMNS` does not
+        project `occurred_at` (the default outer `ORDER BY` column), and
+        every `display_order` element must be present in `columns`
+        (`to_deduplicated_select_sql`'s own docstring) or a real ClickHouse
+        server rejects the outer `ORDER BY` outright
+        (`UNKNOWN_IDENTIFIER`) — confirmed against a live container.
+        """
+        return self.to_deduplicated_select_sql(
+            columns=RAW_VS_ADJUSTED_COLUMNS,
+            display_order=("tenant_id", "experiment_id", "outcome_layer", "b_verdict"),
+        )
 
 
 class AnalyticsQuery:
@@ -197,6 +260,7 @@ def build_insert_columns(
 
 
 __all__ = [
+    "RAW_VS_ADJUSTED_COLUMNS",
     "AnalyticsQuery",
     "TenantScopedQuery",
     "build_insert_columns",

@@ -165,7 +165,13 @@ from typing import Any
 from saena_analytics_clickhouse.executor import ClickHouseExecutor
 from saena_analytics_clickhouse.identifiers import validate_tenant_id
 from saena_analytics_clickhouse.query import AnalyticsQuery, build_insert_columns
-from saena_analytics_clickhouse.rows import CitationRow, ExperimentRegistrationRow, ObservationRow
+from saena_analytics_clickhouse.rows import (
+    CitationRow,
+    ExperimentRegistrationRow,
+    MeasurementOutcomeRow,
+    ObservationRow,
+    RawVsAdjustedLiftRow,
+)
 
 # Column order matches `schema.py`'s CREATE TABLE DDL exactly (`tenant_id,
 # id, idempotency_key, occurred_at, ingested_at, ...`) — this is also the
@@ -210,6 +216,35 @@ _EXPERIMENT_REGISTRATIONS_SELECT_COLUMNS: tuple[str, ...] = (
     "observation_cell",
     "registration_hash",
     "status",
+)
+
+# w5-11 (Wave 5): column order matches `schema.py`'s `measurement_outcome`
+# CREATE TABLE DDL exactly, same discipline as every SELECT-columns tuple
+# above — this is also the exact positional order `_measurement_outcome_
+# from_values` below expects.
+_MEASUREMENT_OUTCOME_SELECT_COLUMNS: tuple[str, ...] = (
+    "tenant_id",
+    "id",
+    "idempotency_key",
+    "occurred_at",
+    "ingested_at",
+    "experiment_id",
+    "registration_canonical_hash",
+    "window_started_at",
+    "window_ended_at",
+    "b_verdict",
+    "reason_codes",
+    "outcome_layer",
+    "evidence_basis_id",
+    "sample_count_treatment",
+    "sample_count_control",
+    "insufficient_data",
+    "net_of_control_lift",
+    "raw_lift",
+    "evidence_bundle_manifest_hash",
+    "grs_policy_version",
+    "grs_policy_hash",
+    "grs_policy_provenance",
 )
 
 
@@ -314,6 +349,32 @@ def _experiment_registration_fields(row: ExperimentRegistrationRow) -> dict[str,
         "observation_cell": row.observation_cell,
         "registration_hash": row.registration_hash,
         "status": row.status,
+    }
+
+
+def _measurement_outcome_fields(row: MeasurementOutcomeRow) -> dict[str, object]:
+    return {
+        "tenant_id": row.tenant_id,
+        "id": row.id,
+        "idempotency_key": row.idempotency_key,
+        "occurred_at": row.occurred_at,
+        "experiment_id": row.experiment_id,
+        "registration_canonical_hash": row.registration_canonical_hash,
+        "window_started_at": row.window_started_at,
+        "window_ended_at": row.window_ended_at,
+        "b_verdict": row.b_verdict,
+        "reason_codes": list(row.reason_codes),
+        "outcome_layer": row.outcome_layer,
+        "evidence_basis_id": row.evidence_basis_id,
+        "sample_count_treatment": row.sample_count_treatment,
+        "sample_count_control": row.sample_count_control,
+        "insufficient_data": row.insufficient_data,
+        "net_of_control_lift": row.net_of_control_lift,
+        "raw_lift": row.raw_lift,
+        "evidence_bundle_manifest_hash": row.evidence_bundle_manifest_hash,
+        "grs_policy_version": row.grs_policy_version,
+        "grs_policy_hash": row.grs_policy_hash,
+        "grs_policy_provenance": row.grs_policy_provenance,
     }
 
 
@@ -424,6 +485,76 @@ def _experiment_registration_from_values(values: tuple[Any, ...]) -> ExperimentR
     )
 
 
+def _measurement_outcome_from_values(values: tuple[Any, ...]) -> MeasurementOutcomeRow:
+    (
+        tenant_id,
+        id_,
+        idempotency_key,
+        occurred_at,
+        ingested_at,
+        experiment_id,
+        registration_canonical_hash,
+        window_started_at,
+        window_ended_at,
+        b_verdict,
+        reason_codes,
+        outcome_layer,
+        evidence_basis_id,
+        sample_count_treatment,
+        sample_count_control,
+        insufficient_data,
+        net_of_control_lift,
+        raw_lift,
+        evidence_bundle_manifest_hash,
+        grs_policy_version,
+        grs_policy_hash,
+        grs_policy_provenance,
+    ) = values
+    return MeasurementOutcomeRow(
+        tenant_id=tenant_id,
+        id=id_,
+        idempotency_key=idempotency_key,
+        occurred_at=_coerce_utc(occurred_at),
+        experiment_id=experiment_id,
+        registration_canonical_hash=registration_canonical_hash,
+        window_started_at=_coerce_utc(window_started_at),
+        window_ended_at=_coerce_utc(window_ended_at),
+        b_verdict=b_verdict,
+        reason_codes=tuple(reason_codes),
+        outcome_layer=outcome_layer,
+        evidence_basis_id=evidence_basis_id,
+        sample_count_treatment=sample_count_treatment,
+        sample_count_control=sample_count_control,
+        insufficient_data=insufficient_data,
+        net_of_control_lift=net_of_control_lift,
+        raw_lift=raw_lift,
+        evidence_bundle_manifest_hash=evidence_bundle_manifest_hash,
+        grs_policy_version=grs_policy_version,
+        grs_policy_hash=grs_policy_hash,
+        grs_policy_provenance=grs_policy_provenance,
+        ingested_at=_coerce_utc(ingested_at),
+    )
+
+
+def _raw_vs_adjusted_from_values(values: tuple[Any, ...]) -> RawVsAdjustedLiftRow:
+    (
+        tenant_id,
+        experiment_id,
+        outcome_layer,
+        b_verdict,
+        raw_lift,
+        net_of_control_lift,
+    ) = values
+    return RawVsAdjustedLiftRow(
+        tenant_id=tenant_id,
+        experiment_id=experiment_id,
+        outcome_layer=outcome_layer,
+        b_verdict=b_verdict,
+        raw_lift=raw_lift,
+        net_of_control_lift=net_of_control_lift,
+    )
+
+
 class ClickHouseAnalyticsStore:
     """Adapter over an injected `ClickHouseExecutor` — this package's public
     surface (`__init__.py` re-exports this class)."""
@@ -450,10 +581,20 @@ class ClickHouseAnalyticsStore:
     def append_experiment_registration(self, row: ExperimentRegistrationRow) -> bool:
         return self._append("experiment_registrations", row, _experiment_registration_fields(row))
 
+    def append_measurement_outcome(self, row: MeasurementOutcomeRow) -> bool:
+        """Insert `row` into `measurement_outcome` (w5-11).
+
+        Same idempotency/return-value semantics as `append_observation` —
+        `guard_row_fields` already ran in `MeasurementOutcomeRow.
+        __post_init__` (construction is the enforcement point, `rows.py`),
+        so by the time a row reaches here it has already been refused
+        fail-closed if it carried a raw-content/secret-shaped field."""
+        return self._append("measurement_outcome", row, _measurement_outcome_fields(row))
+
     def _append(
         self,
         table: str,
-        row: ObservationRow | CitationRow | ExperimentRegistrationRow,
+        row: ObservationRow | CitationRow | ExperimentRegistrationRow | MeasurementOutcomeRow,
         fields_map: dict[str, object],
     ) -> bool:
         """Dispatches to the r4-02 race-free path (real/dedup-token-capable
@@ -468,7 +609,7 @@ class ClickHouseAnalyticsStore:
     def _append_with_dedup_token(
         self,
         table: str,
-        row: ObservationRow | CitationRow | ExperimentRegistrationRow,
+        row: ObservationRow | CitationRow | ExperimentRegistrationRow | MeasurementOutcomeRow,
         fields_map: dict[str, object],
     ) -> bool:
         """THE r4-02 fix: unconditional insert, deduplicated by ClickHouse
@@ -492,7 +633,7 @@ class ClickHouseAnalyticsStore:
     def _append_legacy_check_then_insert(
         self,
         table: str,
-        row: ObservationRow | CitationRow | ExperimentRegistrationRow,
+        row: ObservationRow | CitationRow | ExperimentRegistrationRow | MeasurementOutcomeRow,
         fields_map: dict[str, object],
     ) -> bool:
         """Compatibility path ONLY — never used against a real
@@ -602,5 +743,61 @@ class ClickHouseAnalyticsStore:
             for row in self._executor.query(sql, params)
         )
 
+    def get_measurement_outcomes(
+        self,
+        tenant_id: str,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
+    ) -> tuple[MeasurementOutcomeRow, ...]:
+        """Return every `measurement_outcome` row for `tenant_id` (w5-11),
+        optionally bounded by `[start, end)`/`limit` — same unconditional
+        query-time logical dedup (r4-02) as every other `get_*` here; a
+        physical duplicate beyond the physical dedup window is still
+        observed exactly once."""
+        query = AnalyticsQuery.for_tenant("measurement_outcome", tenant_id).with_time_range(
+            start=start, end=end
+        )
+        if limit is not None:
+            query = query.with_limit(limit)
+        sql, params = query.to_deduplicated_select_sql(columns=_MEASUREMENT_OUTCOME_SELECT_COLUMNS)
+        return tuple(
+            _measurement_outcome_from_values(tuple(row))
+            for row in self._executor.query(sql, params)
+        )
 
-__all__ = ["ClickHouseAnalyticsStore"]
+    def get_measurement_outcome_raw_vs_adjusted_view(
+        self,
+        tenant_id: str,
+        *,
+        experiment_id: str | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int | None = None,
+    ) -> tuple[RawVsAdjustedLiftRow, ...]:
+        """Dashboard obligation (k3s §9.2:485, wave5-plan.md w5-11 deliverable
+        3): both the RAW and the control-adjusted (`net_of_control_lift`)
+        per-signal lift, derivable from the SAME underlying rows — this
+        adapter never maintains a second, separately-written table for the
+        "raw view" vs. the "adjusted view"; both are projections of the one
+        append-only `measurement_outcome` row set, logically deduplicated the
+        same way every other read path here is (r4-02).
+
+        `experiment_id` optionally narrows to one experiment (still always
+        `tenant_id`-scoped first, per `query.py`'s structural guarantee).
+        """
+        query = AnalyticsQuery.for_tenant("measurement_outcome", tenant_id).with_time_range(
+            start=start, end=end
+        )
+        if experiment_id is not None:
+            query = query.filter_eq("experiment_id", experiment_id)
+        if limit is not None:
+            query = query.with_limit(limit)
+        sql, params = query.to_raw_vs_adjusted_select_sql()
+        return tuple(
+            _raw_vs_adjusted_from_values(tuple(row)) for row in self._executor.query(sql, params)
+        )
+
+
+__all__ = ["ClickHouseAnalyticsStore", "RawVsAdjustedLiftRow"]

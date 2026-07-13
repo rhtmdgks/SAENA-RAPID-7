@@ -36,11 +36,21 @@ from saena_analytics_clickhouse.query_privacy import (
     derive_query_digest,
     derive_query_ref,
 )
-from saena_analytics_clickhouse.rows import CitationRow, ExperimentRegistrationRow, ObservationRow
+from saena_analytics_clickhouse.rows import (
+    MEASUREMENT_OUTCOME_B_VERDICTS,
+    MEASUREMENT_OUTCOME_LAYERS,
+    CitationRow,
+    ExperimentRegistrationRow,
+    MeasurementOutcomeRow,
+    ObservationRow,
+    RawVsAdjustedLiftRow,
+)
 from saena_analytics_clickhouse.schema import MIGRATIONS, TABLE_NAMES, migrate_down, migrate_up
 from saena_analytics_clickhouse.store import ClickHouseAnalyticsStore
 
 __all__ = [
+    "MEASUREMENT_OUTCOME_B_VERDICTS",
+    "MEASUREMENT_OUTCOME_LAYERS",
     "MIGRATIONS",
     "QUERY_SIGNING_KEY_ENV_VAR",
     "TABLE_NAMES",
@@ -52,6 +62,7 @@ __all__ = [
     "ClickHouseExecutor",
     "ExecutorError",
     "ExperimentRegistrationRow",
+    "MeasurementOutcomeRow",
     "MigrationError",
     "MissingQuerySigningKeyError",
     "ObservationRow",
@@ -59,6 +70,7 @@ __all__ = [
     "QueryRef",
     "QuerySigningKeyRef",
     "RawContentRejectedError",
+    "RawVsAdjustedLiftRow",
     "RowValidationError",
     "TenantId",
     "TenantIsolationError",
