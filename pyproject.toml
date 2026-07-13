@@ -23,6 +23,8 @@ members = [
     "services/acquisition/repository-intake-service",
     "services/acquisition/chatgpt-observer-service",
     "services/acquisition/site-discovery-service",
+    "services/intelligence/demand-graph-service",
+    "services/intelligence/entity-resolution-service",
     "services/platform/quality-eval-service",
     "services/foundation/tenant-control-service",
     "services/foundation/policy-gate-service",
@@ -64,6 +66,8 @@ dev = [
     "saena-hooks-runtime",
     "saena-analytics-clickhouse",
     "saena-vector-store",
+    "saena-demand-graph",
+    "saena-entity-resolution",
     "saena-repository-intake",
     "saena-quality-eval",
     "saena-chatgpt-observer",
@@ -95,6 +99,8 @@ saena-forgectl = { workspace = true }
 saena-hooks-runtime = { workspace = true }
 saena-analytics-clickhouse = { workspace = true }
 saena-vector-store = { workspace = true }
+saena-demand-graph = { workspace = true }
+saena-entity-resolution = { workspace = true }
 saena-repository-intake = { workspace = true }
 saena-quality-eval = { workspace = true }
 saena-chatgpt-observer = { workspace = true }

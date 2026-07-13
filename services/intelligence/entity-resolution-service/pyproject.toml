@@ -1,0 +1,40 @@
+[project]
+name = "saena-entity-resolution"
+version = "0.1.0"
+description = "SAENA entity-resolution-service — tenant-scoped brand/product/integration/competitor alias canonicalization (W4, w4-03)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "saena-domain",
+    "saena-schemas",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_entity_resolution"]
+
+[tool.uv.sources]
+saena-domain = { workspace = true }
+saena-schemas = { workspace = true }
+
+# NOTE (w4-03): this package is NOT YET a member of the root workspace
+# (root pyproject.toml `[tool.uv.workspace].members` / dev dependency-group
+# / `[tool.mypy] files` / `[tool.coverage.run] source` / `.importlinter`
+# `root_packages`) — per this repo's established Wave-3/Wave-4
+# parallel-unit convention (see packages/vector-store/pyproject.toml
+# "Packaging note", added by unit/w4-07-vector, and
+# services/acquisition/site-discovery-service/pyproject.toml, added by
+# unit/w3-05, same not-yet-registered state at the time each of those
+# units was authored), each new-package patch unit's own exclusive paths
+# never include root pyproject.toml: registering a new workspace member is
+# the Integrator's job at merge time (CLAUDE.md "독점 수정 경로" / "단일
+# owner" — root pyproject.toml is shared infrastructure every parallel
+# Wave-4 unit would otherwise collide on). Until that registration happens,
+# this package is NOT `uv sync`-installed/importable as a real
+# distribution — this unit's own tests
+# (`tests/unit/svc_entity_resolution/conftest.py`) import it by inserting
+# `src/` directly onto `sys.path` instead, exactly like
+# `tests/unit/svc_observer_discovery/conftest.py` and
+# `tests/unit/vector_store/conftest.py` already do for their own packages.

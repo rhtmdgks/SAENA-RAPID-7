@@ -9,8 +9,10 @@ members = [
     "saena-artifact-registry",
     "saena-audit-ledger",
     "saena-chatgpt-observer",
+    "saena-demand-graph",
     "saena-domain",
     "saena-engine-gateway",
+    "saena-entity-resolution",
     "saena-forge-console",
     "saena-forgectl",
     "saena-hooks-runtime",
@@ -1317,6 +1319,21 @@ dependencies = [
 requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
 
 [[package]]
+name = "saena-demand-graph"
+version = "0.1.0"
+source = { editable = "services/intelligence/demand-graph-service" }
+dependencies = [
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+]
+
+[[package]]
 name = "saena-domain"
 version = "0.1.0"
 source = { editable = "packages/domain" }
@@ -1368,6 +1385,21 @@ requires-dist = [
     { name = "saena-observability", editable = "packages/observability" },
     { name = "saena-schemas", editable = "packages/schemas" },
     { name = "uvicorn", specifier = ">=0.32,<1" },
+]
+
+[[package]]
+name = "saena-entity-resolution"
+version = "0.1.0"
+source = { editable = "services/intelligence/entity-resolution-service" }
+dependencies = [
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
 ]
 
 [[package]]
@@ -1438,8 +1470,10 @@ dev = [
     { name = "saena-artifact-registry" },
     { name = "saena-audit-ledger" },
     { name = "saena-chatgpt-observer" },
+    { name = "saena-demand-graph" },
     { name = "saena-domain" },
     { name = "saena-engine-gateway" },
+    { name = "saena-entity-resolution" },
     { name = "saena-forge-console" },
     { name = "saena-forgectl" },
     { name = "saena-hooks-runtime" },
@@ -1480,8 +1514,10 @@ dev = [
     { name = "saena-artifact-registry", editable = "services/platform/artifact-registry-service" },
     { name = "saena-audit-ledger", editable = "services/foundation/audit-ledger-service" },
     { name = "saena-chatgpt-observer", editable = "services/acquisition/chatgpt-observer-service" },
+    { name = "saena-demand-graph", editable = "services/intelligence/demand-graph-service" },
     { name = "saena-domain", editable = "packages/domain" },
     { name = "saena-engine-gateway", editable = "services/platform/engine-adapter-gateway" },
+    { name = "saena-entity-resolution", editable = "services/intelligence/entity-resolution-service" },
     { name = "saena-forge-console", editable = "services/platform/forge-console-api" },
     { name = "saena-forgectl", editable = "tools/forgectl" },
     { name = "saena-hooks-runtime", editable = "packages/hooks-runtime" },
