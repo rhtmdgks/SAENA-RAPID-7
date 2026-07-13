@@ -84,7 +84,35 @@ class ObservationNotFoundError(ChatgptObserverError):
     error_code = "saena.not_found.platform_observation"
 
 
+class BrowserPoolExhaustedError(ChatgptObserverError):
+    """`BrowserPool.acquire()` timed out — every pooled session was in use
+    and no new session could be created within `max_size` (w4-08 pool
+    lifecycle "bounded size")."""
+
+    error_code = "saena.rate_limited.browser_pool_exhausted"
+    retryable = True
+
+
+class BrowserPoolClosedError(ChatgptObserverError):
+    """A caller attempted to `acquire()` from an already-`close()`d
+    `BrowserPool`."""
+
+    error_code = "saena.unavailable.browser_pool_closed"
+
+
+class BrowserSessionRenderError(ChatgptObserverError):
+    """A `BrowserSessionPort.render_search_result` call failed (fixture:
+    unregistered query or a closed session; real driver: any Playwright/
+    network failure — see `playwright_driver.py`)."""
+
+    error_code = "saena.upstream_engine.browser_session_render_failed"
+    retryable = True
+
+
 __all__ = [
+    "BrowserPoolClosedError",
+    "BrowserPoolExhaustedError",
+    "BrowserSessionRenderError",
     "ChatgptObserverError",
     "CrossTenantObservationError",
     "JobKindScopeError",

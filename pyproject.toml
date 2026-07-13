@@ -204,4 +204,15 @@ omit = [
     # postgres adapter above (integration lane runs its OWN coverage; this
     # omit only affects the blocking unit-lane ratchet).
     "packages/vector-store/src/saena_vector_store/pgvector/*",
+    # services/.../chatgpt-observer-service/.../playwright_driver.py (w4-08):
+    # the real Playwright/Chromium browser driver. Its `import playwright...`
+    # is guarded so the module imports without the package installed, but its
+    # actual session/render/close methods are MEANINGFULLY exercisable only
+    # against a live headless browser — a fake would test the fake, not the
+    # real driver. The unit lane instead drives the pool through the
+    # deterministic `FixtureBrowserSessionFactory` (pool.py, 98% unit cov);
+    # the real driver is integration-lane only (tests/integration/
+    # browser_observer/**, browser-gated). Same documented, non-silent ratchet
+    # treatment as the w2-13 postgres / w4-07 pgvector real adapters above.
+    "services/acquisition/chatgpt-observer-service/src/saena_chatgpt_observer/playwright_driver.py",
 ]
