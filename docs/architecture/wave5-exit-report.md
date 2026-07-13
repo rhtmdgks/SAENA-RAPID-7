@@ -2,18 +2,87 @@
 
 Branch: `wave5-measurement` (from `main` = `156568c`, W4 PR #5 + remediation PR #6).
 Plan/DAG: `docs/architecture/wave5-plan.md` (commit `6e40907`).
+Final branch HEAD: **`dab5e9a`** (Wave 5 Closure complete).
 Engine scope: ChatGPT Search ONLY. Date: 2026-07-14.
 
 ## Status
 
-**PARTIAL PASS** — the full W5 measurement·B-layer *mechanism* (21 of 24 seed
-units) is delivered, independently critic-verified, and `just verify`-green.
-Three units are residual: **w5-19** (E2E harness delivered, test cases cut
-short by an external account rate-limit), **w5-20** (failure-mode suite
-partial + one seam finding), **w5-21** (Helm — BLOCKED on human protected-path
-approval). Production operation (real GRS thresholds, live ChatGPT observation,
-real customer deployment, live cluster) is BLOCKED(human/production-only) and
-is NOT claimed PASS anywhere. No unsupported external-lift claim is made.
+**PASS (code + static-deployment mechanism) — 24/24 seed units.** The Wave 5
+Closure (commits `812c3a5`..`dab5e9a`) completed the three previously-residual
+units and all associated defects, with independent adversarial critics on every
+unit and honest Lead-fallback verification where spawned critics stalled.
+Clean separation of what PASSes vs what remains human/production-gated:
+
+- **Code / mechanism: PASS.** DiD activation, deployment.confirmed.v1 7-day
+  clock, outcome_layer ≥2-independent-layer B-gate, evidence bundle, GRS
+  fail-closed mechanism, B-verified-only skill-bank intake, real composed E2E,
+  full failure-mode matrix, conflicting-confirmation seam. `just verify` green
+  3× (deterministic); real Postgres 16 / ClickHouse 24.8 / Temporal
+  time-skipping container lanes green 2×.
+- **Static deployment package: PASS.** w5-21 saena-forge Helm wiring +
+  validation (helm lint/template, kubeconform strict, forgectl preflight
+  pos/neg, values.schema, deploy unit+integration tests) — human-authorized
+  protected-path work (H8 grant recorded, commit `9099c1d`).
+- **Live staging/production deployment: OPEN.** No live cluster in this
+  environment; live install/rollback not run, not claimed.
+- **Production GRS thresholds / SLA / credit, ChatGPT observation methodology
+  + ToS, PII-vs-audit legal: BLOCKED(human).** Mechanism only; production
+  values never invented, never claimed PASS.
+
+No production deployment, no live customer observation, and **no unsupported
+external-lift claim** is made anywhere.
+
+### Wave 5 Closure — units, findings, remediation
+
+| Closure unit | Scope | Integrating SHA(s) | Critic outcome |
+|---|---|---|---|
+| c5-03 | conflicting-confirmation seam fix | `812c3a5`,`9c10af7`,`4d177e8` | correctness PASS; security FAIL (multi-conflict `EvidenceHashMismatchError` crash) → fix → re-verify PASS |
+| c5-04 | w5-21 Helm/deploy wiring (Lead-direct) | `9099c1d`,`d95a183`,`cb9a9d4` | PASS (deploy-security) + 2 should-fixes applied |
+| c5-01 | w5-19 real composed E2E | `c7daad7`,`88ed805`,`1390c59`,`e0cedbf`,`bde828d` | FAIL×3 on the zero-collected guard (dead session-fixture → env-var contract; MF-1 dead-in-CI + MF-2 over-fire → env contract; RV-3 Docker-absent self-test skip → lazy fixtures) → re-verify PASS |
+| c5-02 | w5-20 failure-mode matrix + F-9 repoint | `9a51d45`,`7077fd7` | PASS (failure-completeness); matrix 6-check gate proven to have teeth |
+| c5-05 | wire real E2E/failure lanes into named gates | `c965a9e` | (the gaps c5-06 checked) |
+| c5-06 | cross-unit adversarial audit | `75632e0`,`f9a6cca`,`dab5e9a` | audit-a FAIL (**real secret-leak**: hyphen-infix `sk-live-…` admitted into skill-bank PRODUCTION pool — 3 content guards missed the shape) → fix all 3 + regression → re-verify PASS; audit-b fail-closed/tenant/replay = Lead verification (spawned auditors stalled) |
+
+**Key defect closed by the audit (would have shipped otherwise):** the shared
+`_SECRET_SHAPED_PATTERNS` set (duplicated in intake.py / evidence.py /
+analytics_clickhouse/guard.py) matched Stripe underscore (`sk_live_`) but NOT
+the hyphen-infix convention (`sk-live-…`), so a real credential shape was
+admitted verbatim into the strategy-skill-bank production candidate pool under
+an innocuous field name — the sole enforcement point for the open-class
+payload's "no raw content" invariant. Fixed across all three guards + ADMIT-path
+regression tests (`75632e0`).
+
+**Conflicting-confirmation seam (the w5-20 finding, now closed):**
+`run_measurement` no longer lets a persistence `IdempotencyConflictError`
+escape — it catches it by type and returns a deterministic
+`UNDETERMINED(conflicting_confirmation)` with the first accepted record
+unmutated; two unrelated same-tenant conflicts no longer collide (each conflict
+records a run-distinguishing, fingerprint-only evidence entry).
+
+### Honesty disclosures
+
+- **c5-04 (w5-21 Helm) was Lead-authored**, not by an isolated write-agent: two
+  spawned agents correctly declined the protected-path write on the strength of
+  the then-stale `BLOCKED(human)` living-doc, refusing to trust a second-hand
+  authorization claim. Resolution: the user's direct in-session H8 grant was
+  recorded in `wave5-plan.md` (`9099c1d`), and the Lead — holding the
+  first-party human authorization — did the deploy work directly. An
+  independent critic (not the author) reviewed it: PASS.
+- **c5-06 audit-b (fail-closed/tenant/replay) is Lead verification**, not an
+  independent-critic PASS: the spawned auditor and its respawn stalled without
+  delivering a verdict, so per CLAUDE.md principle 9 the Lead reran the
+  adversarial probes directly (140 tests across the integrated container lanes
+  + direct probes) and recorded the result honestly as Lead fallback
+  (`/tmp` verdict `c5-06-audit-b-LEAD.json`; audit-a covered provider-scope +
+  CI-vacuity + no-fake-mock independently). Every other unit has an independent
+  critic that did not author it.
+
+### Original wave (pre-closure) status, superseded
+
+The initial pass reached PARTIAL PASS (21/24) with w5-19/w5-20/w5-21 residual;
+that state is superseded by this Closure. Stale per-commit verification claims
+against the earlier `80530a8`/`f52e566` heads have been reconciled to the final
+`dab5e9a`.
 
 ## Delivered units (integrated on wave5-measurement)
 
@@ -133,29 +202,27 @@ gate), not silently.
 
 ## Residual / OPEN / production-only
 
-- **w5-19 (E2E)** — RESIDUAL. A 779-line real-stack E2E harness
-  (`tests/e2e/measurement/measurement_e2e_harness.py`) was delivered but the
-  author was cut off by an external account rate-limit before writing the
-  collectible `test_*` cases + `tests/integration/measurement_e2e/`. NOT
-  integrated (harness-only). The `measurement-e2e` CI gate currently covers the
-  boundary + pipeline + Temporal integration as an interim; the full
-  multi-container composed E2E is a follow-up. Worktree preserved.
-- **w5-20 (failure modes)** — RESIDUAL (partial). 15 of ~19 failure-mode
-  integration tests written; the coverage-matrix gate referenced 2 unwritten
-  files and the F-9 evaluator repoint (delegating `measurement_fraud.py` /
-  `fm-09` to the integrated engine) was not finished. NOT integrated. The
-  fail-closed / fraud / UNDETERMINED-never-PASS space IS covered by w5-18 (16
-  cross-module tests, critic-verified 9/9 mutation kills) + w5-13 pipeline
-  fail-closed branches. **Seam finding (real):** `run_measurement` does NOT
-  convert a persistence-level `IdempotencyConflictError` (raised by
-  `PgConfirmationStore` on a same-key/different-content conflicting
-  confirmation) into a clean `UNDETERMINED(conflicting_confirmation)` outcome —
-  the store exception propagates. Behaviour is SAFE (fail-closed, first-wins,
-  never arbitrary, never PASS) but not graceful; a follow-up should wrap that
-  write. Non-blocking (safety holds). Worktree preserved.
-- **w5-21 (Helm/forgectl)** — BLOCKED(human). `deploy/**` protected-path
-  approval was requested (consolidated decision H8) and not granted; no chart
-  changes made.
+- **w5-19 (E2E)** — CLOSED (c5-01). 18 real-container composed E2E scenarios +
+  guard-mechanism tests in `tests/integration/measurement_e2e/` — real Postgres
+  16 + ClickHouse 24.8 + Temporal time-skipping, no mock-only, no wall-clock
+  sleep. A `SAENA_MEASUREMENT_E2E_REQUIRED=1` env-var contract arms a
+  zero-collected hard-fail guard (a naming/import error collecting 0 exits
+  non-0, never a silent pass) wired into the `measurement-e2e` named gate.
+- **w5-20 (failure modes)** — CLOSED (c5-02). Full 18-node failure-mode matrix,
+  every node existing + collectible + run-verified (6-check gate with teeth);
+  F-9 repointed to the integrated `b_gate.decide_b_verdict` (thin shim, all
+  importers green). 31 integration tests vs real Postgres. **Seam finding
+  closed (c5-03):** `run_measurement` now catches the persistence
+  `IdempotencyConflictError` by type and returns
+  `UNDETERMINED(conflicting_confirmation)` (first record unmutated, two unrelated
+  same-tenant conflicts no longer collide).
+- **w5-21 (Helm/forgectl)** — CLOSED, static (c5-04). deploy/** authorized by the
+  human (H8 grant, `9099c1d`). 2 measurement Deployments (experiment-attribution,
+  strategy-skill-bank) via the generic `services.<key>` shape; digest-pinned +
+  SecretRef-only + hardened + zero K8s API + no ClusterRole; GRS bundle a signed
+  ExternalSecret with **no threshold values**; Google/Gemini fail schema +
+  forgectl preflight. **Live install/rollback: OPEN** (no live cluster — not run,
+  not claimed).
 - **GRS production thresholds + B-SLA remediation/credit** (§13-7) — BLOCKED(human).
 - **ChatGPT observation methodology / account / rate-limit / ToS owner** (§13-1) — BLOCKED(human); dev uses approved-fixture adapter only.
 - **PII-vs-audit legal** (W4 carry, H10) — bundle carries hashes/refs only, no raw content; legal sign-off pending.

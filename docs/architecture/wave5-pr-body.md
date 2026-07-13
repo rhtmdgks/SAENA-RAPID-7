@@ -3,6 +3,13 @@
 **DO NOT AUTO-MERGE.** Human review + normal merge only (no admin/squash/rebase/
 force). No production deployment. No unsupported external-lift claim is made.
 
+**Status: PASS (code + static-deployment mechanism), 24/24 seed units.** Final
+branch HEAD `dab5e9a` (Wave 5 Closure complete). Live cluster install/rollback
+is OPEN (not run); production GRS thresholds / ToS / legal remain BLOCKED(human).
+Full detail + honesty disclosures (Lead-direct w5-21 Helm under the recorded H8
+grant; Lead-fallback verification for the fail-closed/tenant/replay audit lane)
+in `docs/architecture/wave5-exit-report.md`.
+
 ## Authoritative scope
 
 Wave 5 activates the *measurement / B-layer* half of the AEO engine on top of
