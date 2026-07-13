@@ -27,15 +27,31 @@ DSL" design.
 
 from __future__ import annotations
 
+import os
 import re
 import threading
 from typing import Any
 
+from saena_analytics_clickhouse.query_privacy import QuerySigningKeyRef, derive_query_ref
 from saena_analytics_clickhouse.rows import CitationRow, ExperimentRegistrationRow, ObservationRow
 from saena_analytics_clickhouse.schema import TABLE_NAMES
 
 TENANT_A = "acme-co"
 TENANT_B = "globex-co"
+
+# `derive_query_ref` (independent-critic MUST-FIX round 2) is now KEYED and
+# fail-closed, exactly like `derive_query_digest` always was — this factory
+# module needs a deterministic test signing key to keep building
+# `ObservationRow` fixtures without every call site threading a real
+# `SecretRef` through. A DEDICATED env var name (never
+# `QUERY_SIGNING_KEY_ENV_VAR` itself), set once at module-import time to a
+# fixed, obviously-synthetic value — never a real secret, never read from
+# any production key source. `os.environ.setdefault` (not a plain assign) so
+# a real test run that already set this var for its own reason is never
+# silently overwritten.
+_TEST_QUERY_SIGNING_KEY_ENV_VAR = "SAENA_ANALYTICS_QUERY_SIGNING_KEY__TEST_FIXTURE"
+os.environ.setdefault(_TEST_QUERY_SIGNING_KEY_ENV_VAR, "test-fixture-signing-key-not-a-real-secret")
+_TEST_SIGNING_KEY_REF = QuerySigningKeyRef(env_var=_TEST_QUERY_SIGNING_KEY_ENV_VAR)
 
 _EQ_PARAM_RE = re.compile(r"^eq_(.+)_(\d+)$")
 _FROM_RE = re.compile(r"FROM\s+(\w+)", re.IGNORECASE)
@@ -162,16 +178,30 @@ def new_fake_executor_with_tables() -> FakeClickHouseExecutor:
 
 
 def make_observation_row(**overrides: Any) -> ObservationRow:
+    """`query_ref` defaults to the `derive_query_ref` (KEYED, r4-04 round 2)
+    projection of the SAME synthetic query `make_observation_row` always
+    used pre-r4-04 (`"best crm for startups"`) — never a raw `query_text`
+    field any more (r4-04: `ObservationRow` has no such field), and never an
+    unkeyed hash either (round-2 fix: `derive_query_ref` is fail-closed,
+    keyed by `_TEST_SIGNING_KEY_REF` here). A caller that needs to override
+    the underlying query should pass `query_ref=derive_query_ref(
+    tenant_id=..., raw_query=..., signing_key_ref=_TEST_SIGNING_KEY_REF
+    ).query_ref` explicitly, never a raw string."""
     import datetime as _dt
 
+    default_tenant_id = TENANT_A
     fields: dict[str, Any] = {
-        "tenant_id": TENANT_A,
+        "tenant_id": default_tenant_id,
         "id": "obs-1",
         "idempotency_key": "idem-obs-1",
         "occurred_at": _dt.datetime(2026, 7, 1, tzinfo=_dt.UTC),
         "engine_id": "chatgpt-search",
         "run_id": "run-1",
-        "query_text": "best crm for startups",
+        "query_ref": derive_query_ref(
+            tenant_id=overrides.get("tenant_id", default_tenant_id),
+            raw_query="best crm for startups",
+            signing_key_ref=_TEST_SIGNING_KEY_REF,
+        ).query_ref,
         "citation_refs": ("ref://citation/1",),
         "raw_object_ref": "ref://object/1",
     }
@@ -219,8 +249,26 @@ __all__ = [
     "TENANT_A",
     "TENANT_B",
     "FakeClickHouseExecutor",
+    "fixture_signing_key_ref",
     "make_citation_row",
     "make_experiment_registration_row",
     "make_observation_row",
     "new_fake_executor_with_tables",
 ]
+
+
+def fixture_signing_key_ref() -> QuerySigningKeyRef:
+    """The deterministic, obviously-synthetic `QuerySigningKeyRef` this
+    module's own factories key `derive_query_ref`/`derive_query_digest`
+    calls with — exposed for OTHER test modules in this directory
+    (`test_rows.py`, `test_query_privacy.py`) that call `derive_query_ref`
+    directly rather than through `make_observation_row`, so every test in
+    this package shares the SAME deterministic key rather than each
+    reaching for its own ad hoc `monkeypatch.setenv`.
+
+    Deliberately NOT prefixed `test_` — pytest's default `python_functions`
+    collection pattern (`test_*`, no custom override in this repo's root
+    `pyproject.toml`) would otherwise mistake this for a zero-assertion test
+    function and silently "pass" it on every collection.
+    """
+    return _TEST_SIGNING_KEY_REF

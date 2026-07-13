@@ -38,6 +38,7 @@ import pytest
 from saena_analytics_clickhouse.errors import AnalyticsClickHouseError
 from saena_analytics_clickhouse.executor import ClickHouseConnectExecutor
 from saena_analytics_clickhouse.query import AnalyticsQuery, build_insert_columns
+from saena_analytics_clickhouse.query_privacy import QuerySigningKeyRef, derive_query_ref
 from saena_analytics_clickhouse.rows import CitationRow, ExperimentRegistrationRow, ObservationRow
 from saena_analytics_clickhouse.store import ClickHouseAnalyticsStore
 
@@ -48,16 +49,28 @@ TENANT_B = "globex-co"
 
 _WRITER_COUNT = 20
 
+# `derive_query_ref` (independent-critic MUST-FIX round 2) is now KEYED and
+# fail-closed — same duplicated-constant convention as `test_clickhouse_
+# store.py`/`conftest.py` in this directory (never `from conftest import
+# ...`, see that test module's own comment for the collision rationale).
+_TEST_SIGNING_KEY_ENV_VAR = "SAENA_ANALYTICS_QUERY_SIGNING_KEY__INTEGRATION_TEST_FIXTURE"
+_TEST_SIGNING_KEY_REF = QuerySigningKeyRef(env_var=_TEST_SIGNING_KEY_ENV_VAR)
+
 
 def _observation(**overrides: Any) -> ObservationRow:
+    tenant_id = overrides.get("tenant_id", TENANT_A)
     fields: dict[str, Any] = {
-        "tenant_id": TENANT_A,
+        "tenant_id": tenant_id,
         "id": "obs-race",
         "idempotency_key": "idem-race",
         "occurred_at": dt.datetime(2026, 7, 1, tzinfo=dt.UTC),
         "engine_id": "chatgpt-search",
         "run_id": "run-race",
-        "query_text": "best crm for startups",
+        "query_ref": derive_query_ref(
+            tenant_id=tenant_id,
+            raw_query="best crm for startups",
+            signing_key_ref=_TEST_SIGNING_KEY_REF,
+        ).query_ref,
         "citation_refs": ("ref://citation/1",),
         "raw_object_ref": "ref://object/1",
     }
@@ -144,7 +157,8 @@ def _old_append(executor: ClickHouseConnectExecutor, table: str, row: Observatio
         "occurred_at": row.occurred_at,
         "engine_id": row.engine_id,
         "run_id": row.run_id,
-        "query_text": row.query_text,
+        "query_ref": row.query_ref,
+        "query_digest": row.query_digest,
         "citation_refs": list(row.citation_refs),
         "raw_object_ref": row.raw_object_ref,
         "dedup_witness": "",

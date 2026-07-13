@@ -39,6 +39,7 @@ from intelligence_failure_factories import (
     TENANT_A,
     FailingInsertExecutor,
     SimulatedInsertFailure,
+    fixture_signing_key_ref,
     make_observation_row,
     make_observation_source_with_one_query,
     make_patch_unit_completed_envelope,
@@ -47,6 +48,7 @@ from intelligence_failure_factories import (
     run_async,
 )
 from saena_analytics_clickhouse.errors import RawContentRejectedError
+from saena_analytics_clickhouse.query_privacy import derive_query_ref
 from saena_analytics_clickhouse.rows import ObservationRow
 from saena_chatgpt_observer.capture import run_chatgpt_observation
 from saena_chatgpt_observer.errors import ObservationNotFoundError, ObservationRetryExhaustedError
@@ -201,7 +203,11 @@ def test_artifact_gateway_rejects_raw_content_before_any_row_object_exists() -> 
             occurred_at=datetime(2026, 7, 1, tzinfo=UTC),
             engine_id="chatgpt-search",
             run_id=RUN_ID,
-            query_text="best crm for startups",
+            query_ref=derive_query_ref(
+                tenant_id=TENANT_A,
+                raw_query="best crm for startups",
+                signing_key_ref=fixture_signing_key_ref(),
+            ).query_ref,
             citation_refs=("ref://citation/1",),
             # AWS-shaped secret shows up in what should be an opaque object
             # ref — the artifact gateway must refuse this outright.
@@ -221,7 +227,11 @@ def test_artifact_gateway_rejection_leaves_the_clickhouse_store_completely_untou
             occurred_at=datetime(2026, 7, 1, tzinfo=UTC),
             engine_id="chatgpt-search",
             run_id=RUN_ID,
-            query_text="best crm for startups",
+            query_ref=derive_query_ref(
+                tenant_id=TENANT_A,
+                raw_query="best crm for startups",
+                signing_key_ref=fixture_signing_key_ref(),
+            ).query_ref,
             citation_refs=("ref://citation/1",),
             raw_object_ref="ref://object/AKIAABCDEFGHIJKLMNOP",
         )

@@ -176,7 +176,8 @@ class TestRoundTrip:
         assert fetched.idempotency_key == row.idempotency_key
         assert fetched.engine_id == row.engine_id
         assert fetched.run_id == row.run_id
-        assert fetched.query_text == row.query_text
+        assert fetched.query_ref == row.query_ref
+        assert fetched.query_digest == row.query_digest
         assert fetched.citation_refs == row.citation_refs
         assert fetched.raw_object_ref == row.raw_object_ref
 

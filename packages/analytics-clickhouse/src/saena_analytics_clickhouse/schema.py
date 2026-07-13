@@ -52,6 +52,29 @@ the same live-server probe) — this is what makes `store.py`'s
 guarantee rather than a no-op setting on an executor that silently ignores
 it.
 
+`query_text` -> `query_ref`/`query_digest` (r4-04 query privacy boundary —
+FORMAT BOUNDARY, not a live-data migration): the pre-r4-04 `observations`
+table had a `query_text String` column carrying the raw customer query
+verbatim (`data-ownership.md` Constraints violation — "No PII/secrets in
+event payloads — object refs + access policy"). This migration's
+`CREATE TABLE` below REPLACES that column outright with `query_ref String`
+(required, opaque `query://...` ref — see `query_privacy.py`) and
+`query_digest Nullable(String)` (optional, KEYED HMAC digest, `NULL` when a
+caller did not derive one). This is recorded here, explicitly, as a
+CONTRACT change to `MIGRATIONS[0]` itself (not a new additive migration
+entry) because — per this task's own instruction — **no Wave-4 data has
+reached a real production deployment through this still-unreleased schema**
+(same "no real deployment has ingested data" precondition `dedup_witness`'s
+own r4-02 addition already relied on, see below); the module docstring's
+own CONTRACT-is-forbidden-once-deployed policy therefore does not (yet)
+apply to this specific column swap. A schema already carrying LIVE data
+under the pre-r4-04 `query_text` shape would require a separate, explicitly
+human-approved, additive migration (`ALTER TABLE ... ADD COLUMN query_ref
+...` + a backfill/dual-write window + a LATER drop of `query_text`) — this
+migration is NOT that; it is a same-commit format-boundary replacement,
+valid only because no production data exists yet. Do not silently reuse
+this same-commit pattern once real data has landed.
+
 Expand/contract policy note (mirrors `saena_domain.persistence.postgres.
 tables`'s own documented policy — same rationale, reproduced for this
 store): this module is the ONLY schema definition for these three tables.
@@ -135,7 +158,8 @@ CREATE TABLE IF NOT EXISTS observations
     ingested_at DateTime64(3, 'UTC') DEFAULT now64(3, 'UTC'),
     engine_id String,
     run_id String,
-    query_text String,
+    query_ref String,
+    query_digest Nullable(String),
     citation_refs Array(String),
     raw_object_ref String,
     dedup_witness String DEFAULT ''

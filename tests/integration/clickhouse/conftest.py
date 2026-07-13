@@ -44,6 +44,30 @@ from saena_analytics_clickhouse.executor import ClickHouseConnectExecutor  # noq
 from saena_analytics_clickhouse.schema import MIGRATIONS, TABLE_NAMES, migrate_up  # noqa: E402
 from saena_analytics_clickhouse.store import ClickHouseAnalyticsStore  # noqa: E402
 
+# `derive_query_ref` (independent-critic MUST-FIX round 2) is now KEYED and
+# fail-closed, exactly like `derive_query_digest` — every `_observation(...)`
+# builder across this directory's own test modules needs a deterministic
+# signing key to build an `ObservationRow` fixture at all. conftest.py loads
+# before every test module in its subtree (pytest collection order), so
+# setting this env var HERE guarantees it is already present by the time any
+# test module's own `_observation(...)` helper runs — every test module
+# additionally DUPLICATES a matching `QuerySigningKeyRef(env_var=...)`
+# constant pointing at the SAME env var name locally (never
+# `from conftest import ...`, collision-prone once the whole `tests/` suite
+# is collected together under pytest's default `prepend` import mode — see
+# `tests/integration/vector/test_pgvector_store.py`'s own identical
+# `TEST_DIMENSION` precedent). This conftest itself never calls
+# `derive_query_ref`, so it only needs to set the env var, not construct a
+# `QuerySigningKeyRef` — the env var NAME (a plain string, not a secret) is
+# the single source of truth both sides must agree on; the VALUE this
+# conftest sets is a fixed, obviously-synthetic string, never a real
+# secret. `os.environ.setdefault` so a real run that already set this var
+# for its own reason is never silently overwritten.
+TEST_QUERY_SIGNING_KEY_ENV_VAR = "SAENA_ANALYTICS_QUERY_SIGNING_KEY__INTEGRATION_TEST_FIXTURE"
+os.environ.setdefault(
+    TEST_QUERY_SIGNING_KEY_ENV_VAR, "integration-test-fixture-signing-key-not-a-real-secret"
+)
+
 
 def _docker_available() -> bool:
     """Probe the Docker daemon socket directly — never starts a container to

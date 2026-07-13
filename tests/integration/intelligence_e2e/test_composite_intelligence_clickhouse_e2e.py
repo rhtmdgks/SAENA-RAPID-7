@@ -20,13 +20,28 @@ silently passed.
 from __future__ import annotations
 
 import datetime as dt
+import os
 
 import pytest
 from intelligence_e2e_harness import ENGINE_ID, RUN_ID, TENANT_1, TENANT_2, run_composite_chain
+from saena_analytics_clickhouse.query_privacy import QuerySigningKeyRef, derive_query_ref
 from saena_analytics_clickhouse.rows import ObservationRow
 from saena_analytics_clickhouse.store import ClickHouseAnalyticsStore
 
 pytestmark = pytest.mark.integration
+
+# `derive_query_ref` (independent-critic MUST-FIX round 2) is now KEYED and
+# fail-closed, exactly like `derive_query_digest` — this module needs a
+# deterministic test signing key to project `ObservationRow`s. A DEDICATED
+# env var name, set once at module-import time to a fixed, obviously-
+# synthetic value — never a real secret. `os.environ.setdefault` so a real
+# run that already set this var for its own reason is never silently
+# overwritten.
+_TEST_QUERY_SIGNING_KEY_ENV_VAR = "SAENA_ANALYTICS_QUERY_SIGNING_KEY__E2E_TEST_FIXTURE"
+os.environ.setdefault(
+    _TEST_QUERY_SIGNING_KEY_ENV_VAR, "e2e-test-fixture-signing-key-not-a-real-secret"
+)
+_TEST_SIGNING_KEY_REF = QuerySigningKeyRef(env_var=_TEST_QUERY_SIGNING_KEY_ENV_VAR)
 
 
 def _observation_row_from_pooled_result(pooled_result, *, tenant_id: str) -> ObservationRow:
@@ -38,7 +53,14 @@ def _observation_row_from_pooled_result(pooled_result, *, tenant_id: str) -> Obs
     field copy, not a translation layer") — exactly that straight field
     copy, performed here as this E2E's own writer glue (this package is a
     standalone leaf per its own module docstring; it never imports
-    `saena_chatgpt_observer` itself)."""
+    `saena_chatgpt_observer` itself). r4-04 (round 2: KEYED, fail-closed):
+    `query_ref` REPLACES the pre-fix `query_text` field —
+    `record["observation_id"]` is not itself a real query (the formal
+    record does not carry one, see the ORIGINAL comment this replaces), it
+    is this harness's own deterministic stand-in, now passed through
+    `derive_query_ref` like a real caller's raw query would be, rather than
+    assigned directly to a raw-text field that no longer exists on this row
+    type."""
     record = pooled_result.observation_record
     return ObservationRow(
         tenant_id=tenant_id,
@@ -47,7 +69,11 @@ def _observation_row_from_pooled_result(pooled_result, *, tenant_id: str) -> Obs
         occurred_at=dt.datetime.fromisoformat(record["captured_at"].replace("Z", "+00:00")),
         engine_id=record["engine_id"],
         run_id=record["run_id"],
-        query_text=record["observation_id"],  # query_text is not carried on the formal record
+        query_ref=derive_query_ref(
+            tenant_id=tenant_id,
+            raw_query=record["observation_id"],
+            signing_key_ref=_TEST_SIGNING_KEY_REF,
+        ).query_ref,
         citation_refs=tuple(record["citation_refs"]),
         raw_object_ref=record["raw_object_ref"],
     )

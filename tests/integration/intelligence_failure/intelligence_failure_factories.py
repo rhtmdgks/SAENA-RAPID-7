@@ -10,6 +10,7 @@ ChatGPT/creds/customer repo content anywhere in this module.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import threading
 from collections.abc import Coroutine, Mapping, Sequence
@@ -18,6 +19,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from saena_analytics_clickhouse.errors import AnalyticsClickHouseError
+from saena_analytics_clickhouse.query_privacy import QuerySigningKeyRef, derive_query_ref
 from saena_analytics_clickhouse.rows import ObservationRow
 from saena_analytics_clickhouse.schema import TABLE_NAMES
 from saena_analytics_clickhouse.store import ClickHouseAnalyticsStore
@@ -34,6 +36,19 @@ TENANT_A = "acme-co"
 TENANT_B = "globex-co"
 
 RUN_ID = "run-w4-18-0001"
+
+# `derive_query_ref` (independent-critic MUST-FIX round 2) is now KEYED and
+# fail-closed, exactly like `derive_query_digest` — this factory module
+# needs a deterministic test signing key to keep building `ObservationRow`
+# fixtures. A DEDICATED env var name, set once at module-import time to a
+# fixed, obviously-synthetic value — never a real secret.
+# `os.environ.setdefault` so a real run that already set this var for its
+# own reason is never silently overwritten.
+_TEST_QUERY_SIGNING_KEY_ENV_VAR = "SAENA_ANALYTICS_QUERY_SIGNING_KEY__FAILURE_TEST_FIXTURE"
+os.environ.setdefault(
+    _TEST_QUERY_SIGNING_KEY_ENV_VAR, "failure-test-fixture-signing-key-not-a-real-secret"
+)
+_TEST_SIGNING_KEY_REF = QuerySigningKeyRef(env_var=_TEST_QUERY_SIGNING_KEY_ENV_VAR)
 
 
 def run_async(coro: Coroutine[Any, Any, Any]) -> Any:
@@ -282,14 +297,22 @@ class FailingInsertExecutor:
 
 
 def make_observation_row(**overrides: Any) -> ObservationRow:
+    tenant_id = overrides.get("tenant_id", TENANT_A)
     fields: dict[str, Any] = {
-        "tenant_id": TENANT_A,
+        "tenant_id": tenant_id,
         "id": "obs-1",
         "idempotency_key": "idem-obs-1",
         "occurred_at": datetime(2026, 7, 1, tzinfo=UTC),
         "engine_id": "chatgpt-search",
         "run_id": RUN_ID,
-        "query_text": "best crm for startups",
+        # r4-04 (round 2: KEYED, fail-closed): opaque ref, never the raw
+        # query — see `saena_analytics_clickhouse.query_privacy` module
+        # docstring.
+        "query_ref": derive_query_ref(
+            tenant_id=tenant_id,
+            raw_query="best crm for startups",
+            signing_key_ref=_TEST_SIGNING_KEY_REF,
+        ).query_ref,
         "citation_refs": ("ref://citation/1",),
         "raw_object_ref": "ref://object/1",
     }
@@ -337,6 +360,18 @@ def make_patch_unit_completed_envelope(
     )
 
 
+def fixture_signing_key_ref() -> QuerySigningKeyRef:
+    """The deterministic, obviously-synthetic `QuerySigningKeyRef` this
+    module's own `make_observation_row` keys `derive_query_ref` calls
+    with — exposed for `test_rollback_fail_closed.py`'s own direct
+    `ObservationRow(...)` constructions, which need the same key. Not
+    prefixed `test_` — pytest's default `python_functions` collection
+    pattern would otherwise mistake this for a zero-assertion test
+    function (same rationale as `tests/unit/analytics_clickhouse/
+    analytics_clickhouse_factories.py::fixture_signing_key_ref`)."""
+    return _TEST_SIGNING_KEY_REF
+
+
 __all__ = [
     "DEFAULT_FRESHNESS_POLICY",
     "DEFAULT_LINK_STATUSES",
@@ -348,6 +383,7 @@ __all__ = [
     "FakeClickHouseExecutor",
     "SimulatedInsertFailure",
     "TenantId",
+    "fixture_signing_key_ref",
     "make_evidence_record",
     "make_experiment_registration",
     "make_extracted_claim",

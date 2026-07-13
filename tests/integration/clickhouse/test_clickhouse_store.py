@@ -14,6 +14,7 @@ import datetime as dt
 from typing import Any
 
 import pytest
+from saena_analytics_clickhouse.query_privacy import QuerySigningKeyRef, derive_query_ref
 from saena_analytics_clickhouse.rows import CitationRow, ExperimentRegistrationRow, ObservationRow
 from saena_analytics_clickhouse.store import ClickHouseAnalyticsStore
 
@@ -22,16 +23,35 @@ pytestmark = pytest.mark.integration
 TENANT_A = "acme-co"
 TENANT_B = "globex-co"
 
+# `derive_query_ref` (independent-critic MUST-FIX round 2) is now KEYED and
+# fail-closed. `_TEST_SIGNING_KEY_REF` is deliberately DUPLICATED (not
+# `from conftest import ...`) in every test module of this directory that
+# needs one — a plain `import conftest`/`from conftest import` is
+# collision-prone once the whole `tests/` suite is collected together under
+# pytest's default `prepend` import mode (see `tests/integration/vector/
+# test_pgvector_store.py`'s own identical `TEST_DIMENSION` precedent/
+# rationale, and `conftest.py`'s own `TEST_QUERY_SIGNING_KEY_ENV_VAR` — kept
+# in sync by hand, same env var NAME both places, a mismatch would surface
+# immediately as a `MissingQuerySigningKeyError` in every test, never a
+# silent pass).
+_TEST_SIGNING_KEY_ENV_VAR = "SAENA_ANALYTICS_QUERY_SIGNING_KEY__INTEGRATION_TEST_FIXTURE"
+_TEST_SIGNING_KEY_REF = QuerySigningKeyRef(env_var=_TEST_SIGNING_KEY_ENV_VAR)
+
 
 def _observation(**overrides: Any) -> ObservationRow:
+    tenant_id = overrides.get("tenant_id", TENANT_A)
     fields: dict[str, Any] = {
-        "tenant_id": TENANT_A,
+        "tenant_id": tenant_id,
         "id": "obs-1",
         "idempotency_key": "idem-1",
         "occurred_at": dt.datetime(2026, 7, 1, tzinfo=dt.UTC),
         "engine_id": "chatgpt-search",
         "run_id": "run-1",
-        "query_text": "best crm for startups",
+        "query_ref": derive_query_ref(
+            tenant_id=tenant_id,
+            raw_query="best crm for startups",
+            signing_key_ref=_TEST_SIGNING_KEY_REF,
+        ).query_ref,
         "citation_refs": ("ref://citation/1",),
         "raw_object_ref": "ref://object/1",
     }
@@ -77,7 +97,8 @@ class TestAppendRoundTrip:
         assert store.append_observation(row) is True
         (fetched,) = store.get_observations(TENANT_A)
         assert fetched.id == row.id
-        assert fetched.query_text == row.query_text
+        assert fetched.query_ref == row.query_ref
+        assert fetched.query_digest == row.query_digest
         assert fetched.citation_refs == row.citation_refs
 
     def test_citation_append_then_get_round_trips(self, store: ClickHouseAnalyticsStore) -> None:

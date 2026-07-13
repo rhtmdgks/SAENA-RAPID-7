@@ -110,7 +110,10 @@ class TestObservationCapture:
         # the observation row stored in ClickHouse mirrors the same discipline.
         row = chain_result.observation_row
         assert row.raw_object_ref == record["raw_object_ref"]
-        assert _RESPONSE_A.decode() not in row.query_text
+        # r4-04: the row carries only an opaque `query_ref`, never the raw
+        # query text at all — the raw response bytes cannot appear in it by
+        # construction (there is no field capable of holding them).
+        assert _RESPONSE_A.decode() not in row.query_ref
         assert _RESPONSE_A not in repr(row).encode("utf-8")
 
 
@@ -166,7 +169,11 @@ class TestClickHouseAppendOnlyTenantScoped:
         # the observation row's own fields are all ref/hash/metadata shaped
         assert obs_row.raw_object_ref.startswith("artifact://")
         assert _RESPONSE_A not in repr(obs_row).encode("utf-8")
-        assert len(obs_row.query_text) < 200  # short query text, not a raw page
+        # r4-04: `query_ref` is a short opaque reference, never a raw query
+        # string (let alone a raw page) — it is a `query://` URI, not text.
+        assert obs_row.query_ref.startswith("query://")
+        assert len(obs_row.query_ref) < 200
+        assert _QUERY_A not in obs_row.query_ref
 
         # citation rows carry only normalized/hashed refs, never raw HTML
         for row in citation_rows:
