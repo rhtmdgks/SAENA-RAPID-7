@@ -30,9 +30,9 @@ B_Department prompt package §11, ADR-0003/0004/0007/0012/0017/0018/0019.
 | approval bypass negative tests | `tests/unit/svc_agent_runner/test_approval.py` (unapproved/forged/hash-mismatch refused); `tests/integration/execution_e2e/test_temporal_signal_e2e.py::test_forged_signal_for_a_real_contract_hash_does_not_transition` | `ada77f0`,`9213c5e` | PASS |
 | engine_id Google/Gemini 거부 | `packages/domain/src/saena_domain/execution/engine.py::guard_engine_id`; `tests/unit/svc_observer_discovery/test_chatgpt_observer_engine_guard.py` | `e38fe6b`,`b7b08dc` | PASS |
 | unit/integration/E2E/evals CI 배선 | `.github/workflows/ci.yml` jobs: lint, schema-validate, boundaries, unit, integration, contract-compat, contract-lint, **evals, failure-modes, execution-e2e, helm-smoke**; `security.yml`: guards, secret-scan, sbom, vuln-scan, actions-lint | `56c8138` | PASS |
-| Helm/package smoke | CI `helm-smoke` (`just helm-smoke`: helm lint + template + kubeconform -strict + forgectl preflight) | `56c8138` | PASS |
+| Helm/package smoke | CI `helm-smoke` (`just helm-smoke`: helm lint + template + kubeconform -strict + forgectl preflight) | `56c8138`,`fa5d21f` (helm checksum fix) | PASS |
 | architecture boundary | `.importlinter` (independence + leaf contracts, 15 root packages); CI `boundaries` (`lint-imports`) | all integrations | PASS |
-| security gates | `secret-scan` (gitleaks full-history), `sbom`, `vuln-scan`, hook bypass corpus (LEAK=0 Lead-verified) | `55206f8` | PASS |
+| security gates | `secret-scan` (gitleaks full-history; 7 W3 test-fixture FPs suppressed by fingerprint per ADR-0020), `sbom`, `vuln-scan`, hook bypass corpus (LEAK=0 Lead-verified) | `55206f8`,`fa5d21f` | PASS |
 | worktree audit clean | `git worktree list` = main only (all unit worktrees destroyed) | — | PASS |
 | git status clean | working tree clean at each checkpoint | — | PASS |
 | remote wave3-execution 최신 | `origin/wave3-execution` = local HEAD, pushed each checkpoint | — | PASS |
