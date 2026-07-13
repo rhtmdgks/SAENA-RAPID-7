@@ -1441,6 +1441,7 @@ dependencies = [
     { name = "saena-domain" },
     { name = "saena-schemas" },
     { name = "sqlalchemy" },
+    { name = "temporalio" },
 ]
 
 [package.metadata]
@@ -1449,6 +1450,7 @@ requires-dist = [
     { name = "saena-domain", editable = "packages/domain" },
     { name = "saena-schemas", editable = "packages/schemas" },
     { name = "sqlalchemy", specifier = ">=2.0.36,<3" },
+    { name = "temporalio", specifier = ">=1.9,<2" },
 ]
 
 [[package]]

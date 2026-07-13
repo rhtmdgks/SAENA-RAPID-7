@@ -1,13 +1,14 @@
 [project]
 name = "saena-experiment-attribution"
 version = "0.1.0"
-description = "SAENA experiment-attribution-service — measurement persistence (Postgres) for confirmations/windows/decisions/evidence (W5, w5-10)"
+description = "SAENA experiment-attribution-service — measurement persistence (Postgres, w5-10), event boundary (w5-12), pipeline (w5-13) and durable 7-day Temporal workflow (w5-14)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "saena-domain",
     "saena-schemas",
     "sqlalchemy>=2.0.36,<3",
     "asyncpg>=0.30,<1",
+    "temporalio>=1.9,<2",
 ]
 
 [build-system]
