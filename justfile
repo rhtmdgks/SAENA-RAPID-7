@@ -56,6 +56,28 @@ test-execution-e2e:
     uv run pytest tests/e2e/execution -q
     uv run pytest -q -m integration tests/integration/execution_e2e -p no:cacheprovider
 
+# W4 named required-check recipes (ADR-0018 stable check names; wave4-plan §99).
+# Same belt-and-suspenders shape as the W3 named checks above: targeted subsets
+# used as their own CI jobs; the `test`/`test-integration` umbrellas still run
+# the same tests. Container legs honest-skip when Docker/driver is absent.
+test-intelligence-e2e:
+    uv run pytest tests/e2e/intelligence -q
+    uv run pytest -q -m integration tests/integration/intelligence_e2e -p no:cacheprovider
+
+test-storage-integration:
+    uv run pytest -q -m integration tests/integration/clickhouse tests/integration/vector tests/integration/intelligence_pipeline -p no:cacheprovider
+
+test-browser-observer:
+    uv run pytest tests/unit/svc_chatgpt_observer -q
+
+test-qeeg-replay:
+    uv run pytest tests/unit/domain_qeeg tests/unit/svc_claim_evidence -q
+    uv run pytest -q -m integration tests/integration/intelligence_failure -p no:cacheprovider
+
+test-experiment-integrity:
+    uv run pytest tests/unit/domain_experiment -q
+    uv run pytest -q -m integration tests/integration/intelligence_failure/test_experiment_ledger_tamper.py -p no:cacheprovider
+
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
 helm-smoke:
