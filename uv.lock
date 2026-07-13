@@ -4,6 +4,7 @@ requires-python = "==3.12.*"
 
 [manifest]
 members = [
+    "saena-agent-runner",
     "saena-artifact-registry",
     "saena-audit-ledger",
     "saena-domain",
@@ -1170,6 +1171,23 @@ wheels = [
 ]
 
 [[package]]
+name = "saena-agent-runner"
+version = "0.1.0"
+source = { editable = "services/platform/agent-runner-service" }
+dependencies = [
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+    { name = "saena-shared" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+    { name = "saena-shared", editable = "packages/shared" },
+]
+
+[[package]]
 name = "saena-artifact-registry"
 version = "0.1.0"
 source = { editable = "services/platform/artifact-registry-service" }
@@ -1333,6 +1351,7 @@ dev = [
     { name = "pyyaml" },
     { name = "ruff" },
     { name = "rust-just" },
+    { name = "saena-agent-runner" },
     { name = "saena-artifact-registry" },
     { name = "saena-audit-ledger" },
     { name = "saena-domain" },
@@ -1367,6 +1386,7 @@ dev = [
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "ruff", specifier = ">=0.14,<0.15" },
     { name = "rust-just", specifier = ">=1.36,<3" },
+    { name = "saena-agent-runner", editable = "services/platform/agent-runner-service" },
     { name = "saena-artifact-registry", editable = "services/platform/artifact-registry-service" },
     { name = "saena-audit-ledger", editable = "services/foundation/audit-ledger-service" },
     { name = "saena-domain", editable = "packages/domain" },

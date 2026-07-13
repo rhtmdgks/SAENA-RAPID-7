@@ -25,6 +25,7 @@ members = [
     "services/platform/agent-orchestrator-service",
     "services/platform/artifact-registry-service",
     "services/platform/engine-adapter-gateway",
+    "services/platform/agent-runner-service",
     "tools/forgectl",
 ]
 
@@ -51,6 +52,7 @@ dev = [
     "saena-orchestrator",
     "saena-artifact-registry",
     "saena-engine-gateway",
+    "saena-agent-runner",
     "saena-forgectl",
     "datamodel-code-generator>=0.26,<1",
     "openapi-spec-validator>=0.7,<1",
@@ -74,6 +76,7 @@ saena-forge-console = { workspace = true }
 saena-orchestrator = { workspace = true }
 saena-artifact-registry = { workspace = true }
 saena-engine-gateway = { workspace = true }
+saena-agent-runner = { workspace = true }
 saena-forgectl = { workspace = true }
 
 [tool.ruff]
