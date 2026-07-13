@@ -124,32 +124,19 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
-def _this_dir_is_an_invocation_target(config: pytest.Config) -> bool:
-    """True iff this directory (or something inside it) was named on the
-    command line — i.e. this lane is (part of) what the invoker asked to run.
-
-    The zero-collected HARD FAILURE below must fire ONLY when this directory
-    is a deliberate target: a broad repo-wide `pytest` run that simply does
-    not select anything here (e.g. `-m 'not integration'`) is NOT a failure
-    of THIS lane — it never asked for it. But `pytest tests/integration/
-    measurement_e2e ...` that ends up with zero collected items IS a failure,
-    because the required real-container lane was explicitly targeted and
-    silently contributed nothing (naming typo, `-k`/`-m` mismatch, or an
-    import/collection error that pytest would otherwise report only as the
-    bare exit-code 5 a CI wrapper might tolerate)."""
-    for raw_arg in config.invocation_params.args:
-        # Strip any `::node-id` / `-k`-style suffix noise; only the leading
-        # path component matters for target detection.
-        arg_path_str = raw_arg.split("::", 1)[0]
-        if not arg_path_str or arg_path_str.startswith("-"):
-            continue
-        try:
-            arg_path = Path(arg_path_str).resolve()
-        except OSError:
-            continue
-        if arg_path == _THIS_DIR or _THIS_DIR in arg_path.parents or arg_path in _THIS_DIR.parents:
-            return True
-    return False
+#: EXPLICIT env-var contract that arms the zero-collected HARD FAILURE. The
+#: c5-05 named-gate recipe (`just measurement-e2e`) sets this to "1" and names
+#: this directory; in that invocation — and ONLY that invocation — zero items
+#: collected FROM THIS DIRECTORY is a hard failure. An env-var contract is
+#: used deliberately INSTEAD of guessing from `config.invocation_params.args`:
+#: the real required CI invocation (`just test-integration` -> `pytest -m
+#: integration` with NO bare path arg; locations come from pyproject
+#: `testpaths`) passes no path to guess from, so path-guessing would be dead
+#: code there; and a bare ancestor path (`pytest tests/integration -k <x>`)
+#: would over-fire, hard-failing the whole suite because THIS lane collected 0
+#: while an unrelated sibling test ran. The env var is unambiguous and robust
+#: to how pytest is invoked.
+_REQUIRED_ENV_VAR = "SAENA_MEASUREMENT_E2E_REQUIRED"
 
 
 def _this_dir_items(items: list[pytest.Item]) -> list[pytest.Item]:
@@ -167,30 +154,37 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     fires BEFORE deselection (so it still sees the not-yet-deselected items).
     `session.items` here reflects the FINAL, post-deselection selection.
 
+    The guard fires ONLY when the explicit env-var contract
+    `SAENA_MEASUREMENT_E2E_REQUIRED=1` is set AND zero items were collected
+    FROM THIS DIRECTORY specifically. That flag is set only by the c5-05
+    required named-gate recipe (`just measurement-e2e`); an umbrella
+    `just test-integration`, a dev ad-hoc run, or a broad `pytest
+    tests/integration ...` never sets it, so 0-items-here in those runs is
+    normal and silent (no false-fire). Counting items FROM THIS DIRECTORY —
+    not the whole session — means a broad run that DOES set the flag and
+    collects other directories but 0 here still fails correctly.
+
     Distinct from the Docker-absent honest skip (in
     `pytest_collection_modifyitems` below): a Docker-absent environment still
-    COLLECTS every item (they are merely marked skipped), so the final
-    selection is non-empty there. Zero items collected FROM a
-    deliberately-targeted invocation of this directory instead means a naming
-    typo, a `-k`/`-m` mismatch, or an import/collection error silently
-    produced nothing — a hard, non-5 failure, never a tolerated exit-5.
+    COLLECTS every item here (they are merely marked skipped), so the count
+    FROM THIS DIRECTORY is non-empty there — the guard stays silent and the
+    individual honest skips stand. Zero items collected here WITH the flag set
+    instead means a naming typo, a `-k`/`-m` mismatch, or an import/collection
+    error silently produced nothing — a hard, non-5 failure, never exit-5.
     """
+    if os.environ.get(_REQUIRED_ENV_VAR) != "1":
+        return
     if _this_dir_items(session.items):
         return
-    if not _this_dir_is_an_invocation_target(session.config):
-        # A broad repo-wide run that simply did not select anything here (e.g.
-        # `-m 'not integration'`) is NOT a failure of THIS lane — it never
-        # asked for it. Only a deliberate target with zero result is a failure.
-        return
     raise pytest.UsageError(
-        "tests/integration/measurement_e2e collected ZERO test items despite "
-        "being an explicit invocation target — this is the REQUIRED "
-        "real-container measurement E2E lane (wave5-plan.md E9); zero "
-        "collection is a HARD FAILURE (returncode != 0, != 5), never an "
-        "honest skip. A Docker-absent environment still COLLECTS these items "
-        "(it only skips them individually with a reason); zero collection "
-        "instead signals a naming typo, a -k/-m mismatch, or an "
-        "import/collection error that must not silently pass."
+        "tests/integration/measurement_e2e collected ZERO test items while "
+        f"{_REQUIRED_ENV_VAR}=1 — this is the REQUIRED real-container "
+        "measurement E2E lane (wave5-plan.md E9); zero collection is a HARD "
+        "FAILURE (returncode != 0, != 5), never an honest skip. A "
+        "Docker-absent environment still COLLECTS these items (it only skips "
+        "them individually with a reason); zero collection instead signals a "
+        "naming typo, a -k/-m mismatch, or an import/collection error that "
+        "must not silently pass."
     )
 
 
