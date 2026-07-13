@@ -1,0 +1,50 @@
+[project]
+name = "saena-analytics-clickhouse"
+version = "0.1.0"
+description = "SAENA FORGE ClickHouse analytical-store adapter + migrations (w4-06, Wave 4)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "clickhouse-connect>=0.8,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_analytics_clickhouse"]
+
+# UPDATE (Integrator, at integration time — mirrors tools/forgectl's own
+# w2-19/w2-20 precedent, tools/forgectl/README.md "Packaging note"): this
+# package is deliberately left OUT of the root `pyproject.toml`
+# `[tool.uv.workspace]` members / `[dependency-groups] dev` /
+# `[tool.uv.sources]` / `[tool.mypy] files` / `[tool.coverage.run] source` /
+# `.importlinter` `root_packages` lists by this patch unit (w4-06) — editing
+# those is outside this unit's exclusive write paths
+# (`packages/analytics-clickhouse/**`, `tests/unit/analytics_clickhouse/**`,
+# `tests/integration/clickhouse/**` only). The Integrator must add:
+#   - root `[tool.uv.workspace] members`: "packages/analytics-clickhouse"
+#   - root `[dependency-groups] dev`: "saena-analytics-clickhouse"
+#   - root `[tool.uv.sources]`: saena-analytics-clickhouse = { workspace = true }
+#   - root `[tool.mypy] files` / `[tool.coverage.run] source`: this
+#     package's `src/` path
+#   - `.importlinter` `root_packages`: "saena_analytics_clickhouse", plus a
+#     standalone-leaf contract pair (mirrors `saena_hooks_runtime`'s exact
+#     shape, NOT `saena_forgectl`'s — this package imports no other `saena_*`
+#     package at all, not even `saena_schemas`/`saena_shared`: it is a pure
+#     adapter over its own row models + a `typing.Protocol` execution seam,
+#     deliberately decoupled from `saena_domain`'s `TenantId`/envelope types
+#     so `packages/domain` never has to change for a new analytical-store
+#     column). Recommended contract names:
+#       `saena_analytics_clickhouse-is-a-standalone-leaf` (forbidden:
+#       every other root package) and `nothing-imports-
+#       saena_analytics_clickhouse-except-services` is NOT needed as a
+#       separate contract — the existing `services-are-independent`
+#       `independence` contract already prevents any one service importing
+#       this package from leaking into another service via a transitive
+#       service->service edge, and `saena_domain`/`saena_observability`
+#       simply never list it as an allowed forbidden-module exception.
+#   - README.md ("clickhouse-connect" is this package's ONLY third-party
+#     runtime dependency, added by this pyproject.toml above; it is not yet
+#     present in the shared `uv.lock` — the Integrator's workspace-member
+#     registration is also what pulls it into the lock).
