@@ -104,6 +104,60 @@ intelligence-privacy:
     uv run pytest tests/unit/analytics_clickhouse/test_query_privacy.py -q
     uv run pytest -q -m integration tests/integration/clickhouse/test_query_privacy_boundary.py -p no:cacheprovider
 
+# ---- Wave 5 (Measurement·B-Layer) named required checks (ADR-0018 stable
+# check names; wave5-plan.md §"Named CI gates"). Same belt-and-suspenders
+# shape as the W3/W4 named checks: targeted subsets used as their own CI
+# jobs; the `test`/`test-integration` umbrellas still run the same tests.
+# Container/Temporal legs honest-skip when Docker/the time-skipping server is
+# absent. NOTE (w5-18 critic): the tests/security/measurement_*.py files use
+# non-`test_*` filenames (helper-module convention, like measurement_fraud.py)
+# so default collection SKIPS them — these gates name them EXPLICITLY so they
+# actually run in CI.
+
+# w5-03/w5-14: deployment-confirmed validation + trusted 7-day clock (domain)
+# + durable Temporal timer (time-skipping integration).
+measurement-clock:
+    uv run pytest tests/unit/domain_measurement_clock tests/unit/svc_experiment_attribution_workflow -q
+    uv run pytest -q -m integration tests/integration/measurement_workflow -p no:cacheprovider
+
+# w5-04: measurement-time experiment binding — immutability + contamination.
+experiment-registration:
+    uv run pytest tests/unit/domain_measurement_binding -q
+
+# w5-05: deterministic per-signal DiD engine.
+did-attribution:
+    uv run pytest tests/unit/domain_measurement_did -q
+
+# w5-06/w5-07: outcome-layer ≥2-independent-layer B-gate + GRS fail-closed policy.
+b-layer-gate:
+    uv run pytest tests/unit/domain_measurement_bgate tests/unit/domain_measurement_grs -q
+
+# w5-08/w5-09: evidence-bundle manifest (tamper-evident) + persistence ports.
+evidence-bundle:
+    uv run pytest tests/unit/domain_measurement_evidence tests/unit/domain_measurement_ports -q
+
+# w5-18: cross-module privacy/tenant isolation + adversarial (non-test_* files
+# named explicitly so they run) + real-Postgres persistence + ClickHouse
+# outcome projection tenant isolation.
+measurement-privacy:
+    uv run pytest tests/security/measurement_privacy_tenant.py tests/security/measurement_adversarial.py -q
+    uv run pytest tests/unit/svc_experiment_attribution_boundary -q
+    uv run pytest -q -m integration tests/integration/measurement_pg tests/integration/clickhouse_outcome -p no:cacheprovider
+
+# w5-12/w5-13: experiment-attribution boundary + fail-closed measurement
+# pipeline (registration→DiD→B-gate→evidence→outcome). E2E through the
+# integrated stack; the full real-container E2E harness (w5-19) + broader
+# failure-mode suite (w5-20) are residual (see wave5-exit-report.md).
+measurement-e2e:
+    uv run pytest tests/unit/svc_experiment_attribution_boundary tests/unit/svc_experiment_attribution_pipeline -q
+    uv run pytest -q -m integration tests/integration/measurement_workflow -p no:cacheprovider
+
+# w5-06/w5-13/w5-18: measurement fail-closed / fraud / UNDETERMINED-never-PASS
+# discriminators (named explicitly — non-test_* helper files).
+measurement-failure-modes:
+    uv run pytest tests/security/measurement_fraud.py tests/security/measurement_adversarial.py -q
+    uv run pytest tests/unit/svc_experiment_attribution_pipeline -q
+
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
 helm-smoke:
