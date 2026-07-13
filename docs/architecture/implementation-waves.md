@@ -59,4 +59,9 @@ wave2-runtime, 2026-07-13) — 코드 레벨 exit 조건 전 항목 PASS, 증거
 `docs/architecture/wave2-exit-report.md` 참조. deploy/infra 레벨 항목
 (saena-forge Helm chart, 대시보드 6종, 프로덕션 Temporal/MinIO/Redpanda 배포,
 helm rollback drill)은 BLOCKED(human) — `deploy/**` 보호 경로 + 라이브
-클러스터 부재, 동일 문서 참조** / W3+ NOT IMPLEMENTED
+클러스터 부재, 동일 문서 참조** / **W3 CONFIRMED (Execution, wave3-execution,
+2026-07-13) — Job 5종·hook 5종·SA 3분리·synthetic E2E·evals(추출 아키텍처
+테스트)·failure-mode 9종·rollback gate 전 항목 PASS, 증거는
+`docs/architecture/wave3-exit-report.md`. production-only 항목(라이브 클러스터
+배포, 대시보드 live 구동, browser pool=W4)은 정직히 범위 밖 기록** / W4
+NOT IMPLEMENTED
