@@ -230,25 +230,27 @@ jobs:
       - name: Install helm + kubeconform (pinned binaries + checksum verify)
         run: |
           set -eu
-          # helm (pinned + sha256 verify against the published checksum)
+          cd /tmp
+          # Both projects publish checksum lines that reference the ORIGINAL
+          # release filename, so download to that exact name and let
+          # `sha256sum -c` match the line directly (no rename mismatch).
+          # helm
           hver=3.16.3
-          curl -fsSL -o /tmp/helm.tar.gz "https://get.helm.sh/helm-v${hver}-linux-amd64.tar.gz"
-          # The published .sha256sum references the original filename; we
-          # saved the tarball as helm.tar.gz, so extract just the digest
-          # (first field, robust to bare-digest or "digest  filename" forms)
-          # and build the check line sha256sum -c expects.
-          hdigest="$(curl -fsSL "https://get.helm.sh/helm-v${hver}-linux-amd64.tar.gz.sha256sum" | awk '{print $1}')"
-          (cd /tmp && echo "${hdigest}  helm.tar.gz" | sha256sum -c -)
-          tar -xzf /tmp/helm.tar.gz -C /tmp
+          hfile="helm-v${hver}-linux-amd64.tar.gz"
+          curl -fsSL -o "$hfile" "https://get.helm.sh/${hfile}"
+          curl -fsSL -o "${hfile}.sha256sum" "https://get.helm.sh/${hfile}.sha256sum"
+          sha256sum -c "${hfile}.sha256sum"
+          tar -xzf "$hfile" -C /tmp
           install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
           helm version
-          # kubeconform (pinned + checksum verify)
+          # kubeconform
           kver=0.6.7
+          kfile="kubeconform-linux-amd64.tar.gz"
           kbase="https://github.com/yannh/kubeconform/releases/download/v${kver}"
-          curl -fsSL -o /tmp/kubeconform.tar.gz "${kbase}/kubeconform-linux-amd64.tar.gz"
-          curl -fsSL -o /tmp/kubeconform-checksums.txt "${kbase}/CHECKSUMS"
-          (cd /tmp && grep "kubeconform-linux-amd64.tar.gz" kubeconform-checksums.txt | sha256sum -c -)
-          tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
+          curl -fsSL -o "$kfile" "${kbase}/${kfile}"
+          curl -fsSL -o kubeconform-CHECKSUMS "${kbase}/CHECKSUMS"
+          grep " ${kfile}\$" kubeconform-CHECKSUMS | sha256sum -c -
+          tar -xzf "$kfile" -C /usr/local/bin kubeconform
           kubeconform -v
       - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
         with:
