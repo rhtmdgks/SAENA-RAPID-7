@@ -9,6 +9,7 @@ members = [
     "saena-artifact-registry",
     "saena-audit-ledger",
     "saena-chatgpt-observer",
+    "saena-citation-intelligence",
     "saena-claim-evidence",
     "saena-demand-graph",
     "saena-domain",
@@ -1320,6 +1321,17 @@ dependencies = [
 requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
 
 [[package]]
+name = "saena-citation-intelligence"
+version = "0.1.0"
+source = { editable = "services/intelligence/citation-intelligence-service" }
+dependencies = [
+    { name = "saena-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
+
+[[package]]
 name = "saena-claim-evidence"
 version = "0.1.0"
 source = { editable = "services/intelligence/claim-evidence-service" }
@@ -1486,6 +1498,7 @@ dev = [
     { name = "saena-artifact-registry" },
     { name = "saena-audit-ledger" },
     { name = "saena-chatgpt-observer" },
+    { name = "saena-citation-intelligence" },
     { name = "saena-claim-evidence" },
     { name = "saena-demand-graph" },
     { name = "saena-domain" },
@@ -1531,6 +1544,7 @@ dev = [
     { name = "saena-artifact-registry", editable = "services/platform/artifact-registry-service" },
     { name = "saena-audit-ledger", editable = "services/foundation/audit-ledger-service" },
     { name = "saena-chatgpt-observer", editable = "services/acquisition/chatgpt-observer-service" },
+    { name = "saena-citation-intelligence", editable = "services/intelligence/citation-intelligence-service" },
     { name = "saena-claim-evidence", editable = "services/intelligence/claim-evidence-service" },
     { name = "saena-demand-graph", editable = "services/intelligence/demand-graph-service" },
     { name = "saena-domain", editable = "packages/domain" },
