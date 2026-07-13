@@ -54,3 +54,16 @@ Static chart correctness (helm lint/template, kubeconform strict, forgectl
 preflight, values.schema, deploy unit tests, engine-scope negatives) PASS.
 Live cluster install/rollback is production-readiness **OPEN** (no live
 cluster in this environment; not claimed as run).
+
+### Topology note (w5-21 count/naming deviation)
+
+ADR-0002 rev.3 / service-catalog.md describe the v1 worker-host plan as "2"
+(intelligence-worker + a single optimization-worker). The measurement plane
+renders as **2 separate Deployments** (`experiment-attribution`,
+`strategy-skill-bank`) — 12 Deployments total, not the ADR's literal 10.
+Rationale: `strategy-skill-bank-service` was already coded as its own service
+package (w5-16) and `experiment-attribution-service`'s independence is
+recorded in `docs/architecture/wave5-plan.md`. No hard requirement is broken
+(each pod is isolated, least-privilege, no K8s API); this note records the
+deviation explicitly (c5-04 critic should-fix). Both new SAs set
+`automountServiceAccountToken: false` (zero RBAC → unused token).

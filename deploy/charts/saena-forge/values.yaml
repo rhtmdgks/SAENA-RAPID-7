@@ -630,6 +630,13 @@ services:
       limits: { cpu: "1500m", memory: 1Gi }
     rbac:
       rules: []
+    # rbac.rules is empty (zero K8s API need), so the mounted SA token would
+    # grant nothing — disable the automount entirely rather than leave an
+    # unused token in the pod (same rationale as chatgptObserver; c5-04
+    # critic should-fix).
+    serviceAccount:
+      create: true
+      automountServiceAccountToken: false
 
   # strategy-skill-bank — the B-verified-only intake boundary Deployment
   # (service-catalog.md strategy-skill-bank-service; w5-16). Consumes ONLY
@@ -655,6 +662,9 @@ services:
       limits: { cpu: "1", memory: 512Mi }
     rbac:
       rules: []
+    serviceAccount:
+      create: true
+      automountServiceAccountToken: false
 
 # images[] — flat mirror list forgectl's image_digest_signature check reads
 # (k3s spec §7 skeleton shape / tests/unit/forgectl/fixtures/values-passing.yaml).
