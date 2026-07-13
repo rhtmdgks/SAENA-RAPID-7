@@ -72,6 +72,8 @@ from saena_experiment_attribution.workflow.activities import (
 from saena_experiment_attribution.workflow.workflow import (
     ABORT_MEASUREMENT_SIGNAL_NAME,
     DEPLOYMENT_CONFIRMED_SIGNAL_NAME,
+    PAUSE_OBSERVATION_SIGNAL_NAME,
+    RESUME_SIGNAL_NAME,
     MeasurementWorkflow,
     MeasurementWorkflowInput,
 )
@@ -479,6 +481,64 @@ def test_conflicting_confirmation_records_replay_and_keeps_original_window(
             assert result.status.value == "decided"
             # Decided against the FIRST confirmation's key (first wins).
             assert result.outcome_ref == "outcome-ref:idem-conflict"
+
+    asyncio.run(scenario())
+
+
+# --------------------------------------------------------------------------- #
+# 6b. Pause/resume — a decision is NEVER taken while observation is paused
+# --------------------------------------------------------------------------- #
+def test_pause_holds_decision_past_window_end_until_resume(
+    temporal_env: WorkflowEnvironment,
+) -> None:
+    """The load-bearing pause invariant: if ``pause_observation`` is in effect
+    when the durable 7-day timer fires, the workflow must NOT take a decision —
+    it holds at the collect-and-decide gate (``run()`` step 4) even as the
+    virtual clock runs WELL past the original absolute window end. Only
+    ``resume`` releases it, and the outcome is anchored to the ORIGINAL window
+    (pause never moved the end nor restarted anything).
+    """
+
+    async def scenario() -> None:
+        async with _worker(temporal_env.client):
+            accepted, _anchor = await _accepted_at_env_now(
+                temporal_env, idempotency_key="idem-pause"
+            )
+            handle = await temporal_env.client.start_workflow(
+                MeasurementWorkflow.run,
+                _input(),
+                id="wf-mw-pause",
+                task_queue=_TASK_QUEUE,
+            )
+            await handle.signal(DEPLOYMENT_CONFIRMED_SIGNAL_NAME, accepted)
+            status = await handle.query(MeasurementWorkflow.status)
+            assert status.window_bound is True
+
+            # Just before the Day-7 end: pause observation (still mid-window).
+            await temporal_env.sleep(_SEVEN_DAYS - _MARGIN)
+            await handle.signal(PAUSE_OBSERVATION_SIGNAL_NAME)
+            status = await handle.query(MeasurementWorkflow.status)
+            assert status.paused is True
+
+            # Advance WELL PAST the original absolute end (to ~Day 21 — three
+            # windows' worth). The durable timer has fired, but because
+            # observation is PAUSED the workflow must NOT decide: it holds at
+            # the pause gate, still RUNNING, no collect-and-decide taken.
+            await temporal_env.sleep(timedelta(days=14) + 2 * _MARGIN)
+            await _assert_running(handle)
+            status = await handle.query(MeasurementWorkflow.status)
+            # Still paused, still bound, no outcome — a decision was NOT taken
+            # while paused (the load-bearing invariant).
+            assert status.paused is True
+            assert status.window_bound is True
+
+            # Resume: NOW the held decision is released — the workflow completes
+            # and DECIDES, anchored to the ORIGINAL window (pause moved nothing).
+            await handle.signal(RESUME_SIGNAL_NAME)
+            result = await _fetch_completed_result(temporal_env, handle)
+            assert result.status.value == "decided"
+            assert result.outcome_ref == "outcome-ref:idem-pause"
+            assert result.reason is None
 
     asyncio.run(scenario())
 
