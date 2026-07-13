@@ -28,6 +28,7 @@ DSL" design.
 from __future__ import annotations
 
 import re
+import threading
 from typing import Any
 
 from saena_analytics_clickhouse.rows import CitationRow, ExperimentRegistrationRow, ObservationRow
@@ -46,11 +47,30 @@ _DDL_TABLE_RE = re.compile(
 
 
 class FakeClickHouseExecutor:
-    """In-memory `ClickHouseExecutor` — see module docstring."""
+    """In-memory `ClickHouseExecutor` — see module docstring.
+
+    `dedup_token` support (r4-02): this fake simulates ClickHouse's REAL
+    server-side `insert_deduplication_token` behavior (verified against a
+    live container as part of the r4-02 fix, see `store.py`'s module
+    docstring) closely enough for deterministic unit coverage of
+    `ClickHouseAnalyticsStore`'s dedup-driven `_append`/`_won_dedup_race`
+    logic: a `(table, dedup_token)` pair that has already been inserted once
+    is a NO-OP on every subsequent `insert_rows` call carrying that same
+    pair — no second row is appended, mirroring the real server's
+    block-level dedup exactly (not merely "the LAST write wins", which would
+    misrepresent what a real `dedup_witness` read-back observes: the FIRST
+    writer's payload survives, every later duplicate is silently dropped).
+    A `threading.Lock` guards the check-and-append pair so this fake itself
+    does not reintroduce a check-then-insert race when exercised by a real
+    multi-threaded unit test (`test_idempotency_distributed.py`-style
+    concurrency assertions against the fake, not just the real container).
+    """
 
     def __init__(self) -> None:
         self.tables: dict[str, list[dict[str, Any]]] = {}
         self.ddl_log: list[str] = []
+        self._seen_dedup_tokens: set[tuple[str, str]] = set()
+        self._lock = threading.Lock()
 
     # --- ClickHouseExecutor Protocol methods --------------------------------
 
@@ -69,7 +89,8 @@ class FakeClickHouseExecutor:
     def query(self, sql: str, params: dict[str, Any] | None = None) -> list[tuple[Any, ...]]:
         params = params or {}
         table = _extract_table(sql)
-        rows = self.tables.get(table, [])
+        with self._lock:
+            rows = list(self.tables.get(table, []))
         filtered = [row for row in rows if _matches(row, params)]
         limit_match = _LIMIT_RE.search(sql)
         if limit_match is not None:
@@ -78,11 +99,25 @@ class FakeClickHouseExecutor:
         return [tuple(row.get(column) for column in columns) for row in filtered]
 
     def insert_rows(
-        self, table: str, columns: tuple[str, ...] | list[str], rows: list[tuple[Any, ...]]
+        self,
+        table: str,
+        columns: tuple[str, ...] | list[str],
+        rows: list[tuple[Any, ...]],
+        *,
+        dedup_token: str | None = None,
     ) -> None:
-        stored = self.tables.setdefault(table, [])
-        for values in rows:
-            stored.append(dict(zip(columns, values, strict=True)))
+        with self._lock:
+            if dedup_token is not None:
+                dedup_key = (table, dedup_token)
+                if dedup_key in self._seen_dedup_tokens:
+                    # Real ClickHouse block dedup: a repeat of an
+                    # already-seen token is a silent no-op — the FIRST
+                    # writer's block is what was kept, never overwritten.
+                    return
+                self._seen_dedup_tokens.add(dedup_key)
+            stored = self.tables.setdefault(table, [])
+            for values in rows:
+                stored.append(dict(zip(columns, values, strict=True)))
 
 
 def _extract_table(sql: str) -> str:

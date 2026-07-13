@@ -32,6 +32,27 @@ uses Python `%(name)s`-style placeholders against a `dict` `params` — this is
 builder output is passed to a real `Client.query`/`.command` completely
 unchanged. `params={}`/`None` is a no-op substitution (safe for DDL, which
 carries no placeholders).
+
+`insert_rows`'s optional `dedup_token` (r4-02 fix): distributed idempotency
+fix, see `store.py` module docstring for the full invariant/mechanism. This
+parameter is OPTIONAL, keyword-only, defaulting to `None` — deliberately, so
+every PRE-EXISTING `ClickHouseExecutor`-shaped fake in this repo (this
+package's own `tests/unit/analytics_clickhouse/analytics_clickhouse_
+factories.py::FakeClickHouseExecutor`, and — outside this patch unit's
+exclusive write paths — `tests/integration/intelligence_failure/
+intelligence_failure_factories.py`'s two executor fakes) keeps working
+UNMODIFIED. `store.py._append` introspects each executor's own
+`insert_rows` signature once (`_executor_supports_dedup_token`) and only
+passes `dedup_token=` to executors that actually declare the parameter — an
+executor that predates this fix (3-positional-arg `insert_rows`, no
+`dedup_token`) is called exactly the same way it always was, with the SAME
+`insert_rows` call count per `append_*` invocation (no second/ledger insert
+is ever added — see `store.py` docstring "Why not a second ledger insert").
+`ClickHouseConnectExecutor.insert_rows` is the ONE implementation that
+actually turns `dedup_token` into a real `clickhouse_connect` `settings={
+'insert_deduplication_token': ...}` kwarg on `Client.insert` — the exact,
+grounded ClickHouse server setting name/semantics (see `store.py` module
+docstring for the live-server verification this patch unit performed).
 """
 
 from __future__ import annotations
@@ -60,10 +81,24 @@ class ClickHouseExecutor(Protocol):
         ...
 
     def insert_rows(
-        self, table: str, columns: Sequence[str], rows: Sequence[Sequence[Any]]
+        self,
+        table: str,
+        columns: Sequence[str],
+        rows: Sequence[Sequence[Any]],
+        *,
+        dedup_token: str | None = None,
     ) -> None:
         """Bulk-insert `rows` (each a positional value sequence matching
-        `columns`) into `table`."""
+        `columns`) into `table`.
+
+        `dedup_token` (optional, keyword-only, r4-02): when given, a
+        REAL/capable executor (`ClickHouseConnectExecutor`) MUST perform
+        this insert as an atomic, server-side deduplicated block insert
+        keyed by this exact token string (ClickHouse's native
+        `insert_deduplication_token` setting) — never a client-side
+        check-then-insert. An executor that does not support this
+        parameter at all (a pre-existing fake) is never called with it
+        (see module docstring `_executor_supports_dedup_token`)."""
         ...
 
 
@@ -102,11 +137,17 @@ class ClickHouseConnectExecutor:
         return list(result.result_rows)
 
     def insert_rows(
-        self, table: str, columns: Sequence[str], rows: Sequence[Sequence[Any]]
+        self,
+        table: str,
+        columns: Sequence[str],
+        rows: Sequence[Sequence[Any]],
+        *,
+        dedup_token: str | None = None,
     ) -> None:  # pragma: no cover - real driver, integration lane
         if not rows:
             return
-        self._client.insert(table, list(rows), column_names=list(columns))
+        settings = {"insert_deduplication_token": dedup_token} if dedup_token is not None else None
+        self._client.insert(table, list(rows), column_names=list(columns), settings=settings)
 
 
 def create_executor(
