@@ -63,5 +63,17 @@ helm rollback drill)은 BLOCKED(human) — `deploy/**` 보호 경로 + 라이브
 2026-07-13) — Job 5종·hook 5종·SA 3분리·synthetic E2E·evals(추출 아키텍처
 테스트)·failure-mode 9종·rollback gate 전 항목 PASS, 증거는
 `docs/architecture/wave3-exit-report.md`. production-only 항목(라이브 클러스터
-배포, 대시보드 live 구동, browser pool=W4)은 정직히 범위 밖 기록** / W4
-NOT IMPLEMENTED
+배포, 대시보드 live 구동, browser pool=W4)은 정직히 범위 밖 기록** / **W4
+CONFIRMED (Intelligence, PR #5+#6 merged to main `156568c`, 2026-07-13) —
+intelligence-worker P0 4모듈·chatgpt-observer·ClickHouse/vector·실험 등록 원장,
+증거 `docs/architecture/wave4-exit-report.md`** / **W5 PARTIAL PASS
+(Measurement·B-Layer, wave5-measurement, 2026-07-14) — 21/24 seed unit 통합·독립
+critic 검증·`just verify` green: DiD 측정 활성(experiment-attribution-service),
+deployment.confirmed.v1 7일 clock(Temporal durable timer, time-skipping 검증),
+outcome_layer ≥2 독립 layer B-gate, evidence bundle, GRS 정책 mechanism(값은
+BLOCKED §13-7), skill-bank B-verified-only intake. 증거
+`docs/architecture/wave5-exit-report.md`. RESIDUAL: w5-19 E2E(harness만, 계정
+rate-limit로 중단), w5-20 failure-modes(부분+seam finding), w5-21 Helm
+BLOCKED(human). production 항목(실 GRS 임계값, 라이브 ChatGPT 관측, 실 고객
+배포, 라이브 클러스터)은 BLOCKED(human/production-only), PASS 미주장. merge는
+인간**
