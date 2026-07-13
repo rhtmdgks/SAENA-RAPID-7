@@ -301,9 +301,17 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if not passed:
         reasons.append("ZERO required real-container E2E tests PASSED")
     if reasons:
+        # Set the hard-fail exit code FIRST — it must hold even if the terminal
+        # reporter is unavailable (e.g. `-p no:terminalreporter` via a poisoned
+        # PYTEST_ADDOPTS), so the fail-closed contract never degrades to a
+        # message-crash exit 1. Then guard the reporter for parity with the
+        # failure sibling's `_report_hard_fail` (critic-F SHOULD-FIX).
         session.exitstatus = _HARD_FAIL_EXIT
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter is None:
+            return
         sep = "\n  - "
-        session.config.pluginmanager.get_plugin("terminalreporter").write_line(
+        reporter.write_line(
             f"\nSAENA_MEASUREMENT_E2E_REQUIRED=1 HARD FAILURE (exit {_HARD_FAIL_EXIT}):{sep}"
             + sep.join(reasons)
             + "\n  A required real-container lane must actually RUN its Postgres 16 / "
