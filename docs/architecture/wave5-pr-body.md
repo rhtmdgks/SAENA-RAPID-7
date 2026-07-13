@@ -3,9 +3,11 @@
 **DO NOT AUTO-MERGE.** Human review + normal merge only (no admin/squash/rebase/
 force). No production deployment. No unsupported external-lift claim is made.
 
-**Status: PASS (code + static-deployment mechanism), 24/24 seed units.** Final
-branch HEAD `dab5e9a` (Wave 5 Closure complete). Live cluster install/rollback
-is OPEN (not run); production GRS thresholds / ToS / legal remain BLOCKED(human).
+**Status: PASS (code + static-deployment mechanism), 24/24 seed units.** The
+authoritative branch tip is the PR #7 head shown on GitHub (a moving value this
+doc does not hardcode — a commit cannot reference its own future SHA). Live
+cluster install/rollback is OPEN (not run); production GRS thresholds / ToS /
+legal remain BLOCKED(human).
 Full detail + honesty disclosures (Lead-direct w5-21 Helm under the recorded H8
 grant; Lead-fallback verification for the fail-closed/tenant/replay audit lane)
 in `docs/architecture/wave5-exit-report.md`.
@@ -84,16 +86,25 @@ boundary; raw-content/secret guards (NFKC-normalized) across evidence + rows +
 skill-bank; no raw customer query/content/secret in any event/log/audit
 payload (w5-18 leakage sweep).
 
-## Residual / open / production-only
+## Closed in Wave 5 Closure / open / production-only
 
-- **w5-19 E2E** — harness delivered, test cases cut short by an external
-  account rate-limit; NOT integrated (interim coverage via measurement-e2e gate).
-- **w5-20 failure-modes** — partial (15 tests) + one real seam finding
-  (`run_measurement` propagates a persistence `IdempotencyConflictError` on
-  conflicting confirmation rather than emitting a clean UNDETERMINED — SAFE but
-  not graceful; follow-up). Fail-closed/fraud/UNDETERMINED space is covered by
-  w5-18 + pipeline.
-- **w5-21 Helm** — BLOCKED(human): `deploy/**` approval not granted.
+The initial pass reached PARTIAL PASS (21/24) with w5-19/w5-20/w5-21 residual;
+the Closure round CLOSED all three (see `wave5-exit-report.md` c5-01…c5-04):
+
+- **w5-19 E2E** — CLOSED (c5-01). Real composed E2E integrated: real Postgres 16
+  + ClickHouse 24.8 + Temporal time-skipping, driving the actual
+  `run_measurement` composition; run by the required `measurement-e2e` gate
+  (36 pass, skipped=0, Docker-present; exit 6 Docker-absent).
+- **w5-20 failure-modes** — CLOSED (c5-02). Full failure-mode matrix integrated
+  (`measurement-failure-modes` gate: 35 pass, skipped=0). The conflicting-
+  confirmation seam is CLOSED (c5-03): `run_measurement` now catches the
+  persistence `IdempotencyConflictError` and emits `UNDETERMINED
+  (CONFLICTING_CONFIRMATION)` — never PASS — instead of propagating the raw
+  exception; the SAFE store-level first-content-wins behaviour is preserved.
+- **w5-21 Helm** — CLOSED, STATIC only (c5-04). saena-forge Helm wiring +
+  forgectl preflight + kubeconform pass offline; `deploy/**` authorized under the
+  recorded H8 grant (Lead-direct authorship, disclosed). **Live cluster
+  install/rollback is NOT run — OPEN.**
 - **Production**: GRS thresholds/SLA (§13-7), ChatGPT observation methodology/
   ToS (§13-1), PII-vs-audit legal, live cluster/observation/deploy — all
   BLOCKED(human/production-only), none claimed PASS.

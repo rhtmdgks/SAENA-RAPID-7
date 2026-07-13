@@ -67,8 +67,9 @@ helm rollback drill)은 BLOCKED(human) — `deploy/**` 보호 경로 + 라이브
 CONFIRMED (Intelligence, PR #5+#6 merged to main `156568c`, 2026-07-13) —
 intelligence-worker P0 4모듈·chatgpt-observer·ClickHouse/vector·실험 등록 원장,
 증거 `docs/architecture/wave4-exit-report.md`** / **W5 PASS (code +
-static-deployment mechanism, Measurement·B-Layer, wave5-measurement HEAD
-`dab5e9a`, Wave 5 Closure 2026-07-14) — 24/24 seed unit 통합·유닛별 독립
+static-deployment mechanism, Measurement·B-Layer, branch wave5-measurement —
+authoritative tip = PR #7 head on GitHub, not hardcoded here; Wave 5 Closure
+2026-07-14) — 24/24 seed unit 통합·유닛별 독립
 adversarial critic·`just verify` green 3×: DiD 측정 활성
 (experiment-attribution-service), deployment.confirmed.v1 7일
 clock(Temporal durable timer, time-skipping 검증), outcome_layer ≥2 독립 layer

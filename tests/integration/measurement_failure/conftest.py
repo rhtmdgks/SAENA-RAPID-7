@@ -220,8 +220,24 @@ def postgres_url(postgres_container: PostgresContainer) -> str:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _apply_migrations(postgres_url: str) -> None:
-    """Session-scoped one-time migration apply, on its own short-lived engine/loop."""
+def _apply_migrations(request: pytest.FixtureRequest) -> None:
+    """Session-scoped one-time migration apply, on its own short-lived engine/loop.
+
+    Resolve `postgres_url` LAZILY (not as a direct parameter) — RV-3 parity with
+    the `measurement_e2e` sibling: this is a SESSION-scoped autouse fixture, so a
+    direct `postgres_url` param would pull `postgres_container` at session setup,
+    and on a Docker-absent host that fixture calls `pytest.skip(...)`, which from
+    a session-scoped autouse fixture sweeps EVERY test in the session into the
+    skip — including this directory's container-free, subprocess-based
+    `test_failure_required_guard.py` guard-proof tests, which MUST run on ANY
+    host (their whole purpose is to PROVE the Docker-absent hard-fail via a child
+    process). Early-return before touching the container when Docker is absent;
+    the real failure-mode tests still skip individually via
+    `pytest_collection_modifyitems`."""
+    if not _DOCKER_AVAILABLE:
+        return
+
+    postgres_url = request.getfixturevalue("postgres_url")
 
     async def _do() -> None:
         eng = create_async_engine(postgres_url)
