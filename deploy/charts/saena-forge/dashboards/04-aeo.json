@@ -1,0 +1,75 @@
+{
+  "title": "SAENA FORGE — AEO",
+  "uid": "saena-forge-aeo",
+  "tags": ["saena-forge", "aeo"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "editable": false,
+  "time": { "from": "now-7d", "to": "now" },
+  "description": "k3s spec §9.2 dashboard 4: discovery/citation/absorption observations by query cluster, raw and control-adjusted view. Engine scope v1 = chatgpt-search only (saena.engine_id closed enum, CLAUDE.md).",
+  "templating": {
+    "list": [
+      { "name": "engine_id", "type": "custom", "label": "Engine", "query": "chatgpt-search", "current": { "text": "chatgpt-search", "value": "chatgpt-search" } }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Discovery observations by query cluster",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_aeo_discovery_observation_total{saena_engine_id=\"$engine_id\"}[1h])) by (query_cluster)",
+          "legendFormat": "{{query_cluster}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Citation observations by query cluster — raw",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_aeo_citation_observation_total{saena_engine_id=\"$engine_id\", cohort=\"raw\"}[1h])) by (query_cluster)",
+          "legendFormat": "{{query_cluster}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Citation observations — control-adjusted view (treatment vs control)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_aeo_citation_observation_total{saena_engine_id=\"$engine_id\", cohort=\"treatment\"}[1h])) by (query_cluster)",
+          "legendFormat": "treatment {{query_cluster}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(saena_aeo_citation_observation_total{saena_engine_id=\"$engine_id\", cohort=\"control\"}[1h])) by (query_cluster)",
+          "legendFormat": "control {{query_cluster}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Absorption observations by query cluster",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_aeo_absorption_observation_total{saena_engine_id=\"$engine_id\"}[1h])) by (query_cluster)",
+          "legendFormat": "{{query_cluster}}"
+        }
+      ]
+    }
+  ]
+}

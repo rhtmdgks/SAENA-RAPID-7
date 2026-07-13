@@ -1,0 +1,109 @@
+{{- /*
+Explicit allow rules layered on top of default-deny (k3s spec §6.2). Two
+named profiles: runner (agent-runner Jobs) and browser (chatgpt-observer /
+site-discovery Jobs), matching k3s spec §6.2's example block and ADR-0004's
+"customer source를 다루는 모든 Job은 runner pool 상속" pool-isolation
+principle. Egress targets here are DNS-name placeholders (`approved-*`,
+`internal-*`) resolved by the operator's actual DNS/egress-proxy allowlist
+at install time (k3s spec §6.1 "egress proxy는 host allowlist와 request
+audit을 강제한다") — this template emits the *policy shape* (label-selector
+based intra-cluster allows + an egress-proxy pass-through for named external
+targets), not literal external IPs.
+*/ -}}
+{{- if .Values.networkPolicy.defaultDeny }}
+{{- $np := .Values.networkPolicy }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-runner-egress
+  namespace: {{ .Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      saena.io/pool: runner
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespaces.system }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: policy-gate
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespaces.system }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: artifact-registry
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # approved-git-host / approved-model-provider / approved-customer-domain
+    # (k3s spec §6.2) resolve to an egress-proxy Service in this namespace —
+    # the proxy itself enforces the host allowlist + audit (k3s spec §6.1).
+    # OPT-IN: egress-proxy is an out-of-band dependency NOT rendered by this
+    # chart; emitted only when egressProxy.enabled=true so the chart never
+    # ships an allow rule targeting a workload that does not exist.
+    {{- if .Values.egressProxy.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: egress-proxy
+      ports:
+        - protocol: TCP
+          port: 3128
+    {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-browser-egress
+  namespace: {{ .Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" . | nindent 4 }}
+  annotations:
+    saena.io/denied-egress: "git-write,kubernetes-api,cloud-metadata (k3s spec §6.2 browser.denied — enforced by the absence of any allow rule to those targets below, plus default-deny)"
+spec:
+  podSelector:
+    matchLabels:
+      saena.io/pool: browser
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    {{- if .Values.egressProxy.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: egress-proxy
+      ports:
+        - protocol: TCP
+          port: 3128
+    {{- end }}
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}

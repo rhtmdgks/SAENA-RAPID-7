@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push --tags origin wave2-runtime stays denied (no tag publication)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push --tags origin wave2-runtime"
+    }
+  },
+  "expect_exit": 2
+}

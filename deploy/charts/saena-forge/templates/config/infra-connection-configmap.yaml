@@ -1,0 +1,30 @@
+{{- /*
+Non-secret CONNECTION config for PG/Temporal/MinIO/Redpanda (host/port/db/
+endpoint) — credential values themselves are never here, only *SecretRef
+names a service's Deployment env carries as plain env vars (pointing at the
+ExternalSecret-managed Secret object name, not a value — see
+templates/services/deployments.yaml env `*_CREDENTIALS_SECRET_REF` entries
+and templates/config/external-secret-refs.yaml). This mirrors k3s spec §6.1:
+"secret은 Helm values, ConfigMap ... 에 절대 저장하지 않는다" — only
+non-secret endpoint metadata lives in this ConfigMap.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "saena-forge.fullname" . }}-infra-connection
+  namespace: {{ .Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" . | nindent 4 }}
+data:
+  POSTGRES_HOST: {{ .Values.postgres.host | quote }}
+  POSTGRES_PORT: {{ .Values.postgres.port | quote }}
+  POSTGRES_DATABASE: {{ .Values.postgres.database | quote }}
+  TEMPORAL_HOST: {{ .Values.temporal.host | quote }}
+  TEMPORAL_PORT: {{ .Values.temporal.port | quote }}
+  TEMPORAL_NAMESPACE: {{ .Values.temporal.namespace | quote }}
+  OBJECT_STORAGE_ENDPOINT: {{ .Values.objectStorage.endpoint | quote }}
+  OBJECT_STORAGE_BUCKET: {{ .Values.objectStorage.bucket | quote }}
+  OBJECT_STORAGE_USE_TLS: {{ .Values.objectStorage.useTLS | quote }}
+  EVENT_BUS_TYPE: {{ .Values.eventBus.type | quote }}
+  EVENT_BUS_BROKERS: {{ join "," .Values.eventBus.brokers | quote }}
+  OTEL_COLLECTOR_ENDPOINT: {{ .Values.observability.otelCollectorEndpoint | quote }}

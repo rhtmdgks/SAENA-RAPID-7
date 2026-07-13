@@ -1,0 +1,31 @@
+[project]
+name = "saena-forgectl"
+version = "0.1.0"
+description = "SAENA FORGE k3s package operator CLI — forgectl preflight (w2-19, W2C)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pyyaml>=6,<7",
+    "saena-schemas",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_forgectl"]
+
+# UPDATE (w2-20, Wave 2 exit — Integrator/Lead root-config edit): this
+# package IS now a `uv` workspace member (root pyproject.toml
+# `[tool.uv.workspace]` members + `[tool.uv.sources]` + dev-group dependency
+# `saena-forgectl`, `[tool.mypy]` files, `[tool.coverage.run]` source, and
+# `.importlinter` `root_packages` / leaf contract — all added by w2-20). w2-19
+# (the patch unit that created this package) deliberately left it OUT of the
+# workspace because doing so would have required editing root config outside
+# that unit's exclusive write paths (tools/forgectl/**,
+# tests/unit/forgectl/** only) — see git history / w2-19 commits for that
+# original rationale, preserved here for context. `tests/unit/forgectl`'s
+# `sys.path` insert (`tests/unit/forgectl/conftest.py`) still works
+# (idempotent no-op once the editable install already puts `saena_forgectl`
+# on `sys.path`) and was left as-is by w2-20 — out of this unit's stated
+# scope to touch test collection wiring beyond the flaky-gate fix.

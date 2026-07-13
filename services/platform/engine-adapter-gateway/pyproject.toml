@@ -1,0 +1,25 @@
+[project]
+name = "saena-engine-gateway"
+version = "0.1.0"
+description = "SAENA engine-adapter-gateway — engine adapter isolation, v1 chatgpt-search only (W2B)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.32,<1",
+    "httpx>=0.28,<1",
+    "saena-domain",
+    "saena-observability",
+    "saena-schemas",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_engine_gateway"]
+
+[tool.uv.sources]
+saena-domain = { workspace = true }
+saena-observability = { workspace = true }
+saena-schemas = { workspace = true }

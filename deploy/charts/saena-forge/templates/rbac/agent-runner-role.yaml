@@ -1,0 +1,38 @@
+{{- /*
+agent-runner ServiceAccount RBAC — namespace-scoped Role, no cluster-admin,
+no wildcard verb/resource (k3s spec §8.1 condition 5 / ADR-0004 SA
+3-separation: agent-runner gets worktree-scoped access only, distinct from
+quality-eval and repository-intake SAs which are OUT of this chart's 8
+independently-deployed services — they render as Jobs in their own patch
+unit, not here).
+*/ -}}
+{{- if .Values.agentRunner.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.agentRunner.job.serviceAccount }}-role
+  namespace: {{ .Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" . | nindent 4 }}
+    saena.io/pool: runner
+rules:
+  {{- .Values.agentRunner.job.rbac.rules | toYaml | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.agentRunner.job.serviceAccount }}-rolebinding
+  namespace: {{ .Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" . | nindent 4 }}
+    saena.io/pool: runner
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.agentRunner.job.serviceAccount }}
+    namespace: {{ .Values.namespaces.system }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Values.agentRunner.job.serviceAccount }}-role
+{{- end }}

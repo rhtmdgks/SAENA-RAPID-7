@@ -1,0 +1,63 @@
+asyncapi: 3.0.0
+info:
+  title: SAENA events (w2-02 unit-test fixture)
+  version: "1.0.0"
+  description: >-
+    Test-only fixture, NOT the authoritative contract
+    (packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml is
+    authoritative). Adds one context_type=system channel
+    (adapter.config.updated.v1, per ADR-0013 appendix example 2 /
+    docs/architecture/api-event-contracts.md:30 SystemContext row) that has
+    not yet landed in the CONFIRMED v1 catalog, so
+    EnvelopeFactory.build_system_envelope's happy-path behavior can be
+    exercised against a real parsed file rather than asserted into
+    production defaults. Mirrors the "<producer> produces <event_type>."
+    operations.*.summary convention this repo's saena_domain.events._topics
+    module parses (see that module's docstring).
+defaultContentType: application/json
+channels:
+  patch.unit.completed.v1:
+    address: patch.unit.completed.v1
+    description: Copied from the real catalog so tenant-context tests can
+      also point at this fixture file if needed.
+    messages:
+      patchUnitCompleted:
+        name: PatchUnitCompleted
+        title: patch.unit.completed.v1
+        summary: Patch unit completed (agent-runner-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            type: object
+
+  adapter.config.updated.v1:
+    address: adapter.config.updated.v1
+    description: SystemContext example (ADR-0013 appendix example 2).
+    messages:
+      adapterConfigUpdated:
+        name: AdapterConfigUpdated
+        title: adapter.config.updated.v1
+        summary: Adapter config updated (policy-gate).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            type: object
+
+operations:
+  sendPatchUnitCompleted:
+    action: send
+    channel:
+      $ref: "#/channels/patch.unit.completed.v1"
+    summary: agent-runner-service produces patch.unit.completed.v1.
+    messages:
+      - $ref: "#/channels/patch.unit.completed.v1/messages/patchUnitCompleted"
+
+  sendAdapterConfigUpdated:
+    action: send
+    channel:
+      $ref: "#/channels/adapter.config.updated.v1"
+    summary: policy-gate produces adapter.config.updated.v1.
+    messages:
+      - $ref: "#/channels/adapter.config.updated.v1/messages/adapterConfigUpdated"

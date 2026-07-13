@@ -1,0 +1,76 @@
+{
+  "title": "SAENA FORGE — Workflow",
+  "uid": "saena-forge-workflow",
+  "tags": ["saena-forge", "workflow"],
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "editable": false,
+  "time": { "from": "now-24h", "to": "now" },
+  "description": "k3s spec §9.2 dashboard 1: intake -> approval -> execution -> quality-gate lead time.",
+  "templating": {
+    "list": [
+      { "name": "tenant_id", "type": "query", "label": "Tenant", "query": "label_values(saena_workflow_lead_time_seconds, saena_tenant_id)" }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Intake -> Approval -> Execution -> Quality Gate lead time (p50/p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum(rate(saena_workflow_lead_time_seconds_bucket[5m])) by (le, saena_context))",
+          "legendFormat": "p50 {{saena_context}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum(rate(saena_workflow_lead_time_seconds_bucket[5m])) by (le, saena_context))",
+          "legendFormat": "p95 {{saena_context}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "Stage transitions by stage (intake/approval/execution/quality_gate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(saena_workflow_stage_transition_total[5m])) by (stage, saena_tenant_id)",
+          "legendFormat": "{{stage}} ({{saena_tenant_id}})"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Runs currently WAITING_APPROVAL (k3s spec §4.3 state machine)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(saena_workflow_stage_transition_total{stage=\"WAITING_APPROVAL\"}) by (saena_tenant_id)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Lead time by run_id (drilldown table)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(50, saena_workflow_lead_time_seconds{saena_tenant_id=~\"$tenant_id\"})",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{{- /*
+Dashboards-as-code (k3s spec §9.2, 6 required dashboards) mounted via the
+Grafana sidecar ConfigMap-discovery convention: a ConfigMap labeled
+`<dashboardSidecarLabel>: "<dashboardSidecarLabelValue>"` in the
+observability namespace is auto-discovered by the Grafana sidecar
+(`sidecar.dashboards.enabled=true`, itself part of the kube-prometheus-stack/
+grafana chart deployed separately — this chart only emits the labeled
+ConfigMap, it does not deploy Grafana itself; observability.md "기성 스택").
+One ConfigMap per dashboard keeps each under the ~1MiB ConfigMap size limit
+and lets Grafana's sidecar file-watcher pick up per-dashboard changes
+independently. Source JSON files live in `dashboards/` at the chart root
+(NOT under templates/ — Helm does not template *.json chart-root files, so
+`.Files.Get` reads them byte-for-byte; this is the deliberate reason the
+JSON source of truth is not itself a `.tpl`).
+*/ -}}
+{{- $labelKey := .Values.observability.grafana.dashboardSidecarLabel }}
+{{- $labelValue := .Values.observability.grafana.dashboardSidecarLabelValue }}
+{{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+{{- $name := base $path | trimSuffix ".json" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "saena-forge.fullname" $ }}-dashboard-{{ $name }}
+  namespace: {{ $.Values.namespaces.observability }}
+  labels:
+    {{- include "saena-forge.labels" $ | nindent 4 }}
+    {{ $labelKey }}: {{ $labelValue | quote }}
+  annotations:
+    saena.io/dashboard-source: {{ $path }}
+data:
+  {{ base $path }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+{{- end }}

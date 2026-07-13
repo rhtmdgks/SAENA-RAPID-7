@@ -99,7 +99,53 @@ printf '%s\n' "$_segments" | while IFS= read -r _seg; do
             _sub="$(printf '%s' "$_seg" | awk '{print $2}')"
             case "$_sub" in
                 push)
-                    _deny "git push is forbidden in dev-repo sessions (CLAUDE.md #10)"
+                    # Precision rule (user-approved 2026-07-13, Wave 3 entry
+                    # gate): the ONLY permitted push is a checkpoint push of a
+                    # wave integration branch to origin — exactly
+                    # `git push [-u|--set-upstream] origin wave<N>-<name>`.
+                    # Any other flag (--force/-f/--force-with-lease/--delete/
+                    # --tags/--all/--mirror/...), any refspec containing `:`,
+                    # any non-origin remote, any non-wave branch (main/master/
+                    # HEAD/tags/unit/*) stays denied. main lands via human PR
+                    # only (CLAUDE.md #10).
+                    _push_ok=1
+                    _push_remote=""
+                    _push_branch=""
+                    _push_rest="$(printf '%s' "$_seg" | awk '{$1=""; $2=""; print}')"
+                    for _push_tok in $_push_rest; do
+                        case "$_push_tok" in
+                            -u|--set-upstream)
+                                : # upstream tracking on first checkpoint push — harmless
+                                ;;
+                            -*)
+                                _push_ok=0 # every other flag: force/delete/tags/all/mirror/... fail-closed
+                                ;;
+                            *:*)
+                                _push_ok=0 # refspec rewrite (e.g. wave3-x:main)
+                                ;;
+                            *)
+                                if [ -z "$_push_remote" ]; then
+                                    _push_remote="$_push_tok"
+                                elif [ -z "$_push_branch" ]; then
+                                    _push_branch="$_push_tok"
+                                else
+                                    _push_ok=0 # extra positional args
+                                fi
+                                ;;
+                        esac
+                    done
+                    [ "$_push_remote" = "origin" ] || _push_ok=0
+                    case "$_push_branch" in
+                        wave[0-9]*-*)
+                            : # wave integration branch — permitted target
+                            ;;
+                        *)
+                            _push_ok=0
+                            ;;
+                    esac
+                    if [ "$_push_ok" -ne 1 ]; then
+                        _deny "git push is allowed ONLY as 'git push [-u] origin wave<N>-<branch>' (checkpoint push, user-approved 2026-07-13); everything else forbidden (CLAUDE.md #10)"
+                    fi
                     ;;
                 merge)
                     # Precision rule (W1, user-approved 2026-07-12): the ONLY
@@ -179,7 +225,47 @@ printf '%s\n' "$_segments" | while IFS= read -r _seg; do
         gh)
             case "$_seg" in
                 gh\ pr\ merge*)
-                    _deny "gh pr merge is forbidden in dev-repo sessions"
+                    # Precision rule (user-approved 2026-07-13, nonstop
+                    # directive): merging a PR is allowed ONLY when the PR's
+                    # live-resolved head branch is a wave integration branch
+                    # (wave<N>-*) and its base is main — the designed landing
+                    # path. No --admin (branch-protection bypass). Anything
+                    # unresolvable fails closed.
+                    case "$_seg" in
+                        *--admin*)
+                            _deny "gh pr merge --admin is forbidden (branch-protection bypass)"
+                            ;;
+                    esac
+                    _pr_num=""
+                    for _pr_tok in $(printf '%s' "$_seg" | awk '{$1=""; $2=""; $3=""; print}'); do
+                        case "$_pr_tok" in
+                            [0-9]*) _pr_num="$_pr_tok"; break ;;
+                        esac
+                    done
+                    if [ -z "$_pr_num" ]; then
+                        _deny "gh pr merge without an explicit PR number is forbidden (fail-closed)"
+                    fi
+                    if [ -n "${HOOK_TEST_MOCK_PR_HEAD+x}" ]; then
+                        _pr_head="$HOOK_TEST_MOCK_PR_HEAD"
+                        _pr_base="${HOOK_TEST_MOCK_PR_BASE:-main}"
+                    elif command -v gh >/dev/null 2>&1; then
+                        _pr_head="$(gh pr view "$_pr_num" --json headRefName --jq .headRefName 2>/dev/null)"
+                        _pr_base="$(gh pr view "$_pr_num" --json baseRefName --jq .baseRefName 2>/dev/null)"
+                    else
+                        _pr_head=""
+                        _pr_base=""
+                    fi
+                    case "$_pr_head" in
+                        wave[0-9]*-*)
+                            : # wave integration branch — permitted source
+                            ;;
+                        *)
+                            _deny "gh pr merge allowed only for wave<N>-* head branches (resolved head: '${_pr_head:-<unresolved>}')"
+                            ;;
+                    esac
+                    if [ "$_pr_base" != "main" ]; then
+                        _deny "gh pr merge allowed only into main (resolved base: '${_pr_base:-<unresolved>}')"
+                    fi
                     ;;
             esac
             ;;

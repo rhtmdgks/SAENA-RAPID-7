@@ -1,0 +1,15 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "nonstop-directive: gh pr merge 3 --merge with wave head + main base (mocked) must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "gh pr merge 3 --merge"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_PR_HEAD": "wave2-runtime",
+    "HOOK_TEST_MOCK_PR_BASE": "main"
+  },
+  "expect_exit": 0
+}

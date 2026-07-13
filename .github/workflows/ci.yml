@@ -88,12 +88,43 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked
-      - run: uv run pytest -q --cov --cov-report=xml --cov-report=term:skip-covered
+      # w2-22: byte-identical selector to justfile `test` recipe
+      # (`-m "not integration"`) — deterministic unit+contract lane only,
+      # no real Temporal/testcontainers process. tests/unit/ci_identity/
+      # asserts this stays in lockstep (ADR-0018).
+      - run: uv run pytest -q -m "not integration" --cov --cov-report=xml --cov-report=term:skip-covered
       - name: Coverage gates (ADR-0017 — harness>=90, diff>=90, ratchet)
         run: |
           uv run coverage report --include="tests/contract/harness/*" --fail-under=90
           uv run diff-cover coverage.xml --compare-branch origin/main --fail-under=90
           sh tools/validation/coverage-ratchet.sh
+
+  integration:
+    # w2-22: the OTHER lane (ADR-0018 two-lane split, w2-20). Depends only on
+    # `unit` (not lint/schema-validate directly) — if the deterministic gate
+    # is red there is no value paying for real Temporal/testcontainers
+    # startup cost; `unit` already re-validates lint+schema-validate as its
+    # own upstream gate. This is a REAL required check, not
+    # continue-on-error: a container that fails to start must fail the job,
+    # not skip silently. The tests' own skipif (Temporal test-server binary
+    # unavailable) is the only honest skip path — CI is expected to have
+    # network egress for that binary's on-demand download plus Docker
+    # (ubuntu-latest GitHub-hosted runners ship Docker preinstalled for
+    # testcontainers Postgres/Redpanda), so in CI these tests are expected
+    # to RUN, not skip.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just test-integration
 
   contract-compat:
     needs: [unit]

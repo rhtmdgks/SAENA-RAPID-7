@@ -1,9 +1,10 @@
 """Validation harness for the SAENA telemetry attribute registry (ADR-0016).
 
-`packages/observability` is deliberately NOT a uv workspace member (no
-pyproject.toml here — ADR-0016 W0 scope is conventions + registry only).
-These tests are still collected because root pyproject.toml sets
-`testpaths = ["packages"]`.
+`packages/observability` became a uv workspace member in w2-00 (Wave 2
+bootstrap adds pyproject.toml + the empty saena_observability scaffold;
+runtime implementation arrives in w2-06). The W0 registry files below
+predate that and remain the conventions/registry SSOT. These tests are
+collected because root pyproject.toml sets `testpaths = ["packages"]`.
 
 Registry data is authored in attributes.yaml (human-edited SSOT), but
 PyYAML is not part of the reachable dependency surface for this package, so

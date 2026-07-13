@@ -1,0 +1,24 @@
+asyncapi: 3.0.0
+info:
+  title: SAENA events (w2-02 unit-test malformed fixture)
+  version: "1.0.0"
+  description: >-
+    Test-only fixture -- a channel with no matching operations[] entry, so
+    no producer is derivable for it. Exercises TopicCatalogError
+    ("no matching operation").
+defaultContentType: application/json
+channels:
+  patch.unit.completed.v1:
+    address: patch.unit.completed.v1
+    messages:
+      patchUnitCompleted:
+        name: PatchUnitCompleted
+        title: patch.unit.completed.v1
+        summary: Patch unit completed (agent-runner-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            type: object
+
+operations: {}

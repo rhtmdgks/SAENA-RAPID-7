@@ -1,0 +1,15 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "nonstop-directive: gh pr merge into a non-main base (mocked) stays denied",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "gh pr merge 4 --merge"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_PR_HEAD": "wave3-execution",
+    "HOOK_TEST_MOCK_PR_BASE": "release"
+  },
+  "expect_exit": 2
+}

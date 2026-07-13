@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push origin main stays denied (main lands via human PR only)",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push origin main"
+    }
+  },
+  "expect_exit": 2
+}

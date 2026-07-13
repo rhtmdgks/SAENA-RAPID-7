@@ -18,3 +18,8 @@
 #
 # Baseline: empty. Full-history scan on this baseline reported 0 findings
 # (see T09 verification log in the commit message that introduced this file).
+
+# W2 PR #3 verified false positive (2026-07-13): pytest assertion comparing two
+# computed decision_key properties in domain-policy test code — no literal
+# credential; gitleaks generic-api-key entropy FP on the historical blob.
+e646c93bf48d55caee4a16fc5fcb89920abe50f4:tests/unit/domain_policy/test_transitions.py:generic-api-key:602

@@ -1,0 +1,24 @@
+apiVersion: v2
+name: saena-forge
+description: >-
+  SAENA FORGE control/execution-plane services (8 independently-deployed
+  services of the 24-capability catalog), tenant/system/observability
+  namespaces, default-deny NetworkPolicy, scoped RBAC, and the 6 required
+  Grafana dashboards. Internal B-department tool only — not a customer
+  deployment product (k3s spec §1).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+keywords:
+  - saena-forge
+  - k3s
+  - internal
+home: https://github.com/SAENA-Labs/SAENA-RAPID-7
+sources:
+  - https://github.com/SAENA-Labs/SAENA-RAPID-7
+maintainers:
+  - name: SAENA B-department
+annotations:
+  saena.io/chart-identity: "ADR-0005 (2026-07-12) — chart name saena-forge is CONFIRMED"
+  saena.io/engine-scope: "chatgpt-search only (v1) — CLAUDE.md Engine scope"

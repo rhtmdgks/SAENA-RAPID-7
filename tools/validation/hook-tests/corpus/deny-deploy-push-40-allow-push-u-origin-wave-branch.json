@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push -u origin wave3-execution (first checkpoint push with upstream tracking) must be allowed",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push -u origin wave3-execution"
+    }
+  },
+  "expect_exit": 0
+}

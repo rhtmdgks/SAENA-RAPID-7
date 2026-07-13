@@ -27,4 +27,7 @@ PROPOSED.
 
 ## Status
 
-NOT IMPLEMENTED
+W0: conventions + attribute registry + validation harness present (ADR-0016).
+w2-00: uv workspace member (`saena-observability`, empty scaffold). Runtime
+logging/trace implementation NOT IMPLEMENTED — arrives in unit w2-06;
+exporter/collector stack deployment remains W2C.
