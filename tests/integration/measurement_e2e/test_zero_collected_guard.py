@@ -16,7 +16,12 @@ These tests PROVE the required behaviours by running pytest AS A SUBPROCESS
 
   (a) flag set + `-k` deselecting everything  -> exit 4 (UsageError) + message
       (the ZERO-COLLECTED guard in `pytest_collection_finish`)
-  (b) flag set + a normal non-empty selection -> passes, guard silent
+  (b) flag set + a selection keeping ONLY container-free items (the inert guard
+      leaf) -> HARD FAILURE exit 6 (critic-F probe 5a: a required run that
+      executes ZERO real-container scenarios is a BYPASS — collection_finish
+      stays silent because dir items DO exist, so `pytest_sessionfinish` must
+      catch the empty real-container set). Was previously (wrongly) asserted as
+      an exit-0 pass; the corrected fail-closed contract forbids that.
   (c) flag NOT set + zero-collected-here       -> guard silent (MF-2 dead: no
       false-fire on an umbrella/ancestor invocation collecting nothing here)
   (d) flag set + Docker absent (infra-absent → real-container scenarios all
@@ -110,19 +115,37 @@ def test_a_flag_set_zero_collected_hard_fails_non5() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# (b) flag SET + a normal non-empty selection -> passes, guard silent.
+# (b) flag SET + a selection keeping ONLY container-free items (the inert guard
+#     leaf) -> HARD FAILURE exit 6. Critic-F probe 5a regression: dir items DO
+#     exist (so `pytest_collection_finish`'s zero-DIR-collected UsageError stays
+#     silent — no false-fire), but ZERO real-container scenarios were selected,
+#     which `pytest_sessionfinish` must reject as a required-lane BYPASS. A
+#     required run that executes no Postgres/ClickHouse/Temporal scenario at all
+#     must never pass green.
 # --------------------------------------------------------------------------- #
-def test_b_flag_set_nonempty_selection_passes_guard_silent() -> None:
+def test_b_flag_set_container_free_only_selection_hard_fails_bypass_closed() -> None:
     target_node = f"{_GUARD_FILE}::test_inert_leaf_for_nonempty_selection_proof"
     result = _run_pytest_subprocess([target_node], required_flag=True)
     combined = result.stdout + result.stderr
 
     assert "collected ZERO test items" not in combined, (
-        f"guard spuriously fired on a NON-empty selection with the flag set:\n{combined}"
+        "the zero-DIR-collected guard must stay silent here (dir items DO "
+        f"exist) — the BYPASS is caught by pytest_sessionfinish instead:\n{combined}"
     )
-    assert result.returncode == 0, (
-        "a non-empty selection with the flag set must pass cleanly (guard "
-        f"silent); got exit {result.returncode}:\n{combined}"
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "arming the required flag then selecting ONLY container-free tests must "
+        "HARD FAIL (exit 6) — a required run that executes zero real-container "
+        f"scenarios is a bypass, never a green pass; got exit {result.returncode}:\n{combined}"
+    )
+    assert result.returncode not in (0, _TOLERATED_NO_TESTS_EXIT), (
+        "the container-free-only bypass degraded to a silent pass (0) or "
+        f"tolerated exit-5; got {result.returncode}:\n{combined}"
+    )
+    assert "HARD FAILURE" in combined, (
+        f"expected the required-mode guard's reason message:\n{combined}"
+    )
+    assert "ZERO real-container" in combined, (
+        f"expected the bypass-specific reason (zero real-container selected):\n{combined}"
     )
 
 
@@ -166,14 +189,20 @@ _EXPECTED_INFRA_HARD_FAIL_EXIT = 6
 # tests so a child run can never recurse. Callers AND it with their own filter.
 _NO_RECURSE = (
     "not test_a_ and not test_b_ and not test_c_ and not test_d_ "
-    "and not test_e_ and not test_f_ and not test_inert_"
+    "and not test_e_ and not test_f_ and not test_g_ and not test_inert_"
 )
 
 
-def _run_child(*, required_flag: bool, docker_absent: bool, k_extra: str | None = None):
+def _run_child(
+    *,
+    required_flag: bool,
+    docker_absent: bool,
+    k_extra: str | None = None,
+    required_value: str = "1",
+):
     env = dict(os.environ)
     if required_flag:
-        env[_REQUIRED_ENV_VAR] = "1"
+        env[_REQUIRED_ENV_VAR] = required_value
     else:
         env.pop(_REQUIRED_ENV_VAR, None)
     if docker_absent:
@@ -261,3 +290,23 @@ def test_f_required_single_container_test_skipped_hard_fails() -> None:
         "a single skipped required container test must hard-fail the lane; got "
         f"exit {result.returncode}:\n{combined}"
     )
+
+
+# --------------------------------------------------------------------------- #
+# (g) REQUIRED armed with a NON-canonical truthy value (`true` / `yes` / `" 1 "`
+#     with whitespace) -> still ARMS (critic-F SHOULD-FIX: fail-safe arming, not
+#     exact `== "1"` equality). Docker absent + `true` => still HARD FAIL exit 6.
+#     A typo must never silently downgrade the required lane to optional/skip.
+# --------------------------------------------------------------------------- #
+def test_g_required_arms_on_non_canonical_truthy_value() -> None:
+    for value in ("true", "yes", " 1 "):
+        result = _run_child(required_flag=True, docker_absent=True, required_value=value)
+        combined = result.stdout + result.stderr
+        assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+            f"{_REQUIRED_ENV_VAR}={value!r} must still ARM the required lane "
+            f"(fail-safe), hard-failing exit {_EXPECTED_INFRA_HARD_FAIL_EXIT} when "
+            f"Docker absent; got {result.returncode}:\n{combined}"
+        )
+        assert "HARD FAILURE" in combined, (
+            f"expected the required-mode guard message for value {value!r}:\n{combined}"
+        )

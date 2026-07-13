@@ -139,6 +139,18 @@ def pytest_configure(config: pytest.Config) -> None:
 _REQUIRED_ENV_VAR = "SAENA_MEASUREMENT_E2E_REQUIRED"
 
 
+def _required_armed() -> bool:
+    """Fail-SAFE arming check (critic F should-fix): any non-empty value other
+    than an explicit disable (``0``/``false``/``no``/``off``) arms required
+    mode. So ``1``, ``true``, ``yes``, or even ``" 1 "`` (whitespace) all arm —
+    a caller who sets the var at ALL meant the required lane; a typo like
+    ``true`` must not silently downgrade it to the optional/honest-skip lane."""
+    raw = os.environ.get(_REQUIRED_ENV_VAR)
+    if raw is None:
+        return False
+    return raw.strip().lower() not in ("", "0", "false", "no", "off")
+
+
 def _this_dir_items(items: list[pytest.Item]) -> list[pytest.Item]:
     return [item for item in items if _THIS_DIR in Path(str(item.fspath)).resolve().parents]
 
@@ -172,7 +184,7 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     instead means a naming typo, a `-k`/`-m` mismatch, or an import/collection
     error silently produced nothing — a hard, non-5 failure, never exit-5.
     """
-    if os.environ.get(_REQUIRED_ENV_VAR) != "1":
+    if not _required_armed():
         return
     if _this_dir_items(session.items):
         return
@@ -258,18 +270,28 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    if os.environ.get(_REQUIRED_ENV_VAR) != "1":
+    if not _required_armed():
         return
     container_nodes = {
         item.nodeid for item in _this_dir_items(session.items) if _needs_containers(item)
     }
-    if not container_nodes:
-        # Zero required container items collected — already a hard failure via
-        # pytest_collection_finish (UsageError); nothing to add here.
-        return
     skipped = container_nodes & _OUTCOMES["skipped"]
     passed = container_nodes & _OUTCOMES["passed"]
     reasons: list[str] = []
+    if not container_nodes:
+        # ZERO real-container tests were SELECTED while required mode is armed
+        # (critic-F bypass): a `-k` keeping only the container-free guard
+        # self-tests makes `pytest_collection_finish` silent (dir items exist)
+        # AND leaves `container_nodes` empty. A required run that selects no
+        # real-container scenario at all is a HARD FAILURE — the whole point of
+        # arming the flag is to assert the real scenarios ran. (This is
+        # independent of collection_finish's zero-DIR-items UsageError, whose
+        # "empty" is whole-directory, not container-only.)
+        reasons.append(
+            "ZERO real-container E2E tests were SELECTED in required mode "
+            "(a -k/-m selection that runs no Postgres/ClickHouse/Temporal scenario "
+            "— the required flag asserts those scenarios RAN)"
+        )
     if skipped:
         reasons.append(
             f"{len(skipped)} of {len(container_nodes)} REQUIRED real-container E2E "

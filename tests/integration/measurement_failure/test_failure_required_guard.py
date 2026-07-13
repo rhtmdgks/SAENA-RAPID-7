@@ -40,10 +40,16 @@ _NO_MATCH_K = "this_k_matches_no_failure_test_whatsoever_c5closure"
 _NO_RECURSE = "not test_failure_required_guard"
 
 
-def _run_child(*, required_flag: bool, docker_absent: bool, k_extra: str | None = None):
+def _run_child(
+    *,
+    required_flag: bool,
+    docker_absent: bool,
+    k_extra: str | None = None,
+    required_value: str = "1",
+):
     env = dict(os.environ)
     if required_flag:
-        env[_REQUIRED_ENV_VAR] = "1"
+        env[_REQUIRED_ENV_VAR] = required_value
     else:
         env.pop(_REQUIRED_ENV_VAR, None)
     if docker_absent:
@@ -92,6 +98,21 @@ def test_required_zero_collected_hard_fails() -> None:
         f"got {result.returncode}:\n{combined}"
     )
     assert "HARD FAILURE" in combined, f"expected the guard reason message:\n{combined}"
+
+
+def test_required_arms_on_non_canonical_truthy_value() -> None:
+    # Critic-F SHOULD-FIX: arming is fail-SAFE, not exact `== "1"`. A caller
+    # who set the var to `true` (or `yes`, or `" 1 "` with whitespace) still
+    # gets the REQUIRED lane — a typo must never silently downgrade it to the
+    # optional/honest-skip lane. Docker absent + `true` => still exit 6.
+    for value in ("true", "yes", " 1 "):
+        result = _run_child(required_flag=True, docker_absent=True, required_value=value)
+        combined = result.stdout + result.stderr
+        assert result.returncode == _HARD_FAIL_EXIT, (
+            f"{_REQUIRED_ENV_VAR}={value!r} must still ARM the required lane "
+            f"(fail-safe), hard-failing exit {_HARD_FAIL_EXIT} when Docker absent; "
+            f"got {result.returncode}:\n{combined}"
+        )
 
 
 def test_optional_docker_absent_is_honest_skip() -> None:

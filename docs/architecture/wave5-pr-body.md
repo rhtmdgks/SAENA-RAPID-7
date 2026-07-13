@@ -51,8 +51,11 @@ this doc does not hardcode it (a commit cannot reference its own future SHA).
 Both required integration gates hard-fail (exit 6) — never a green "0 passed,
 N skipped" — when Docker/ClickHouse/Temporal is absent, any required test is
 skipped, or zero collected, with the required env var armed by the recipe (SSOT).
-Docker-present: `measurement-e2e` 35 pass / `measurement-failure-modes` 34 pass,
-real containers, skipped=0. Optional/local (flag unset): honest skip.
+Docker-present: `measurement-e2e` 36 pass / `measurement-failure-modes` 35 pass,
+real containers, skipped=0. Optional/local (flag unset): honest skip. Arming is
+fail-safe (any truthy value arms; a typo never downgrades to the optional lane),
+and a required run that selects ZERO real-container scenarios also hard-fails
+(exit 6) — a `-k` keeping only container-free guard tests cannot bypass the lane.
 
 ## Evidence
 

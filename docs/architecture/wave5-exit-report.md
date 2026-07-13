@@ -91,9 +91,18 @@ guard (`pytest_sessionfinish`) in both conftests: when the lane's required env
 var is set, any skipped required test — or zero passed — is a HARD FAILURE
 (exit 6). The `just` recipes set the env var internally (SSOT), so a caller
 cannot drop the required semantics. Proven: both recipes exit 6 on Docker-absent
-via the real `just` invocation; both pass with real containers. Guard
-self-tests updated to this contract (E2E 7, failure 3). Stale "w5-19/w5-20
-residual" comments in `justfile`/`ci.yml` were also corrected.
+via the real `just` invocation; both pass with real containers.
+
+A same-lens re-verification (critic F) then closed two residual gaps: (1) a
+**bypass** — a `-k` selection keeping only the container-free guard self-tests
+left `pytest_sessionfinish`'s real-container set empty while `collection_finish`
+stayed silent (dir items existed), so the lane could exit 0 having run zero real
+scenarios; now an empty required-container selection is itself a HARD FAILURE
+(exit 6). (2) **fail-safe arming** — arming is no longer exact `== "1"`; any
+truthy value (`true`, `yes`, `" 1 "`) arms, so a typo can never silently
+downgrade the required lane to the optional/honest-skip lane. Guard self-tests
+updated to this contract (E2E 8, failure 4). Stale "w5-19/w5-20 residual"
+comments in `justfile`/`ci.yml` were also corrected.
 
 ### Original wave (pre-closure) status, superseded
 
@@ -282,11 +291,12 @@ ci↔justfile parity green.
 
 | Gate | Docker present | Docker absent (required env armed) | Optional (flag unset) |
 |---|---|---|---|
-| `just measurement-e2e` | e2e 35 pass (real PG16 + CH24.8 + Temporal time-skipping), skipped=0 | **exit 6 HARD FAILURE** (never green "0 passed, N skipped") | honest skip, exit 0 |
-| `just measurement-failure-modes` | failure matrix 34 pass (31 real-PG rows + 3 guard proofs), skipped=0 | **exit 6 HARD FAILURE** | honest skip, exit 0 |
+| `just measurement-e2e` | e2e 36 pass (28 real PG16 + CH24.8 + Temporal time-skipping rows + 8 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (never green "0 passed, N skipped") | honest skip, exit 0 |
+| `just measurement-failure-modes` | failure matrix 35 pass (31 real-PG rows + 4 guard proofs), skipped=0 | **exit 6 HARD FAILURE** | honest skip, exit 0 |
 
-Real-container lanes green 2× each; guard self-tests: E2E 7 passed, failure 3
-passed. No wall-clock sleep stabilizes Temporal (time-skipping only).
+Real-container lanes green 2× each; guard self-tests: E2E 8 passed, failure 4
+passed (incl. the container-free-only bypass and fail-safe-arming regressions).
+No wall-clock sleep stabilizes Temporal (time-skipping only).
 Failure-mode matrix: every declared node exists + is collectible + ran; primary
 and recovery both run; skipped=0 in required mode.
 

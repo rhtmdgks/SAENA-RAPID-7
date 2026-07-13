@@ -125,6 +125,17 @@ _FAILURE_HARD_FAIL_EXIT = 6
 _FAILURE_OUTCOMES: dict[str, set[str]] = {"passed": set(), "skipped": set(), "failed": set()}
 
 
+def _failure_required_armed() -> bool:
+    """Fail-SAFE arming (mirrors the E2E lane): any non-empty value other than
+    an explicit disable (``0``/``false``/``no``/``off``) arms required mode —
+    ``1``, ``true``, ``yes`` or ``" 1 "`` all arm. A caller who set the var at
+    ALL meant the required lane; a typo must not silently downgrade it."""
+    raw = os.environ.get(_FAILURE_REQUIRED_ENV_VAR)
+    if raw is None:
+        return False
+    return raw.strip().lower() not in ("", "0", "false", "no", "off")
+
+
 def _this_dir_integration_nodes(session: pytest.Session) -> set[str]:
     return {
         item.nodeid
@@ -143,7 +154,7 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
-    if os.environ.get(_FAILURE_REQUIRED_ENV_VAR) != "1":
+    if not _failure_required_armed():
         return
     nodes = _this_dir_integration_nodes(session)
     if not nodes:
