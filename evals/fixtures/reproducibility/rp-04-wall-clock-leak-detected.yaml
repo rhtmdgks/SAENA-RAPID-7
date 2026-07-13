@@ -1,0 +1,33 @@
+fixture_id: rp-04-wall-clock-leak-detected
+axis: reproducibility
+seed: 6004
+tag: false_negative_guard
+description: >
+  run_a/run_b differ ONLY in evaluated_at (simulating a wall-clock leak —
+  e.g. a caller passing datetime.utcnow() instead of a fixed, supplied
+  timestamp). A naive "looks basically the same" check might dismiss a
+  single-field timestamp diff as still reproducible — this axis must
+  correctly detect it as NOT byte-identical.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  expect_identical: false
+  run_a:
+    tenant_id: acme-co
+    run_id: run-0001
+    patch_unit_id: PU-01
+    worktree_commit: abc1234
+    evaluated_at: "2026-07-13T00:00:00Z"
+    gate:
+      gate_id: build
+      passed: true
+  run_b:
+    tenant_id: acme-co
+    run_id: run-0001
+    patch_unit_id: PU-01
+    worktree_commit: abc1234
+    evaluated_at: "2026-07-13T00:00:07Z"
+    gate:
+      gate_id: build
+      passed: true

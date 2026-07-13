@@ -1,0 +1,33 @@
+fixture_id: ae-04-unusual-approver-id-still-authorizes
+axis: approval_enforcement
+seed: 3004
+tag: false_positive_guard
+description: >
+  An ApprovalDecision signed by an unusual/unfamiliar approver_actor_id
+  looks suspicious on a naive "known approver allowlist" heuristic, but
+  verify_approval only checks contract_hash/tenant_id/run_id/decision — it
+  correctly ALLOWS this (approver identity policy is a separate, later
+  concern, not this axis's).
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  repo_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  approved_scope: ["apps/web/docs/*"]
+  patch_unit_id: PU-01
+  expected_contract_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  expected_approved_patch_unit_ids: ["PU-01"]
+  approval_decision:
+    contract_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    tenant_id: acme-co
+    run_id: run-0001
+    approver_actor_id: actor-never-seen-before-9f2c
+    decision: approved
+    patch_unit_decisions:
+      - patch_unit_id: PU-01
+        decision: approved
+    signature: opaque-signature-bytes
+    signature_algorithm: ed25519
+    decided_at: "2026-07-13T00:00:00Z"

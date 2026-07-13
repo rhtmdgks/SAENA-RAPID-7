@@ -1,0 +1,14 @@
+fixture_id: ti-02-cross-tenant-read-denied
+axis: tenant_isolation
+seed: 4002
+tag: nominal
+description: >
+  Header claims tenant 'globex-co' but the serving pod is scoped to
+  'acme-co' -> cross-tenant read denied (TenantMismatchError, ADR-0014).
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  header_tenant_id: globex-co
+  pod_tenant_id: acme-co
+  expect_denied: true

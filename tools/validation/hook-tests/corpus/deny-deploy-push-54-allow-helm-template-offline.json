@@ -1,0 +1,14 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3: helm template piped to kubeconform (offline render) allowed without k3d context",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "helm template t deploy/charts/saena-forge | kubeconform -strict -summary"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_CONTEXT": ""
+  },
+  "expect_exit": 0
+}

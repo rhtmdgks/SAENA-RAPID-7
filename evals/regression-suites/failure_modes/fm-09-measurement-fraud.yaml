@@ -1,0 +1,20 @@
+mode_id: fm-09-measurement-fraud
+k3s_section: "10"
+name: "Measurement fraud"
+example: "raw citation count grows but control too"
+expected_system_behavior: "B-layer success not granted"
+status: covered
+covering_axis: regression_suite_native
+covering_test: tests/unit/evals_harness/test_failure_mode_regression_suite.py::test_measurement_fraud_raw_lift_without_control_adjustment_rejected
+notes: >
+  Not one of the 9 mandatory eval axes, and — UNLIKE fm-01/02/03/04/06/07/08
+  — NOT backed by any existing repo module: no experiment-attribution /
+  measurement service code exists yet anywhere in this repo (services/
+  experimentation/experiment-attribution-service is an empty scaffold,
+  confirmed by directory search — no *.py under its src/). This check is a
+  harness-owned, spec-encoded rule (Algorithm §11.3 "business integrity:
+  원시 지표와 가중 종합 지표를 모두 표시") rather than a wrapper around real
+  production code, unlike every other covered mode in this mapping — flagged
+  honestly as a forward-looking regression check, to be superseded by a real
+  experiment-attribution-service check once that service lands (Wave 3+
+  "Learning Layer").

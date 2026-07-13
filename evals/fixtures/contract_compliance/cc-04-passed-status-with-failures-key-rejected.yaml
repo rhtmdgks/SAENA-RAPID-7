@@ -1,0 +1,27 @@
+fixture_id: cc-04-passed-status-with-failures-key-rejected
+axis: contract_compliance
+seed: 2004
+tag: false_negative_guard
+description: >
+  status='passed' WITH a non-empty 'failures' array. A shallow check that
+  only enforces "failures, if present, has >=1 item" would wrongly PASS
+  this (it does have 1 item) — but Ruling R4's bidirectional rule forbids
+  'passed' from carrying a 'failures' key AT ALL. The real schema's allOf
+  conditional must reject this.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  schema_relpath: domain/verification-result/v1/verification-result.schema.json
+  payload:
+    tenant_id: acme-co
+    run_id: run-0001
+    patch_unit_id: PU-01
+    gate_id: build
+    status: passed
+    worktree_commit: abc1234
+    evaluated_at: "2026-07-13T00:00:00Z"
+    failures:
+      - error_code: saena.internal.stale_leftover
+        retryable: false
+        summary: "leftover failure entry from a prior attempt"

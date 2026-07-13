@@ -1,0 +1,16 @@
+fixture_id: fr-02-non-retryable-error-no-recovery
+axis: failure_recovery
+seed: 5002
+tag: nominal
+description: >
+  A non-retryable JobError (approval refused) correctly attempts NO
+  recovery — the job stays terminal at FAILED.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  error:
+    error_code: saena.policy_denied.approval_refused
+    summary: "ApprovalDecision.decision was not 'approved'"
+    retryable: false
+  recovery_strategy: none

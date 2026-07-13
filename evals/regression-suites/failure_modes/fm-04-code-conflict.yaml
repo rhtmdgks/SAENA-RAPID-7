@@ -1,0 +1,14 @@
+mode_id: fm-04-code-conflict
+k3s_section: "10"
+name: "Code conflict"
+example: "two agents modify same route"
+expected_system_behavior: "isolated worktrees, integrator only"
+status: covered
+covering_axis: regression_suite_native
+covering_test: tests/unit/evals_harness/test_failure_mode_regression_suite.py::test_code_conflict_isolated_worktrees
+notes: >
+  Not one of the 9 mandatory eval axes (mission scope) — a dedicated
+  regression-suite check over REAL saena_agent_runner.worktree
+  (FakeWorktreeFactory): two patch units targeting the SAME file, in the
+  SAME run, provisioned via the real factory, get non-overlapping
+  filesystem roots (tenant/run/patch_unit-scoped) — writes never collide.

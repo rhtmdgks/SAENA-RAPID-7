@@ -1,0 +1,22 @@
+mode_id: fm-05-skill-compromise
+k3s_section: "10"
+name: "Skill compromise"
+example: "third-party skill changes commands"
+expected_system_behavior: "pinned hash mismatch -> run blocked"
+status: covered
+covering_axis: regression_suite_native
+covering_test: tests/unit/evals_harness/test_failure_mode_regression_suite.py::test_skill_compromise_dedicated_bundle_verifier_blocks_tamper
+notes: >
+  RESOLVED (w3-12): a dedicated skill-bundle content-integrity verifier now
+  exists — saena_domain.execution.skill_bundle.verify_skill_bundle — enforced
+  fail-closed at both the hooks-runtime session_start boundary and the
+  agent-runner (before any worktree/executor). It computes a deterministic
+  sha256:<hex> over the bundle's framed manifest (the k3s §9.1
+  skill_bundle_hash field) and denies on byte-change / file add / delete /
+  rename / missing bundle / missing-or-malformed pin / symlink / traversal —
+  cases the whole-ActionContract contract_hash gate cannot see. This
+  regression-suite check exercises that REAL verifier and proves a one-byte
+  bundle tamper is blocked while the contract_hash stays identical. The
+  contract_hash pin is retained as a complementary defense, not a substitute
+  (tests/security/test_f5_skill_bundle_integrity.py; the F-5 row of
+  tests/security/failure_mode_matrix.json).

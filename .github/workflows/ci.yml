@@ -162,3 +162,100 @@ jobs:
         run: |
           uv sync --locked
           uv run just contract-lint-smoke
+
+  # ---- Wave 3 named required checks (ADR-0018 stable check names) ----
+
+  evals:
+    # W3 eval suite (deterministic 9-axis harness + extraction-architecture
+    # test, w3-10). Unit-lane tests — also run inside `unit`; this named job
+    # gives the exit-required stable check name with fast, isolated signal.
+    needs: [lint, schema-validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just test-evals
+
+  failure-modes:
+    # W3 failure-mode 9종 matrix (k3s §10) + rollback verification (w3-09).
+    # tests/security is fast (no container); the container-backed rollback
+    # proofs run in the `-m integration` subset here.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just test-failure-modes
+
+  execution-e2e:
+    # W3 synthetic-tenant execution E2E (w3-08): real Temporal time-skipping
+    # server + Redpanda + Postgres testcontainers (ubuntu-latest ships Docker).
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just test-execution-e2e
+
+  helm-smoke:
+    # W3 offline chart packaging gate (w2-23/w3-07 chart). No cluster contact:
+    # helm lint + template + kubeconform static validation + forgectl preflight.
+    needs: [lint, schema-validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install helm + kubeconform (pinned binaries + checksum verify)
+        run: |
+          set -eu
+          cd /tmp
+          # Both projects publish checksum lines that reference the ORIGINAL
+          # release filename, so download to that exact name and let
+          # `sha256sum -c` match the line directly (no rename mismatch).
+          # helm
+          hver=3.16.3
+          hfile="helm-v${hver}-linux-amd64.tar.gz"
+          curl -fsSL -o "$hfile" "https://get.helm.sh/${hfile}"
+          curl -fsSL -o "${hfile}.sha256sum" "https://get.helm.sh/${hfile}.sha256sum"
+          sha256sum -c "${hfile}.sha256sum"
+          tar -xzf "$hfile" -C /tmp
+          install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+          helm version
+          # kubeconform
+          kver=0.6.7
+          kfile="kubeconform-linux-amd64.tar.gz"
+          kbase="https://github.com/yannh/kubeconform/releases/download/v${kver}"
+          curl -fsSL -o "$kfile" "${kbase}/${kfile}"
+          curl -fsSL -o kubeconform-CHECKSUMS "${kbase}/CHECKSUMS"
+          grep " ${kfile}\$" kubeconform-CHECKSUMS | sha256sum -c -
+          tar -xzf "$kfile" -C /usr/local/bin kubeconform
+          kubeconform -v
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just helm-smoke

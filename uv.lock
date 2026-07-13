@@ -4,19 +4,25 @@ requires-python = "==3.12.*"
 
 [manifest]
 members = [
+    "saena-agent-runner",
     "saena-artifact-registry",
     "saena-audit-ledger",
+    "saena-chatgpt-observer",
     "saena-domain",
     "saena-engine-gateway",
     "saena-forge-console",
     "saena-forgectl",
+    "saena-hooks-runtime",
     "saena-monorepo",
     "saena-observability",
     "saena-orchestrator",
     "saena-plan-contract",
     "saena-policy-gate",
+    "saena-quality-eval",
+    "saena-repository-intake",
     "saena-schemas",
     "saena-shared",
+    "saena-site-discovery",
     "saena-tenant-control",
     "saena-testing",
 ]
@@ -1170,6 +1176,23 @@ wheels = [
 ]
 
 [[package]]
+name = "saena-agent-runner"
+version = "0.1.0"
+source = { editable = "services/platform/agent-runner-service" }
+dependencies = [
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+    { name = "saena-shared" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+    { name = "saena-shared", editable = "packages/shared" },
+]
+
+[[package]]
 name = "saena-artifact-registry"
 version = "0.1.0"
 source = { editable = "services/platform/artifact-registry-service" }
@@ -1220,6 +1243,17 @@ requires-dist = [
     { name = "saena-shared", editable = "packages/shared" },
     { name = "uvicorn", specifier = ">=0.32,<1" },
 ]
+
+[[package]]
+name = "saena-chatgpt-observer"
+version = "0.1.0"
+source = { editable = "services/acquisition/chatgpt-observer-service" }
+dependencies = [
+    { name = "saena-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
 
 [[package]]
 name = "saena-domain"
@@ -1316,6 +1350,11 @@ requires-dist = [
 ]
 
 [[package]]
+name = "saena-hooks-runtime"
+version = "0.1.0"
+source = { editable = "packages/hooks-runtime" }
+
+[[package]]
 name = "saena-monorepo"
 version = "0.0.0"
 source = { virtual = "." }
@@ -1333,18 +1372,24 @@ dev = [
     { name = "pyyaml" },
     { name = "ruff" },
     { name = "rust-just" },
+    { name = "saena-agent-runner" },
     { name = "saena-artifact-registry" },
     { name = "saena-audit-ledger" },
+    { name = "saena-chatgpt-observer" },
     { name = "saena-domain" },
     { name = "saena-engine-gateway" },
     { name = "saena-forge-console" },
     { name = "saena-forgectl" },
+    { name = "saena-hooks-runtime" },
     { name = "saena-observability" },
     { name = "saena-orchestrator" },
     { name = "saena-plan-contract" },
     { name = "saena-policy-gate" },
+    { name = "saena-quality-eval" },
+    { name = "saena-repository-intake" },
     { name = "saena-schemas" },
     { name = "saena-shared" },
+    { name = "saena-site-discovery" },
     { name = "saena-tenant-control" },
     { name = "saena-testing" },
     { name = "testcontainers" },
@@ -1367,18 +1412,24 @@ dev = [
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "ruff", specifier = ">=0.14,<0.15" },
     { name = "rust-just", specifier = ">=1.36,<3" },
+    { name = "saena-agent-runner", editable = "services/platform/agent-runner-service" },
     { name = "saena-artifact-registry", editable = "services/platform/artifact-registry-service" },
     { name = "saena-audit-ledger", editable = "services/foundation/audit-ledger-service" },
+    { name = "saena-chatgpt-observer", editable = "services/acquisition/chatgpt-observer-service" },
     { name = "saena-domain", editable = "packages/domain" },
     { name = "saena-engine-gateway", editable = "services/platform/engine-adapter-gateway" },
     { name = "saena-forge-console", editable = "services/platform/forge-console-api" },
     { name = "saena-forgectl", editable = "tools/forgectl" },
+    { name = "saena-hooks-runtime", editable = "packages/hooks-runtime" },
     { name = "saena-observability", editable = "packages/observability" },
     { name = "saena-orchestrator", editable = "services/platform/agent-orchestrator-service" },
     { name = "saena-plan-contract", editable = "services/foundation/plan-contract-service" },
     { name = "saena-policy-gate", editable = "services/foundation/policy-gate-service" },
+    { name = "saena-quality-eval", editable = "services/platform/quality-eval-service" },
+    { name = "saena-repository-intake", editable = "services/acquisition/repository-intake-service" },
     { name = "saena-schemas", editable = "packages/schemas" },
     { name = "saena-shared", editable = "packages/shared" },
+    { name = "saena-site-discovery", editable = "services/acquisition/site-discovery-service" },
     { name = "saena-tenant-control", editable = "services/foundation/tenant-control-service" },
     { name = "saena-testing", editable = "packages/testing" },
     { name = "testcontainers", specifier = ">=4.9,<5" },
@@ -1483,6 +1534,48 @@ requires-dist = [
 ]
 
 [[package]]
+name = "saena-quality-eval"
+version = "0.1.0"
+source = { editable = "services/platform/quality-eval-service" }
+dependencies = [
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+    { name = "saena-shared" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+    { name = "saena-shared", editable = "packages/shared" },
+]
+
+[[package]]
+name = "saena-repository-intake"
+version = "0.1.0"
+source = { editable = "services/acquisition/repository-intake-service" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "saena-domain" },
+    { name = "saena-observability" },
+    { name = "saena-schemas" },
+    { name = "saena-shared" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-observability", editable = "packages/observability" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+    { name = "saena-shared", editable = "packages/shared" },
+    { name = "uvicorn", specifier = ">=0.32,<1" },
+]
+
+[[package]]
 name = "saena-schemas"
 version = "0.1.0"
 source = { editable = "packages/schemas" }
@@ -1497,6 +1590,17 @@ requires-dist = [{ name = "pydantic", specifier = ">=2,<3" }]
 name = "saena-shared"
 version = "0.1.0"
 source = { editable = "packages/shared" }
+
+[[package]]
+name = "saena-site-discovery"
+version = "0.1.0"
+source = { editable = "services/acquisition/site-discovery-service" }
+dependencies = [
+    { name = "saena-domain" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
 
 [[package]]
 name = "saena-tenant-control"

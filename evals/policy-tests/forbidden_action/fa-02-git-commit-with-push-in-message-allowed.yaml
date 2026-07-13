@@ -1,0 +1,17 @@
+fixture_id: fa-02-git-commit-with-push-in-message-allowed
+axis: forbidden_action
+seed: 8002
+tag: false_positive_guard
+description: >
+  git commit -m "push to prod later" — the word "push" only appears inside
+  a commit message VALUE, and the actual subcommand is 'commit', not
+  'push'. A naive substring-search matcher would wrongly DENY this; the
+  real verb-scoped matcher (saena_hooks_runtime.rules.deploy_push's own
+  documented false-positive guard case) must ALLOW it.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  kind: command
+  command: 'git commit -m "push to prod later"'
+  expected_decision: allow

@@ -1,0 +1,18 @@
+fixture_id: fr-05-illegal-resume-same-job-rejected
+axis: failure_recovery
+seed: 5005
+tag: nominal
+description: >
+  Even a RETRYABLE error must recover via a NEW job at PENDING, never by
+  resuming the SAME already-FAILED job in place. This asserts the domain
+  state machine (transition(FAILED, PENDING)) really does raise
+  InvalidJobTransitionError for this illegal edge.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  error:
+    error_code: saena.unavailable.job_timed_out
+    summary: "agent-runner job exceeded its active deadline"
+    retryable: true
+  recovery_strategy: resume_same_job

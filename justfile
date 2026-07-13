@@ -37,6 +37,33 @@ test:
 test-integration:
     uv run pytest -q -m integration -p no:cacheprovider
 
+# W3 named required-check recipes (ADR-0018 stable check names). These are
+# TARGETED subsets used as their own CI jobs for fast, individually-named
+# signal; the comprehensive `test-integration` umbrella above still runs the
+# same container tests (deliberate belt-and-suspenders — the named jobs are
+# the stable required checks, the umbrella is the catch-all). Unit-lane
+# subsets (evals, security) also run inside `test` — re-running them here as
+# named checks costs nothing (no container) and never counts twice toward
+# the coverage ratchet (these invocations pass no --cov).
+test-evals:
+    uv run pytest tests/unit/evals_harness -q
+
+test-failure-modes:
+    uv run pytest tests/security -q
+    uv run pytest -q -m integration tests/integration/failure_modes -p no:cacheprovider
+
+test-execution-e2e:
+    uv run pytest tests/e2e/execution -q
+    uv run pytest -q -m integration tests/integration/execution_e2e -p no:cacheprovider
+
+# Offline chart packaging gate (no cluster contact): helm lint + template +
+# kubeconform static validation + forgectl §8.1 preflight.
+helm-smoke:
+    helm lint deploy/charts/saena-forge
+    helm template smoke deploy/charts/saena-forge > /dev/null
+    helm template smoke deploy/charts/saena-forge | kubeconform -strict -ignore-missing-schemas -summary
+    uv run python -m saena_forgectl preflight --values deploy/charts/saena-forge/values.yaml
+
 # ADR-0017 coverage gates (blocking): harness core >=90, changed-lines >=90,
 # global no-decrease ratchet (committed baseline; manual ratchet-up in-PR).
 coverage-gates:

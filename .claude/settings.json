@@ -5,7 +5,7 @@
   },
   "teammateMode": "iterm2",
   "permissions": {
-    "defaultMode": "plan",
+    "defaultMode": "bypassPermissions",
     "deny": [
       "Bash(kubectl apply*)",
       "Bash(kubectl create*)",
@@ -23,6 +23,17 @@
     ]
   },
   "hooks": {
+    "PermissionRequest": [
+      {
+        "$comment": "user-approved 2026-07-13 (explicit: remove all human-approval popups at this stage — auto-approve every tool's permission dialog). Covers ALL tools (no matcher = match-all): Write/Edit/MultiEdit/Bash/Notebook/MCP. This auto-answers the ASK dialog only; it does NOT weaken the hard DENY safety hooks (deny-deploy-push / deny-unpinned-install / secret-scan) which BLOCK dangerous ops and never prompt the user, nor the deny[] rules. protect-paths still RUNS and its ask is still audit-logged (PostToolUse audit-log.sh) — the protected-path edit is auto-approved but recorded. To restore human approval, delete this PermissionRequest block.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}'"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

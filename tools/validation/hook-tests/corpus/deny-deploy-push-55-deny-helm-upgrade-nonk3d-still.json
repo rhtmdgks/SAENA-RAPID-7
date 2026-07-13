@@ -1,0 +1,14 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3: helm upgrade (cluster-touching) still denied outside a k3d context after the offline-verb carve-out",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "helm upgrade --install saena-forge deploy/charts/saena-forge"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_CONTEXT": "prod-cluster"
+  },
+  "expect_exit": 2
+}

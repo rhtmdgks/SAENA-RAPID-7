@@ -1,0 +1,18 @@
+fixture_id: ei-04-near-miss-evidence-id-refused
+axis: evidence_integrity
+seed: 7004
+tag: false_negative_guard
+description: >
+  The claim cites 'ev-01' (lowercase) while the registry only contains
+  'EV-01' (uppercase) — a near-miss that a case-insensitive/fuzzy matcher
+  would wrongly ALLOW. The harness must refuse to score an evidence_id that
+  is not EXACTLY a member of the registered set (CLAUDE.md principle 11).
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  evidence_registry: [EV-01]
+  claims:
+    - claim_id: C-01
+      evidence_id: "ev-01"
+      text: "page X ranks for query cluster QC-01 in ChatGPT Search citations"

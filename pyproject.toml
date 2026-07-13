@@ -17,6 +17,11 @@ members = [
     "packages/schemas",
     "packages/domain",
     "packages/observability",
+    "packages/hooks-runtime",
+    "services/acquisition/repository-intake-service",
+    "services/acquisition/chatgpt-observer-service",
+    "services/acquisition/site-discovery-service",
+    "services/platform/quality-eval-service",
     "services/foundation/tenant-control-service",
     "services/foundation/policy-gate-service",
     "services/foundation/audit-ledger-service",
@@ -25,6 +30,7 @@ members = [
     "services/platform/agent-orchestrator-service",
     "services/platform/artifact-registry-service",
     "services/platform/engine-adapter-gateway",
+    "services/platform/agent-runner-service",
     "tools/forgectl",
 ]
 
@@ -51,7 +57,13 @@ dev = [
     "saena-orchestrator",
     "saena-artifact-registry",
     "saena-engine-gateway",
+    "saena-agent-runner",
     "saena-forgectl",
+    "saena-hooks-runtime",
+    "saena-repository-intake",
+    "saena-quality-eval",
+    "saena-chatgpt-observer",
+    "saena-site-discovery",
     "datamodel-code-generator>=0.26,<1",
     "openapi-spec-validator>=0.7,<1",
     "pyyaml>=6,<7",
@@ -74,7 +86,13 @@ saena-forge-console = { workspace = true }
 saena-orchestrator = { workspace = true }
 saena-artifact-registry = { workspace = true }
 saena-engine-gateway = { workspace = true }
+saena-agent-runner = { workspace = true }
 saena-forgectl = { workspace = true }
+saena-hooks-runtime = { workspace = true }
+saena-repository-intake = { workspace = true }
+saena-quality-eval = { workspace = true }
+saena-chatgpt-observer = { workspace = true }
+saena-site-discovery = { workspace = true }
 
 [tool.ruff]
 target-version = "py312"

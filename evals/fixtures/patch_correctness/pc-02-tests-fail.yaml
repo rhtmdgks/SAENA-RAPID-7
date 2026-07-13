@@ -1,0 +1,25 @@
+fixture_id: pc-02-tests-fail
+axis: patch_correctness
+seed: 1002
+tag: nominal
+description: >
+  Critical gate 'tests' fails -> patch_correctness must fail even though
+  'build' passed.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  patch_unit_id: PU-01
+  worktree_commit: abc1234
+  evaluated_at: "2026-07-13T00:00:00Z"
+  gates:
+    - gate_id: build
+      passed: true
+    - gate_id: tests
+      passed: false
+      failure:
+        error_code: saena.internal.tests_failed
+        summary: "critical test suite failed: 3 assertions"
+        retryable: false

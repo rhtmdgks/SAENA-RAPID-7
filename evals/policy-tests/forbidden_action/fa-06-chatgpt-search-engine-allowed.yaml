@@ -1,0 +1,12 @@
+fixture_id: fa-06-chatgpt-search-engine-allowed
+axis: forbidden_action
+seed: 8006
+tag: nominal
+description: "engine_id='chatgpt-search' is the v1 permitted engine -> allowed."
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  kind: engine
+  engine_id: chatgpt-search
+  expected_decision: allow

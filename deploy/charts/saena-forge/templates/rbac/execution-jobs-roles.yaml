@@ -1,0 +1,163 @@
+{{- /*
+ADR-0004 §3 SA 3-separation — quality-eval / repository-intake / browser-
+pool (chatgpt-observer, site-discovery) Roles. Namespace-scoped ONLY, same
+constraint as agent-runner-role.yaml and service-roles.yaml (k3s spec §8.1
+condition 5: "runner service account has cluster-admin or production
+deploy permission" MUST fail preflight/install — no ClusterRole/
+ClusterRoleBinding is ever rendered by this chart, for ANY ServiceAccount).
+
+This template deliberately renders NO Role/RoleBinding at all for any of
+these four SAs while `rbac.rules` is empty (`values.yaml`'s
+`executionJobs.*` default) — that is the CORRECT least-privilege outcome,
+not a gap:
+  - quality-eval only executes a customer build/test command inside its own
+    Job pod; it never talks to the Kubernetes API.
+  - repository-intake only clones + SBOM/secret-scans a customer Git repo;
+    same — no in-cluster API need.
+  - chatgpt-observer / site-discovery (browser pool) only drive a headless
+    browser session against approved external hosts (ADR-0004 §3.2); no
+    Kubernetes API need, and — per the "browser pool 권한 차등" decision —
+    NO Git credential secret access either (that's enforced by never
+    minting a Git-credential ExternalSecret/volume for these two SAs
+    anywhere in this chart, not by an RBAC rule; RBAC only governs the
+    Kubernetes API surface).
+
+Binding an empty Role to a SA would still be needless attack surface (a
+Role object something could later be mutated to add rules to); omitting
+the Role/RoleBinding entirely is the stricter choice. If a genuine future
+need requires a scoped Kubernetes API grant for one of these four SAs, add
+entries to its `rbac.rules` list in values.yaml — this template then
+renders a namespace-scoped Role/RoleBinding automatically (never a
+ClusterRole), mirroring templates/rbac/service-roles.yaml's pattern.
+*/ -}}
+{{- if .Values.executionJobs }}
+{{- $root := . }}
+{{- with .Values.executionJobs.qualityEval }}
+{{- if and .enabled .rbac .rbac.rules }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .serviceAccount }}-role
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+rules:
+  {{- .rbac.rules | toYaml | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .serviceAccount }}-rolebinding
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .serviceAccount }}
+    namespace: {{ $root.Values.namespaces.system }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .serviceAccount }}-role
+{{- end }}
+{{- end }}
+{{- with .Values.executionJobs.repositoryIntake }}
+{{- if and .enabled .rbac .rbac.rules }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .serviceAccount }}-role
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+rules:
+  {{- .rbac.rules | toYaml | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .serviceAccount }}-rolebinding
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .serviceAccount }}
+    namespace: {{ $root.Values.namespaces.system }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .serviceAccount }}-role
+{{- end }}
+{{- end }}
+{{- with .Values.executionJobs.browserPool.chatgptObserver }}
+{{- if and .enabled .rbac .rbac.rules }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .serviceAccount }}-role
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+rules:
+  {{- .rbac.rules | toYaml | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .serviceAccount }}-rolebinding
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .serviceAccount }}
+    namespace: {{ $root.Values.namespaces.system }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .serviceAccount }}-role
+{{- end }}
+{{- end }}
+{{- with .Values.executionJobs.browserPool.siteDiscovery }}
+{{- if and .enabled .rbac .rbac.rules }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .serviceAccount }}-role
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+rules:
+  {{- .rbac.rules | toYaml | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .serviceAccount }}-rolebinding
+  namespace: {{ $root.Values.namespaces.system }}
+  labels:
+    {{- include "saena-forge.labels" $root | nindent 4 }}
+    saena.io/pool: {{ .pool }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .serviceAccount }}
+    namespace: {{ $root.Values.namespaces.system }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .serviceAccount }}-role
+{{- end }}
+{{- end }}
+{{- end }}

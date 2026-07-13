@@ -176,10 +176,17 @@ FAIL | $_fixture_name | (could not parse 'stdin' field)"
     _mock_context=""
     _mock_branch=""
     _policy_file_override=""
+    _mock_pr_head=""
+    _mock_pr_base=""
     if [ -n "$_env_json" ]; then
         _mock_context="$(_extract_raw_field "$_env_json" "HOOK_TEST_MOCK_CONTEXT")"
         _policy_file_override="$(_extract_raw_field "$_env_json" "POLICY_FILE")"
         _mock_branch="$(_extract_raw_field "$_env_json" "HOOK_TEST_MOCK_BRANCH")"
+        # gh-pr-merge precision fixtures (48-51) mock the resolved PR head/base
+        # so the deny-deploy-push hook never consults the real `gh pr view`
+        # (which would make the verdict depend on whatever live PRs exist).
+        _mock_pr_head="$(_extract_raw_field "$_env_json" "HOOK_TEST_MOCK_PR_HEAD")"
+        _mock_pr_base="$(_extract_raw_field "$_env_json" "HOOK_TEST_MOCK_PR_BASE")"
     fi
 
     # protect-paths fixtures use the corpus-local policy copy by default
@@ -188,7 +195,15 @@ FAIL | $_fixture_name | (could not parse 'stdin' field)"
         _policy_file_override="$_fixtures_dir/protected-paths.txt"
     fi
 
-    _actual_stdout="$(printf '%s' "$_stdin_json" | HOOK_TEST_MOCK_CONTEXT="$_mock_context" POLICY_FILE="$_policy_file_override" HOOK_TEST_MOCK_BRANCH="$_mock_branch" sh "$_hook_script" 2>/tmp/run-corpus.stderr.$$)"
+    # Only export the PR head/base mock when the fixture actually provides it,
+    # so non-pr-merge fixtures don't accidentally count as "mocked" (the hook
+    # keys on the var being SET, not just non-empty). gh-pr-merge fixtures are
+    # the only ones that read these, so build the invocation accordingly.
+    if [ -n "$_mock_pr_head" ] || [ -n "$_mock_pr_base" ]; then
+        _actual_stdout="$(printf '%s' "$_stdin_json" | HOOK_TEST_MOCK_CONTEXT="$_mock_context" POLICY_FILE="$_policy_file_override" HOOK_TEST_MOCK_BRANCH="$_mock_branch" HOOK_TEST_MOCK_PR_HEAD="$_mock_pr_head" HOOK_TEST_MOCK_PR_BASE="$_mock_pr_base" sh "$_hook_script" 2>/tmp/run-corpus.stderr.$$)"
+    else
+        _actual_stdout="$(printf '%s' "$_stdin_json" | HOOK_TEST_MOCK_CONTEXT="$_mock_context" POLICY_FILE="$_policy_file_override" HOOK_TEST_MOCK_BRANCH="$_mock_branch" sh "$_hook_script" 2>/tmp/run-corpus.stderr.$$)"
+    fi
     _actual_exit=$?
     rm -f /tmp/run-corpus.stderr.$$ 2>/dev/null
 

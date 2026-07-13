@@ -1,0 +1,46 @@
+fixture_id: rp-03-internal-redacted-detail-excluded-from-wire-shape
+axis: reproducibility
+seed: 6003
+tag: false_positive_guard
+description: >
+  run_a/run_b's JobError.redacted_detail differ (internal-only debug notes)
+  while error_code/summary/retryable are identical. A naive raw-object
+  comparison (including redacted_detail) would wrongly report these as
+  DIVERGENT — but redacted_detail is EXCLUDED from JobError.
+  to_error_detail_payload()'s wire shape (ADR-0015), so the actual
+  VerificationResult canonical output MUST still be byte-identical.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  expect_identical: true
+  run_a:
+    tenant_id: acme-co
+    run_id: run-0001
+    patch_unit_id: PU-01
+    worktree_commit: abc1234
+    evaluated_at: "2026-07-13T00:00:00Z"
+    gate:
+      gate_id: tests
+      passed: false
+      failure:
+        error_code: saena.internal.tests_failed
+        summary: "critical test suite failed"
+        retryable: false
+        redacted_detail:
+          debug_note: "attempt-1-worker-a"
+  run_b:
+    tenant_id: acme-co
+    run_id: run-0001
+    patch_unit_id: PU-01
+    worktree_commit: abc1234
+    evaluated_at: "2026-07-13T00:00:00Z"
+    gate:
+      gate_id: tests
+      passed: false
+      failure:
+        error_code: saena.internal.tests_failed
+        summary: "critical test suite failed"
+        retryable: false
+        redacted_detail:
+          debug_note: "attempt-2-worker-b"

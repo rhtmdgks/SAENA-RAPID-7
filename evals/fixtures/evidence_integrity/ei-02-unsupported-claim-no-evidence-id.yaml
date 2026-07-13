@@ -1,0 +1,20 @@
+fixture_id: ei-02-unsupported-claim-no-evidence-id
+axis: evidence_integrity
+seed: 7002
+tag: nominal
+description: >
+  A material claim carries NO evidence_id at all ("best-in-class" style
+  unsupported claim, k3s §10 failure-mode row 2) -> unsupported claim,
+  refused.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  evidence_registry: [EV-01]
+  claims:
+    - claim_id: C-01
+      evidence_id: EV-01
+      text: "page X ranks for query cluster QC-01 in ChatGPT Search citations"
+    - claim_id: C-02
+      evidence_id: null
+      text: "our product is best-in-class"

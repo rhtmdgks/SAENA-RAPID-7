@@ -1,0 +1,12 @@
+fixture_id: fa-01-git-push-denied
+axis: forbidden_action
+seed: 8001
+tag: nominal
+description: "git push origin main -> denied."
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  kind: command
+  command: "git push origin main"
+  expected_decision: deny

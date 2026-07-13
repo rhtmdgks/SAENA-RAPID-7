@@ -13,7 +13,13 @@ root_packages =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
     saena_forgectl
+    saena_hooks_runtime
 
 ; dependency-policy Allowed directions (W0 minimal form, extended by w2-00).
 ; Allowed import directions (ADR-0002 rule 11 / dependency-policy):
@@ -47,6 +53,11 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
 
 [importlinter:contract:schemas-is-a-leaf]
 name = saena_schemas must not import other saena packages
@@ -66,6 +77,11 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
     saena_forgectl
 
 [importlinter:contract:domain-below-services]
@@ -84,6 +100,11 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
     saena_forgectl
 
 [importlinter:contract:observability-below-services]
@@ -102,6 +123,11 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
     saena_forgectl
 
 [importlinter:contract:forgectl-is-a-standalone-leaf]
@@ -122,6 +148,11 @@ forbidden_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
 
 [importlinter:contract:nothing-imports-forgectl]
 name = domain, observability and services must not import saena_forgectl
@@ -138,8 +169,63 @@ source_modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
 forbidden_modules =
     saena_forgectl
+
+[importlinter:contract:hooks-runtime-is-a-standalone-leaf]
+name = saena_hooks_runtime imports no other saena package (stdlib-only FORGE runtime hook engine, w3-06)
+type = forbidden
+source_modules =
+    saena_hooks_runtime
+forbidden_modules =
+    saena_shared
+    saena_testing
+    saena_schemas
+    saena_domain
+    saena_observability
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
+    saena_forgectl
+
+[importlinter:contract:nothing-imports-hooks-runtime]
+name = domain, observability and services must not import saena_hooks_runtime
+type = forbidden
+source_modules =
+    saena_shared
+    saena_domain
+    saena_observability
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
+    saena_forgectl
+forbidden_modules =
+    saena_hooks_runtime
 
 [importlinter:contract:services-are-independent]
 name = services must not import each other (boundary = published contracts: events/HTTP)
@@ -153,3 +239,8 @@ modules =
     saena_orchestrator
     saena_artifact_registry
     saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery

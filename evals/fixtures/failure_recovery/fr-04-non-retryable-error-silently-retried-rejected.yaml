@@ -1,0 +1,19 @@
+fixture_id: fr-04-non-retryable-error-silently-retried-rejected
+axis: failure_recovery
+seed: 5004
+tag: false_negative_guard
+description: >
+  A non-retryable JobError (forbidden command attempt) — recovery_strategy
+  looks like the "normal" happy path (spawn a new job), which a naive
+  presence-only check ("some recovery was attempted -> pass") would wrongly
+  ALLOW. retryable=false means this MUST be rejected: a non-retryable
+  failure must never be silently retried via a new job.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  error:
+    error_code: saena.policy_denied.forbidden_command
+    summary: "attempted a structurally forbidden command (git push)"
+    retryable: false
+  recovery_strategy: new_job

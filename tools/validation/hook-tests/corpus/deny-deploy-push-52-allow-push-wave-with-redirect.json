@@ -1,0 +1,11 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "w3-entry: git push -u origin wave3-execution 2>&1 (redirection token) must still be allowed — redirections carry no push semantics",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git push -u origin wave3-execution 2>&1"
+    }
+  },
+  "expect_exit": 0
+}

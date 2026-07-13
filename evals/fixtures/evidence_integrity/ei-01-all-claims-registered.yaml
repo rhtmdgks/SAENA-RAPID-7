@@ -1,0 +1,19 @@
+fixture_id: ei-01-all-claims-registered
+axis: evidence_integrity
+seed: 7001
+tag: nominal
+description: >
+  Every material claim carries an evidence_id present in the fixture's
+  registered evidence ledger -> passes.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  evidence_registry: [EV-01, EV-02]
+  claims:
+    - claim_id: C-01
+      evidence_id: EV-01
+      text: "page X ranks for query cluster QC-01 in ChatGPT Search citations"
+    - claim_id: C-02
+      evidence_id: EV-02
+      text: "structured data added matches visible content"
