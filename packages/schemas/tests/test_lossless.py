@@ -84,6 +84,16 @@ OPEN_CONTRACTS: dict[str, str] = {
     "event/plan_contract_approved_v1": "event/plan-contract-approved/v1",
     "event/repo_intaken_v1": "event/repo-intaken/v1",
     "event/site_inventory_completed_v1": "event/site-inventory-completed/v1",
+    # Wave 4 intelligence events (w4-10) — open-class, same forward-compat
+    # rationale as the CONFIRMED-v1 events above (no additionalProperties:false;
+    # undeclared-key rejection is a policy-gate obligation, not schema-enforced).
+    "event/demand_graph_versioned_v1": "event/demand-graph-versioned/v1",
+    "event/entity_graph_versioned_v1": "event/entity-graph-versioned/v1",
+    "event/claim_evidence_versioned_v1": "event/claim-evidence-versioned/v1",
+    "event/citation_normalized_v1": "event/citation-normalized/v1",
+    "event/observation_captured_v1": "event/observation-captured/v1",
+    "event/experiment_registered_v1": "event/experiment-registered/v1",
+    "event/experiment_anchored_v1": "event/experiment-anchored/v1",
 }
 
 CLOSED_CONTRACTS: dict[str, str] = {
@@ -97,6 +107,13 @@ CLOSED_CONTRACTS: dict[str, str] = {
     "domain/change_plan_v1": "domain/change-plan/v1",
     "domain/patch_artifact_v1": "domain/patch-artifact/v1",
     "domain/source_snapshot_v1": "domain/source-snapshot/v1",
+    # Wave 4 intelligence domain records (w4-10) — closed-class
+    # (additionalProperties:false) for strict validation of stored records.
+    "domain/entity_record_v1": "domain/entity-record/v1",
+    "domain/extracted_claim_v1": "domain/extracted-claim/v1",
+    "domain/evidence_record_v1": "domain/evidence-record/v1",
+    "domain/platform_observation_v1": "domain/platform-observation/v1",
+    "domain/experiment_registration_v1": "domain/experiment-registration/v1",
 }
 
 
@@ -105,16 +122,27 @@ CLOSED_CONTRACTS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def _resolve_ref(ref: str, base_dir: Path) -> tuple[dict[str, Any], Path]:
+def _resolve_ref(
+    ref: str, base_dir: Path, base_file: Path | None = None
+) -> tuple[dict[str, Any], Path, Path | None]:
+    """Resolve a JSON `$ref` to (node, new_base_dir, new_base_file).
+
+    A ref with a file part loads that file (updating both base dir and base
+    file). A pure-fragment ref (`#`, `#/$defs/x`) resolves against the CURRENT
+    document — `base_file` — which is how the reusable `engine_required_payload`
+    fragment's inner `engine_id: {$ref: "#"}` (the bare EngineId enum root)
+    resolves once we have crossed into engine-id.schema.json via the outer
+    file ref.
+    """
     file_part, _, fragment = ref.partition("#")
-    target_path = (base_dir / file_part).resolve() if file_part else None
+    target_path = (base_dir / file_part).resolve() if file_part else base_file
     doc: Any = json.loads(target_path.read_text(encoding="utf-8")) if target_path else None
     node = doc
     if fragment:
         for part in fragment.strip("/").split("/"):
             if part:
                 node = node[part]
-    return node, (target_path.parent if target_path else base_dir)
+    return node, (target_path.parent if target_path else base_dir), target_path
 
 
 # Exhaustive lookup of the `pattern` values actually used across
@@ -148,11 +176,11 @@ def _next_placeholder() -> str:
     return f"example-string-{_COUNTER['n']}"
 
 
-def build_example(schema: dict[str, Any], base_dir: Path) -> Any:
+def build_example(schema: dict[str, Any], base_dir: Path, base_file: Path | None = None) -> Any:
     """Build a minimal, schema-conforming instance from a JSON Schema node."""
     if "$ref" in schema:
-        node, new_base = _resolve_ref(schema["$ref"], base_dir)
-        return build_example(node, new_base)
+        node, new_base, new_file = _resolve_ref(schema["$ref"], base_dir, base_file)
+        return build_example(node, new_base, new_file)
     if "const" in schema:
         return schema["const"]
     if "enum" in schema:
@@ -161,7 +189,7 @@ def build_example(schema: dict[str, Any], base_dir: Path) -> Any:
         if combinator in schema:
             branches = schema[combinator]
             non_null = [b for b in branches if b.get("type") != "null"]
-            return build_example((non_null or branches)[0], base_dir)
+            return build_example((non_null or branches)[0], base_dir, base_file)
 
     stype = schema.get("type")
 
@@ -174,7 +202,10 @@ def build_example(schema: dict[str, Any], base_dir: Path) -> Any:
         # synthesize enough keys to satisfy minProperties.
         min_props = schema.get("minProperties", 0)
         value_schema = schema["additionalProperties"]
-        return {f"key-{i}": build_example(value_schema, base_dir) for i in range(max(min_props, 1))}
+        return {
+            f"key-{i}": build_example(value_schema, base_dir, base_file)
+            for i in range(max(min_props, 1))
+        }
 
     if stype == "object" or ("properties" in schema and stype is None):
         out: dict[str, Any] = {}
@@ -192,13 +223,26 @@ def build_example(schema: dict[str, Any], base_dir: Path) -> Any:
                 if "system" in props[discriminator_key]["enum"]:
                     props[discriminator_key]["enum"] = ["system"]
         for key in required:
-            out[key] = build_example(props[key], base_dir)
+            out[key] = build_example(props[key], base_dir, base_file)
+        # allOf-composed fragments (w4-10 P1 events compose the reusable
+        # `engine_required_payload` engine_id fragment via allOf/$ref): build
+        # each PROPERTY-CONTRIBUTING sub-schema and merge its object keys in,
+        # so allOf-injected required fields (engine_id) land in the minimal
+        # instance. Conditional (if/then/else) allOf branches — the
+        # discriminator-require pattern (ActorContext/AuditEvent) — are handled
+        # by the enum-branch preference above, so skip them here.
+        for sub in schema.get("allOf", []):
+            if {"if", "then", "else"} & sub.keys():
+                continue
+            sub_instance = build_example(sub, base_dir, base_file)
+            if isinstance(sub_instance, dict):
+                out.update(sub_instance)
         return out
 
     if stype == "array":
         items = schema.get("items", {"type": "string"})
         min_items = schema.get("minItems", 1) or 1
-        return [build_example(items, base_dir) for _ in range(min_items)]
+        return [build_example(items, base_dir, base_file) for _ in range(min_items)]
     if stype == "integer":
         return max(schema.get("minimum", 1), 1)
     if stype == "number":
@@ -257,12 +301,22 @@ def _import_root_model(module_dir_name_by_category: str) -> type[BaseModel]:
     expected_fields = frozenset(schema["properties"].keys())
     for name in dir(module):
         obj = getattr(module, name)
-        if (
-            isinstance(obj, type)
-            and issubclass(obj, BaseModel)
-            and obj is not BaseModel
-            and frozenset(obj.model_fields.keys()) == expected_fields
-        ):
+        if not (isinstance(obj, type) and issubclass(obj, BaseModel) and obj is not BaseModel):
+            continue
+        # Match on the class's OWN (non-inherited) fields — mirroring the real
+        # codegen tool's AST own-field rule (codegen-patch-openroot.py
+        # `_class_field_names`). w4-10 P1 event payloads inherit engine_id from
+        # a generated `EngineRequiredPayload` base (allOf/$ref of the reusable
+        # engine_id fragment), so runtime `model_fields` carries an inherited
+        # engine_id the schema's own top-level `properties` does not list.
+        inherited = frozenset(
+            field
+            for base in obj.__bases__
+            if isinstance(base, type) and issubclass(base, BaseModel) and base is not BaseModel
+            for field in base.model_fields
+        )
+        own_fields = frozenset(obj.model_fields.keys()) - inherited
+        if own_fields == expected_fields:
             return obj
     raise AssertionError(
         f"no generated class in saena_schemas.{category}.{module_name} matches "
