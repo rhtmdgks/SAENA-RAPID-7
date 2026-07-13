@@ -169,6 +169,64 @@ agentRunner:
     maxCostUsdPerRun: 100
     maxArtifactsMiBPerRun: 1024
 
+# --- executionJobs — ADR-0004 §3 ServiceAccount 3-separation. The "runner
+# pool 확장" decision extends runner-pool isolation to every Job that
+# touches untrusted customer source: agent-runner (above) + quality-eval +
+# repository-intake, each with its OWN ServiceAccount so a compromise of
+# one Job's credentials cannot escalate into another Job's grant. Plus the
+# browser-pool SAs (chatgpt-observer / site-discovery), which get NO Git
+# credential secret access at all (ADR-0004 §3.2 "browser pool 권한 차등").
+#
+# Every SA here sets `automountServiceAccountToken: false` at the SA level
+# (k3s spec §5.3 / ADR-0004 §3) — the Job/Pod templates that actually
+# consume these SAs are NOT rendered by this chart (same as
+# `agentRunner.job` — see templates/rbac/agent-runner-role.yaml header
+# comment; they render in their own patch unit), so a pod-level
+# `automountServiceAccountToken: true` override is that patch unit's
+# responsibility, gated on whether its Role actually grants anything.
+#
+# `rbac.rules` defaults to `[]` for all four SAs below: none of them need
+# Kubernetes API access at all (quality-eval only runs a customer build/
+# test command; repository-intake only clones+scans a Git repo;
+# chatgpt-observer/site-discovery only drive a headless browser session).
+# `templates/rbac/execution-jobs-roles.yaml` renders NO Role/RoleBinding
+# for a SA whose `rbac.rules` is empty — least privilege means omitting the
+# Role entirely, not granting an empty one.
+executionJobs:
+  qualityEval:
+    enabled: true
+    serviceAccount: saena-quality-eval
+    pool: runner
+    rbac:
+      clusterAdmin: false
+      productionDeploy: false
+      rules: []
+  repositoryIntake:
+    enabled: true
+    serviceAccount: saena-repository-intake
+    pool: runner
+    rbac:
+      clusterAdmin: false
+      productionDeploy: false
+      rules: []
+  browserPool:
+    chatgptObserver:
+      enabled: true
+      serviceAccount: saena-chatgpt-observer
+      pool: browser
+      rbac:
+        clusterAdmin: false
+        productionDeploy: false
+        rules: []
+    siteDiscovery:
+      enabled: true
+      serviceAccount: saena-site-discovery
+      pool: browser
+      rbac:
+        clusterAdmin: false
+        productionDeploy: false
+        rules: []
+
 migrations: []
 # Example (expand/contract only — destructive migrations use a separate
 # approval runbook per k3s spec §8.2, not this values file):

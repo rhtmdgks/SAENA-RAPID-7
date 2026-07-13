@@ -53,7 +53,7 @@ class TestHelmTemplateRendersCleanly:
         deployments = [d for d in docs if d.get("kind") == "Deployment"]
         assert len(deployments) == 8
 
-    def test_renders_8_services_and_8_pdbs_and_9_service_accounts(self, chart_dir: Path) -> None:
+    def test_renders_8_services_and_8_pdbs_and_13_service_accounts(self, chart_dir: Path) -> None:
         result = _run_helm_template(chart_dir)
         docs = [d for d in yaml.safe_load_all(result.stdout) if d]
         kinds: dict[str, int] = {}
@@ -61,8 +61,15 @@ class TestHelmTemplateRendersCleanly:
             kinds[d["kind"]] = kinds.get(d["kind"], 0) + 1
         assert kinds["Service"] == 8
         assert kinds["PodDisruptionBudget"] == 8
-        # 8 services + 1 agent-runner SA
-        assert kinds["ServiceAccount"] == 9
+        # 8 services + agent-runner + ADR-0004 SA 3-separation (quality-eval,
+        # repository-intake) + browser pool (chatgpt-observer, site-discovery)
+        # — see tests/unit/deploy/test_service_accounts.py (w3-07) for the
+        # detailed per-SA assertions this count summarizes.
+        assert kinds["ServiceAccount"] == 13
+        # Role/RoleBinding count is UNCHANGED at 9 (8 services + agent-runner)
+        # — the 4 new w3-07 SAs render zero Role/RoleBinding by default
+        # (empty `rbac.rules`), which is the correct least-privilege outcome,
+        # not an oversight (templates/rbac/execution-jobs-roles.yaml).
         assert kinds["Role"] == 9
         assert kinds["RoleBinding"] == 9
 
