@@ -21,6 +21,7 @@ root_packages =
     saena_forgectl
     saena_hooks_runtime
     saena_analytics_clickhouse
+    saena_vector_store
 
 ; dependency-policy Allowed directions (W0 minimal form, extended by w2-00).
 ; Allowed import directions (ADR-0002 rule 11 / dependency-policy):
@@ -227,6 +228,30 @@ source_modules =
     saena_forgectl
 forbidden_modules =
     saena_hooks_runtime
+
+[importlinter:contract:vector-store-below-services]
+name = saena_vector_store must not import services or testing (infra store adapter, w4-07)
+type = forbidden
+source_modules =
+    saena_vector_store
+forbidden_modules =
+    saena_testing
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+    saena_repository_intake
+    saena_quality_eval
+    saena_agent_runner
+    saena_chatgpt_observer
+    saena_site_discovery
+    saena_forgectl
+    saena_hooks_runtime
+    saena_analytics_clickhouse
 
 [importlinter:contract:analytics-clickhouse-below-services]
 name = saena_analytics_clickhouse must not import services or testing (infra store adapter, w4-06)

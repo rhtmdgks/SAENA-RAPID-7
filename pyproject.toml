@@ -18,6 +18,7 @@ members = [
     "packages/domain",
     "packages/observability",
     "packages/analytics-clickhouse",
+    "packages/vector-store",
     "packages/hooks-runtime",
     "services/acquisition/repository-intake-service",
     "services/acquisition/chatgpt-observer-service",
@@ -62,6 +63,7 @@ dev = [
     "saena-forgectl",
     "saena-hooks-runtime",
     "saena-analytics-clickhouse",
+    "saena-vector-store",
     "saena-repository-intake",
     "saena-quality-eval",
     "saena-chatgpt-observer",
@@ -92,6 +94,7 @@ saena-agent-runner = { workspace = true }
 saena-forgectl = { workspace = true }
 saena-hooks-runtime = { workspace = true }
 saena-analytics-clickhouse = { workspace = true }
+saena-vector-store = { workspace = true }
 saena-repository-intake = { workspace = true }
 saena-quality-eval = { workspace = true }
 saena-chatgpt-observer = { workspace = true }
@@ -179,4 +182,14 @@ source = ["packages", "services", "tests/contract/harness", "tools/forgectl/src"
 omit = [
     "packages/schemas/saena_schemas/*",
     "packages/domain/src/saena_domain/persistence/postgres/adapters.py",
+    # packages/vector-store/src/saena_vector_store/pgvector/** (w4-07): the
+    # real pgvector adapter (Postgres `vector` extension) is MEANINGFULLY
+    # exercisable only against a live pgvector database — a mock would test
+    # the mock, not the SQL/ANN this adapter emits. NO unit-lane behavior
+    # coverage of its own; 100% covered by the real-container
+    # tests/integration/vector/** suite (16 tests incl. cross-tenant NN
+    # leakage). Same documented, non-silent ratchet treatment as the w2-13
+    # postgres adapter above (integration lane runs its OWN coverage; this
+    # omit only affects the blocking unit-lane ratchet).
+    "packages/vector-store/src/saena_vector_store/pgvector/*",
 ]

@@ -78,10 +78,11 @@ class TestEmbedder:
         """
         raw = [self._hash_component(text, i) for i in range(self._dimension)]
         norm = math.sqrt(sum(component * component for component in raw))
-        if norm == 0.0:
-            # Astronomically unlikely for sha256-derived floats, but keep the
-            # output well-defined (a unit vector along the first axis)
-            # rather than dividing by zero.
+        if norm == 0.0:  # pragma: no cover - unreachable defensive guard: no
+            # sha256-derived component vector is all-zero (would require every
+            # one of `dimension` independent 64-bit digests to be exactly 0).
+            # Kept so the output stays well-defined (a unit vector along the
+            # first axis) rather than dividing by zero.
             return tuple(1.0 if i == 0 else 0.0 for i in range(self._dimension))
         return tuple(component / norm for component in raw)
 

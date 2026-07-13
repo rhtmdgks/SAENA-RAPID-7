@@ -26,6 +26,7 @@ members = [
     "saena-site-discovery",
     "saena-tenant-control",
     "saena-testing",
+    "saena-vector-store",
 ]
 
 [[package]]
@@ -1453,6 +1454,7 @@ dev = [
     { name = "saena-site-discovery" },
     { name = "saena-tenant-control" },
     { name = "saena-testing" },
+    { name = "saena-vector-store" },
     { name = "testcontainers" },
     { name = "types-jsonschema" },
     { name = "types-pyyaml" },
@@ -1494,6 +1496,7 @@ dev = [
     { name = "saena-site-discovery", editable = "services/acquisition/site-discovery-service" },
     { name = "saena-tenant-control", editable = "services/foundation/tenant-control-service" },
     { name = "saena-testing", editable = "packages/testing" },
+    { name = "saena-vector-store", editable = "packages/vector-store" },
     { name = "testcontainers", specifier = ">=4.9,<5" },
     { name = "types-jsonschema", specifier = ">=4,<5" },
     { name = "types-pyyaml", specifier = ">=6,<7" },
@@ -1699,6 +1702,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "saena-shared", editable = "packages/shared" }]
+
+[[package]]
+name = "saena-vector-store"
+version = "0.1.0"
+source = { editable = "packages/vector-store" }
+dependencies = [
+    { name = "asyncpg" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asyncpg", specifier = ">=0.30,<1" },
+    { name = "sqlalchemy", specifier = ">=2.0.36,<3" },
+]
 
 [[package]]
 name = "six"
