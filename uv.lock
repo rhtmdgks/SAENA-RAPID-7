@@ -10,6 +10,7 @@ members = [
     "saena-engine-gateway",
     "saena-forge-console",
     "saena-forgectl",
+    "saena-hooks-runtime",
     "saena-monorepo",
     "saena-observability",
     "saena-orchestrator",
@@ -1316,6 +1317,11 @@ requires-dist = [
 ]
 
 [[package]]
+name = "saena-hooks-runtime"
+version = "0.1.0"
+source = { editable = "packages/hooks-runtime" }
+
+[[package]]
 name = "saena-monorepo"
 version = "0.0.0"
 source = { virtual = "." }
@@ -1339,6 +1345,7 @@ dev = [
     { name = "saena-engine-gateway" },
     { name = "saena-forge-console" },
     { name = "saena-forgectl" },
+    { name = "saena-hooks-runtime" },
     { name = "saena-observability" },
     { name = "saena-orchestrator" },
     { name = "saena-plan-contract" },
@@ -1373,6 +1380,7 @@ dev = [
     { name = "saena-engine-gateway", editable = "services/platform/engine-adapter-gateway" },
     { name = "saena-forge-console", editable = "services/platform/forge-console-api" },
     { name = "saena-forgectl", editable = "tools/forgectl" },
+    { name = "saena-hooks-runtime", editable = "packages/hooks-runtime" },
     { name = "saena-observability", editable = "packages/observability" },
     { name = "saena-orchestrator", editable = "services/platform/agent-orchestrator-service" },
     { name = "saena-plan-contract", editable = "services/foundation/plan-contract-service" },

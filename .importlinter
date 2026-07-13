@@ -14,6 +14,7 @@ root_packages =
     saena_artifact_registry
     saena_engine_gateway
     saena_forgectl
+    saena_hooks_runtime
 
 ; dependency-policy Allowed directions (W0 minimal form, extended by w2-00).
 ; Allowed import directions (ADR-0002 rule 11 / dependency-policy):
@@ -140,6 +141,46 @@ source_modules =
     saena_engine_gateway
 forbidden_modules =
     saena_forgectl
+
+[importlinter:contract:hooks-runtime-is-a-standalone-leaf]
+name = saena_hooks_runtime imports no other saena package (stdlib-only FORGE runtime hook engine, w3-06)
+type = forbidden
+source_modules =
+    saena_hooks_runtime
+forbidden_modules =
+    saena_shared
+    saena_testing
+    saena_schemas
+    saena_domain
+    saena_observability
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+    saena_forgectl
+
+[importlinter:contract:nothing-imports-hooks-runtime]
+name = domain, observability and services must not import saena_hooks_runtime
+type = forbidden
+source_modules =
+    saena_shared
+    saena_domain
+    saena_observability
+    saena_tenant_control
+    saena_policy_gate
+    saena_audit_ledger
+    saena_plan_contract
+    saena_forge_console
+    saena_orchestrator
+    saena_artifact_registry
+    saena_engine_gateway
+    saena_forgectl
+forbidden_modules =
+    saena_hooks_runtime
 
 [importlinter:contract:services-are-independent]
 name = services must not import each other (boundary = published contracts: events/HTTP)
