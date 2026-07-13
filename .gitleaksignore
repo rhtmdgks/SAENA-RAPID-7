@@ -68,3 +68,20 @@ be36856f81c68c479e49ddcfa537a524518c4067:tests/unit/analytics_clickhouse/test_gu
 21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:177
 21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:197
 21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:223
+
+# --- Wave 5 (Measurement·B-Layer) synthetic guard-test fixtures ---
+# Verified false positives (2026-07-14). All four are secret-SHAPED literals
+# deliberately placed IN guard/adversarial tests to PROVE the raw-content /
+# secret-shape guards REJECT them — none is a real credential:
+#   - test_errors.py:48,51  — "compound-key-1/2" test lookup keys (not a key;
+#     generic-api-key false positive on a context-dict value proving the
+#     boundary error never echoes caller content).
+#   - test_guard.py:28  — a JWT-shaped literal proving the ClickHouse outcome
+#     row guard rejects secret-shaped values.
+#   - test_guard_mutation.py:65 — xoxb-/AIza/sk_live_ tokens proving the
+#     evidence-bundle guard's widened secret corpus rejects them (w5-08).
+# Suppressed by exact fingerprint per ADR-0020 (path allowlisting stays FORBIDDEN).
+d82c3bd9a6a16468658cfba7f24be47a22feab8e:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:48
+d82c3bd9a6a16468658cfba7f24be47a22feab8e:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:51
+4e9c116c606010b0fb08c154f174a1b1d50ee99f:tests/unit/analytics_clickhouse_outcome/test_guard.py:jwt:28
+7545c19a0bc75558a03007fc8f89db438ee29fbe:tests/unit/domain_measurement_evidence/test_guard_mutation.py:stripe-access-token:65
