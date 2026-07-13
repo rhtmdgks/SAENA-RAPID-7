@@ -458,3 +458,48 @@ def test_temporal_signal_client_sends_approve_signal_over_real_client(
             assert result.run_state.value == "executing"
 
     asyncio.run(_scenario())
+
+
+def test_signal_delivered_before_run_executes_still_completes(
+    temporal_env: WorkflowEnvironment,
+) -> None:
+    """Deterministic reproduction of the 2026-07-13 intermittent CI failure.
+
+    `start_signal` (Temporal signal-with-start) GUARANTEES the approve signal
+    is delivered in the first workflow task — the signal handler executes
+    BEFORE `run()` does. The old implementation scheduled the execution
+    Activity inside the handler behind `assert self._input is not None`;
+    in this ordering `_input` is unset and the workflow died with
+    ApplicationError(AssertionError). The fix moves Activity scheduling into
+    `run()` (the only place `_input` is guaranteed) and stops `run()` from
+    resetting state a pre-run signal already advanced, so a legitimate
+    approval that races workflow start must now complete normally.
+    """
+
+    async def _scenario() -> None:
+        async with Worker(
+            temporal_env.client,
+            task_queue=_TASK_QUEUE,
+            workflows=[ExecutionWorkflow],
+            activities=[run_execution_activity],
+        ):
+            handle = await temporal_env.client.start_workflow(
+                ExecutionWorkflow.run,
+                ExecutionWorkflowInput(
+                    contract_hash=CONTRACT_HASH,
+                    manifest_ref="manifest://run/pre-run-signal",
+                    proposer_actor_id=PROPOSER,
+                ),
+                id="wf-pre-run-signal",
+                task_queue=_TASK_QUEUE,
+                start_signal=APPROVE_SIGNAL_NAME,
+                start_signal_args=[make_signal()],
+            )
+            result = await handle.result()
+
+            assert result.run_state.value == "executing"
+            assert result.plan_state.value == "approved"
+            assert result.activity_result is not None
+            assert result.activity_result.accepted is True
+
+    asyncio.run(_scenario())

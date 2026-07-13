@@ -119,19 +119,39 @@ class ExecutionWorkflow:
         # workflow is started (PROPOSED->WAITING_APPROVAL happens upstream,
         # in plan-contract-service, before the workflow is even started —
         # out of this workflow's scope, which begins at WAITING_APPROVAL).
-        self._plan_state = PlanState.WAITING_APPROVAL
-        self._run_state = RunState.WAITING_APPROVAL
+        #
+        # Deliberately NO state (re-)initialization here: __init__ already
+        # sets both to WAITING_APPROVAL, and Temporal delivers a signal that
+        # arrives in the same workflow task as start BEFORE `run()` executes
+        # — a legitimate approval processed in that window has already driven
+        # `_run_state` to EXECUTING, and resetting it here would swallow that
+        # accepted transition (the workflow would then wait forever on a
+        # decision that `_seen_decisions` says was already consumed). This
+        # exact pre-run-signal ordering was the root cause of the
+        # intermittent `test_duplicate_approve_signal_after_executing_is_a_
+        # no_op` CI failure (AssertionError in the signal handler, 2026-07-13).
 
         # Wait until a valid approval signal has driven run_state to
         # EXECUTING. `_handle_approve` (the @workflow.signal handler) is the
-        # only mutator of `_run_state`; once it observes EXECUTING it also
-        # schedules the activity itself (see below) — the run() method only
-        # needs to wait for that to happen and then await the scheduled
-        # activity's completion, which is tracked via `_activity_task`.
+        # only mutator of `_run_state`. Scheduling the execution Activity
+        # happens HERE, not in the signal handler: `run()` is the only place
+        # `self._input` is guaranteed to be set (a handler running before
+        # `run()` has no input to build the Activity payload from — the old
+        # in-handler scheduling asserted on that and died). `_handle_approve`'s
+        # EXECUTING no-op guard keeps the transition single-shot, so this
+        # schedules exactly once.
         await workflow.wait_condition(lambda: self._run_state == RunState.EXECUTING)
 
-        if self._activity_task is not None:
-            self._activity_result = await self._activity_task
+        self._activity_task = workflow.start_activity(
+            "run_execution_activity",
+            ExecutionActivityInput(
+                contract_hash=self._input.contract_hash,
+                manifest_ref=self._input.manifest_ref,
+            ),
+            start_to_close_timeout=ACTIVITY_START_TO_CLOSE_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
+        )
+        self._activity_result = await self._activity_task
 
         return ExecutionWorkflowStatus(
             run_state=self._run_state,
@@ -144,16 +164,15 @@ class ExecutionWorkflow:
     def _handle_approve(self, signal: ApprovalSignal) -> None:
         """Signal handler — re-validates `signal` (defense-in-depth,
         ADR-0003 step 4) and, ONLY on a valid approval, transitions to
-        EXECUTING and schedules the execution Activity.
+        EXECUTING. Activity scheduling is `run()`'s job (see there): a
+        handler may execute BEFORE `run()` when Temporal delivers the signal
+        in the same workflow task as start, so this handler must be safe to
+        run with `self._input` still unset — it therefore touches only the
+        state machine, never the Activity payload.
 
         Deliberately synchronous (a plain, non-`async def`
         `@workflow.signal` handler) — the re-validation itself
         (`apply_approval_signal`) is pure/CPU-only and needs no `await`.
-        Scheduling the Activity uses `workflow.start_activity`, which
-        schedules the Activity and returns an `ActivityHandle` immediately
-        (it does not block/await completion) — that handle is stashed on
-        `self._activity_task` so `run()` can `await` it once
-        `wait_condition` observes `_run_state == EXECUTING`.
         """
         if self._run_state == RunState.EXECUTING:
             # Idempotent replay guard at the workflow level: once EXECUTING,
@@ -199,17 +218,13 @@ class ExecutionWorkflow:
             self._last_refused_reason = result.refused_reason
             return
 
+        # Transition only — Activity scheduling lives in `run()` (the only
+        # place `self._input` is guaranteed set; Temporal runs a signal
+        # handler BEFORE `run()` when the signal lands in the same workflow
+        # task as start, so scheduling here would race on `_input` — the
+        # 2026-07-13 intermittent CI AssertionError). `run()`'s
+        # `wait_condition` observes this write and schedules exactly once.
         self._run_state = RunState.EXECUTING
-        assert self._input is not None  # run() always sets this before signals are processed
-        self._activity_task = workflow.start_activity(
-            "run_execution_activity",
-            ExecutionActivityInput(
-                contract_hash=self._input.contract_hash,
-                manifest_ref=self._input.manifest_ref,
-            ),
-            start_to_close_timeout=ACTIVITY_START_TO_CLOSE_TIMEOUT,
-            heartbeat_timeout=HEARTBEAT_TIMEOUT,
-        )
 
     @workflow.query
     def status(self) -> ExecutionWorkflowStatus:
