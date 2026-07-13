@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from factories import (
+from boundary_factories import (
     EXPERIMENT_ID,
     REGISTRATION_HASH,
     RUN_ID,

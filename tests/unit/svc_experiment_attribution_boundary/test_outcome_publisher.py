@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import pytest
-from factories import (
+from boundary_factories import (
     TENANT_A,
     FakeManifestLookup,
     make_evidence_manifest,
