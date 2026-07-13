@@ -103,6 +103,7 @@ from saena_domain.measurement import confirmation as confirmation_mod
 from saena_domain.measurement import did as did_mod
 from saena_domain.measurement import evidence as evidence_mod
 from saena_domain.measurement import grs as grs_mod
+from saena_domain.measurement.errors import IdempotencyConflictError
 from saena_domain.measurement.outcome_layer import OutcomeLayer
 from saena_domain.measurement.ports import (
     ConfirmationRecord,
@@ -160,6 +161,7 @@ class _RunState:
         "bound",
         "binding_failed",
         "window_failed",
+        "confirmation_conflicted",
         "window",
         "did_result",
         "b_gate_decision",
@@ -182,6 +184,17 @@ class _RunState:
         #: started, complete window — same fail-closed-forcer role as
         #: `binding_failed` (see `_final_status`).
         self.window_failed: bool = False
+        #: True iff persisting this run's deployment confirmation hit a
+        #: same-tenant/same-key/DIFFERENT-content conflict in
+        #: `ConfirmationStore` (`IdempotencyConflictError`): a first
+        #: confirmation was already durably accepted under this idempotency
+        #: key and this run presents contradictory content. The store, by
+        #: contract, has NOT overwritten the first record. This run must not
+        #: evaluate the conflicting confirmation as if it were accepted — the
+        #: measurement steps are skipped entirely and the outcome is a
+        #: fail-closed UNDETERMINED(conflicting_confirmation). Same
+        #: fail-closed-forcer role as `binding_failed`/`window_failed`.
+        self.confirmation_conflicted: bool = False
         self.window: clock_mod.MeasurementWindow | None = None
         self.did_result: did_mod.DiDResult | None = None
         self.b_gate_decision: b_gate_mod.BGateDecision | None = None
@@ -636,6 +649,12 @@ def _final_status(state: _RunState) -> OutcomeStatus:
         state.grs_decision is not None
         and state.grs_decision.decision is grs_mod.GrsEligibility.ELIGIBLE
     )
+    # A conflicting confirmation short-circuits before `_run_b_gate`, so
+    # `decision` is None on that path and the guard below already yields
+    # UNDETERMINED; this explicit check is a defence-in-depth belt so the
+    # forcer holds even if the short-circuit is ever refactored away.
+    if state.confirmation_conflicted:
+        return OutcomeStatus.UNDETERMINED
     if decision is None:
         return OutcomeStatus.UNDETERMINED
     status = OutcomeStatus.from_b_verdict(decision.verdict)
@@ -672,22 +691,40 @@ def run_measurement(
     # Persist the confirmation submission itself first (idempotent — this is
     # the record `ConfirmationStore` durably remembers this run's confirmation
     # attempt under). Uses the confirmation's own idempotency_key.
-    ports.confirmation_store.put_confirmation(
-        inputs.tenant_id,
-        inputs.deployment_confirmation.idempotency_key,
-        ConfirmationRecord(
-            tenant_id=inputs.tenant_id,
-            confirmation_key=inputs.deployment_confirmation.idempotency_key,
-            measurement_kind="deployment_confirmation",
-            payload=inputs.deployment_confirmation.model_dump(mode="json"),
-        ),
-    )
+    #
+    # A same-tenant/same-key/different-content conflict (`IdempotencyConflict
+    # Error`) is an EXPECTED fail-closed measurement condition, NOT a
+    # programmer error: a first confirmation was already durably accepted
+    # under this key and this run presents contradictory content. The store,
+    # by contract, has already refused to overwrite the first record. We must
+    # NOT evaluate the conflicting confirmation as if accepted, so we skip
+    # every measurement step and fall straight through to a fail-closed
+    # UNDETERMINED(conflicting_confirmation) outcome. This is caught narrowly
+    # by exception TYPE — any other error (integrity, programmer, unexpected
+    # store disposition) still propagates as its own typed error. Byte-
+    # identical replay does NOT raise (the store returns DUPLICATE) and takes
+    # the normal path below, preserving idempotency.
+    try:
+        ports.confirmation_store.put_confirmation(
+            inputs.tenant_id,
+            inputs.deployment_confirmation.idempotency_key,
+            ConfirmationRecord(
+                tenant_id=inputs.tenant_id,
+                confirmation_key=inputs.deployment_confirmation.idempotency_key,
+                measurement_kind="deployment_confirmation",
+                payload=inputs.deployment_confirmation.model_dump(mode="json"),
+            ),
+        )
+    except IdempotencyConflictError:
+        state.confirmation_conflicted = True
+        state.reason_codes.add(ReasonCode.CONFLICTING_CONFIRMATION)
 
-    _run_grs(inputs, policies, state)
-    _run_binding(inputs, policies, state)
-    _run_window(inputs, policies, state)
-    _run_did(inputs, policies, state)
-    _run_b_gate(inputs, policies, state)
+    if not state.confirmation_conflicted:
+        _run_grs(inputs, policies, state)
+        _run_binding(inputs, policies, state)
+        _run_window(inputs, policies, state)
+        _run_did(inputs, policies, state)
+        _run_b_gate(inputs, policies, state)
 
     manifest, is_complete = _seal_bundle(inputs, state)
 
