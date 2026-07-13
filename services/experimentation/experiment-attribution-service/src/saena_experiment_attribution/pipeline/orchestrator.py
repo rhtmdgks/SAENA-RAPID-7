@@ -718,6 +718,37 @@ def run_measurement(
     except IdempotencyConflictError:
         state.confirmation_conflicted = True
         state.reason_codes.add(ReasonCode.CONFLICTING_CONFIRMATION)
+        # Record a run-DISTINGUISHING evidence entry for the conflict so the
+        # sealed bundle's manifest_hash is unique per (run, conflicting
+        # confirmation) rather than identical across every conflict in a
+        # tenant. Without this, every conflict path seals over the SAME
+        # entries (all measurement steps are skipped) and
+        # `compute_manifest_hash` — a pure function of `entries` — collides,
+        # so a second unrelated conflict in the same tenant would try to
+        # store DIFFERENT bundle content under an already-used
+        # (tenant, manifest_hash) key and crash with EvidenceHashMismatchError
+        # instead of returning fail-closed UNDETERMINED (c5-03 security
+        # critic). The ref carries ONLY ids + a content FINGERPRINT (hash) of
+        # the conflicting confirmation — never its raw content (commit sha /
+        # signature / confirmer identity).
+        state.add_entry(
+            evidence_mod.EvidenceEntry(
+                kind=evidence_mod.EvidenceKind.DEPLOYMENT_CONFIRMATION,
+                ref=_evidence_ref(
+                    f"confirmation-conflict://{inputs.experiment_id}/{inputs.run_id}"
+                    f"/{inputs.deployment_confirmation.idempotency_key}",
+                    {
+                        "experiment_id": inputs.experiment_id,
+                        "run_id": inputs.run_id,
+                        "idempotency_key": inputs.deployment_confirmation.idempotency_key,
+                        "conflicting_confirmation": True,
+                        "confirmation_fingerprint": _hash_of(
+                            inputs.deployment_confirmation.model_dump(mode="json")
+                        ),
+                    },
+                ),
+            )
+        )
 
     if not state.confirmation_conflicted:
         _run_grs(inputs, policies, state)

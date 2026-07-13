@@ -172,3 +172,47 @@ def test_seam_never_echoes_confirmation_content_in_reason_codes() -> None:
     rendered = outcome.canonical_payload()
     assert secret_sha not in rendered
     assert "sig-1" not in rendered
+
+    # Also assert the STORED evidence bundle (a separate persistence surface
+    # from the outcome payload) never carries the raw content — only the
+    # confirmation FINGERPRINT (a hash) may appear.
+    stored_bundle = ports.evidence_store.get(inputs.tenant_id, outcome.evidence_bundle_ref)
+    # `manifest` is a (possibly nested) read-only mapping — stringify the whole
+    # structure to search the ACTUAL serialized content, not just top-level keys.
+    bundle_blob = repr(dict(stored_bundle.manifest))
+    assert secret_sha not in bundle_blob
+    assert "sig-1" not in bundle_blob
+    assert "confirmer-1" not in bundle_blob
+
+
+def test_two_unrelated_conflicts_in_same_tenant_do_not_collide_or_crash() -> None:
+    """c5-03 security MUST-FIX regression: two DIFFERENT runs in the SAME
+    tenant that both hit a confirmation conflict must EACH return a clean
+    fail-closed UNDETERMINED — the second must not crash with
+    EvidenceHashMismatchError because both conflict bundles hashed
+    identically. The per-run confirmation-conflict evidence entry makes each
+    manifest_hash unique."""
+    inputs, registration = make_happy_path_inputs()
+    ports = make_ports()
+    _seed_first_confirmation(inputs, ports)
+
+    view = make_registration_view(registration)
+    outcomes = []
+    # NB: both shas differ from the seed confirmation's default ("a"*40) so
+    # each is a genuine same-key/DIFFERENT-content CONFLICT (not a byte-
+    # identical DUPLICATE that would replay the full happy path).
+    for run_id, sha in (("unrelated-run-A", "1" * 40), ("unrelated-run-B", "2" * 40)):
+        conflicting = make_deployment_confirmation(registration, view).model_copy(
+            update={"deployed_commit_sha": sha}
+        )
+        conflicting_inputs = dataclasses.replace(
+            inputs, run_id=run_id, deployment_confirmation=conflicting
+        )
+        # Must NOT raise for either run.
+        outcomes.append(run_measurement(conflicting_inputs, ports, make_policies(registration)))
+
+    for outcome in outcomes:
+        assert outcome.status is OutcomeStatus.UNDETERMINED
+        assert ReasonCode.CONFLICTING_CONFIRMATION in outcome.reason_codes
+    # Distinct runs -> distinct evidence bundle refs (no hash collision).
+    assert outcomes[0].evidence_bundle_ref != outcomes[1].evidence_bundle_ref
