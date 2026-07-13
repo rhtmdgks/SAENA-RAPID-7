@@ -1,0 +1,11 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0001",
+  "engine_id": "gemini",
+  "observation_id": "obs-0001",
+  "raw_object_ref": "s3://saena-observations/run-0001/obs-0001.json",
+  "artifact_hash": "sha256:18874da76bec7d21e4591f1f61e4a3c589a48e70e67384ab17a7f8975376855c",
+  "citation_refs": [],
+  "captured_at": "2026-07-13T09:14:32Z",
+  "_expected_violation": "engine_id must be the v1 closed enum ['chatgpt-search'] (ADR-0007/ADR-0013, CLAUDE.md Engine scope); gemini is disabled."
+}

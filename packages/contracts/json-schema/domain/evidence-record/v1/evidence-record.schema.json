@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/evidence-record/v1/evidence-record.schema.json",
+  "title": "EvidenceRecord",
+  "description": "Evidence backing an ExtractedClaim, owned by claim-evidence-service. Citation span minimized (short excerpt only, full content addressed by hash) — freshness re-check timestamp required.",
+  "$comment": "compat_class: closed, signed: false (non-signed closed contract, ADR-0024(b) family). Authority: docs/architecture/contract-catalog.md P1 table row 'EvidenceRecord | claim-evidence | evidence_id; freshness 필수; 인용 span 최소화' (idempotency key evidence_id; freshness required; citation span minimized); docs/architecture/wave4-plan.md domain-contract candidate list. excerpt maxLength enforces 'span 최소화' (minimize quoted span) — the fuller evidence artifact is addressed via content_hash (sole ledger anchor, mirrors repo-intaken.content_hash pattern), never inlined raw. claim_id is a plain opaque string reference to domain/extracted-claim.claim_id (not a cross-file $ref — see extracted-claim.schema.json $comment on the common-only $ref convention).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "project_id",
+    "evidence_id",
+    "claim_id",
+    "source_uri",
+    "excerpt",
+    "freshness_checked_at",
+    "content_hash"
+  ],
+  "properties": {
+    "tenant_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/tenant_id",
+      "$comment": "Single-authority identifier convention (ADR-0011/ADR-0014)."
+    },
+    "project_id": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/project_id",
+      "$comment": "Project-scoped, same scope as the ExtractedClaim it supports."
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "contract-catalog.md:39 idempotency key 'evidence_id'. Opaque, mirrors common/identifiers/v1 opaque-id shape."
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque reference to domain/extracted-claim.claim_id (plain string value, not a cross-file $ref)."
+    },
+    "source_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "Object reference to the evidence source — query/fragment forbidden (ADR-0024(f) presigned-token smuggling defense)."
+    },
+    "excerpt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 280,
+      "$comment": "contract-catalog.md:39 '인용 span 최소화' (minimize citation span) — short excerpt only, bounded to a tweet-length span; the fuller artifact is addressed via content_hash, never inlined raw."
+    },
+    "freshness_checked_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "contract-catalog.md:39 'freshness 필수' — last freshness re-check timestamp, required on every instance."
+    },
+    "content_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Content-addressed hash of the fuller evidence artifact (sole ledger anchor, mirrors repo-intaken.content_hash / SourceSnapshot.content_hash)."
+    }
+  }
+}

@@ -5,7 +5,14 @@ info:
   description: >-
     CONFIRMED v1 event catalog — 12 channels (docs/architecture/api-event-contracts.md
     §"Recommended topics", quality.gate split into passed/failed channels per
-    ADR-0013/domain-verification-result R4). Delivery semantics: at-least-once
+    ADR-0013/domain-verification-result R4) **+ 4 Wave 4 NEW channels** (w4-10
+    Contracts Steward — docs/architecture/wave4-plan.md "Existing vs new
+    events": demand.graph.versioned.v1/observation.captured.v1/
+    citation.normalized.v1 were already CONFIRMED-v1 channels and only gain
+    their payload $ref here for the first time (no channel-count change);
+    entity.graph.versioned.v1/claim.evidence.versioned.v1/
+    experiment.registered.v1/experiment.anchored.v1 are the 4 brand-new
+    channels — 16 channels total as of Wave 4). Delivery semantics: at-least-once
     with idempotent consumers (docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md
     §4.1; docs/architecture/api-event-contracts.md "Events: versioned topics;
     at-least-once; idempotent consumers"). No dead-letter-queue channel is
@@ -15,8 +22,11 @@ info:
     envelope/event-envelope/v1 (R8, approved plan §1.1 ruling R8 — AsyncAPI
     allOf-overlay pattern) that pins event_type/context_type via const and
     substitutes payload with the event's own payload schema (or leaves the
-    envelope's open payload default for the 5 envelope-only deferred
-    channels below). Every message's payload is a Multi Format Schema Object
+    envelope's open payload default for the 2 remaining envelope-only
+    deferred channels, experiment.outcome.observed.v1 and
+    strategy.card.eligible.v1 — both explicitly out of Wave 4 scope per
+    wave4-plan.md "Forbidden in W4": outcome analysis / strategy-card-eligible).
+    Every message's payload is a Multi Format Schema Object
     (AsyncAPI 3.0.0 spec §Message Object payload field references the Multi
     Format Schema Object, NOT a bare schemaFormat sibling key on the Message
     Object itself — REWORK fixed, critic M2) — payload.schemaFormat +
@@ -71,9 +81,9 @@ channels:
   demand.graph.versioned.v1:
     address: demand.graph.versioned.v1
     description: >-
-      payload contract P1 — envelope-only until demand-graph payload contract
-      lands. context 배정 tenant = 잠정 — 계획 §7 OPEN(Steward 확인) 잔존,
-      3-context 표(ADR-0006 rev.2 / ADR-0013) 비등재 기반 추정 (침묵 종결
+      Demand/query-cluster graph version published (w4-10: payload contract
+      landed, Wave 4). context 배정 tenant = 잠정 — 계획 §7 OPEN(Steward 확인)
+      잔존, 3-context 표(ADR-0006 rev.2 / ADR-0013) 비등재 기반 추정 (침묵 종결
       아님 — 확인 시 재개정 대상).
     messages:
       demandGraphVersioned:
@@ -91,12 +101,61 @@ channels:
                     const: demand.graph.versioned.v1
                   context_type:
                     const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/demand-graph-versioned/v1/demand-graph-versioned.schema.json"
+
+  entity.graph.versioned.v1:
+    address: entity.graph.versioned.v1
+    description: >-
+      Entity-canonicalization graph version published (w4-10, Wave 4 NEW
+      channel — docs/architecture/wave4-plan.md "Existing vs new events").
+    messages:
+      entityGraphVersioned:
+        name: EntityGraphVersioned
+        title: entity.graph.versioned.v1
+        summary: Entity graph version published (entity-resolution-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: entity.graph.versioned.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/entity-graph-versioned/v1/entity-graph-versioned.schema.json"
+
+  claim.evidence.versioned.v1:
+    address: claim.evidence.versioned.v1
+    description: >-
+      Claim/evidence ledger version published (w4-10, Wave 4 NEW channel —
+      docs/architecture/wave4-plan.md "Existing vs new events").
+    messages:
+      claimEvidenceVersioned:
+        name: ClaimEvidenceVersioned
+        title: claim.evidence.versioned.v1
+        summary: Claim/evidence ledger version published (claim-evidence-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: claim.evidence.versioned.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/claim-evidence-versioned/v1/claim-evidence-versioned.schema.json"
 
   observation.captured.v1:
     address: observation.captured.v1
     description: >-
-      payload contract P1 — envelope-only until observation payload contract
-      lands.
+      Observation captured (w4-10: payload contract landed, Wave 4).
     x-saena-engine-id-required: true
     messages:
       observationCaptured:
@@ -114,12 +173,13 @@ channels:
                     const: observation.captured.v1
                   context_type:
                     const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/observation-captured/v1/observation-captured.schema.json"
 
   citation.normalized.v1:
     address: citation.normalized.v1
     description: >-
-      payload contract P1 — envelope-only until citation payload contract
-      lands.
+      Citation normalized (w4-10: payload contract landed, Wave 4).
     x-saena-engine-id-required: true
     messages:
       citationNormalized:
@@ -137,6 +197,63 @@ channels:
                     const: citation.normalized.v1
                   context_type:
                     const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/citation-normalized/v1/citation-normalized.schema.json"
+
+  experiment.registered.v1:
+    address: experiment.registered.v1
+    description: >-
+      QueryExperiment pre-registered (w4-10, Wave 4 NEW channel —
+      docs/architecture/wave4-plan.md "Existing vs new events" +
+      "Experiment ledger — registration ONLY"). Registration ONLY — NO
+      outcome/DiD/causal/lift fields (wave4-plan.md "Forbidden in W4").
+    x-saena-engine-id-required: true
+    messages:
+      experimentRegistered:
+        name: ExperimentRegistered
+        title: experiment.registered.v1
+        summary: Experiment pre-registered (experiment-attribution-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: experiment.registered.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/experiment-registered/v1/experiment-registered.schema.json"
+
+  experiment.anchored.v1:
+    address: experiment.anchored.v1
+    description: >-
+      QueryExperiment hash-anchor notification (w4-10, Wave 4 NEW channel —
+      docs/architecture/wave4-plan.md "Existing vs new events", reusing the
+      audit-ledger hash-chain pattern — "Reuse saena_domain.audit hash chain
+      + canonicalization (no new hashing rule)"). Registration ONLY — NO
+      outcome/DiD/causal/lift fields.
+    x-saena-engine-id-required: true
+    messages:
+      experimentAnchored:
+        name: ExperimentAnchored
+        title: experiment.anchored.v1
+        summary: Experiment hash-anchored (experiment-attribution-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: experiment.anchored.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/experiment-anchored/v1/experiment-anchored.schema.json"
 
   plan.contract.proposed.v1:
     address: plan.contract.proposed.v1
@@ -331,6 +448,22 @@ operations:
     messages:
       - $ref: "#/channels/demand.graph.versioned.v1/messages/demandGraphVersioned"
 
+  sendEntityGraphVersioned:
+    action: send
+    channel:
+      $ref: "#/channels/entity.graph.versioned.v1"
+    summary: entity-resolution-service produces entity.graph.versioned.v1.
+    messages:
+      - $ref: "#/channels/entity.graph.versioned.v1/messages/entityGraphVersioned"
+
+  sendClaimEvidenceVersioned:
+    action: send
+    channel:
+      $ref: "#/channels/claim.evidence.versioned.v1"
+    summary: claim-evidence-service produces claim.evidence.versioned.v1.
+    messages:
+      - $ref: "#/channels/claim.evidence.versioned.v1/messages/claimEvidenceVersioned"
+
   sendObservationCaptured:
     action: send
     channel:
@@ -346,6 +479,22 @@ operations:
     summary: citation-intelligence-service produces citation.normalized.v1.
     messages:
       - $ref: "#/channels/citation.normalized.v1/messages/citationNormalized"
+
+  sendExperimentRegistered:
+    action: send
+    channel:
+      $ref: "#/channels/experiment.registered.v1"
+    summary: experiment-attribution-service produces experiment.registered.v1.
+    messages:
+      - $ref: "#/channels/experiment.registered.v1/messages/experimentRegistered"
+
+  sendExperimentAnchored:
+    action: send
+    channel:
+      $ref: "#/channels/experiment.anchored.v1"
+    summary: experiment-attribution-service produces experiment.anchored.v1.
+    messages:
+      - $ref: "#/channels/experiment.anchored.v1/messages/experimentAnchored"
 
   sendPlanContractProposed:
     action: send

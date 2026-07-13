@@ -1,25 +1,30 @@
 """packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml composition
-proof (w1-11, approved plan §2 "API 문서" AsyncAPI row / §6 "asyncapi" gate).
+proof (w1-11, approved plan §2 "API 문서" AsyncAPI row / §6 "asyncapi" gate;
+extended w4-10 Contracts Steward for the 4 Wave 4 NEW channels).
 
 Asserts:
-  - channel set == exact 12-channel allowlist (CONFIRMED v1 event catalog,
-    ADR-0013/R4 quality.gate split).
+  - channel set == exact 16-channel allowlist (12 CONFIRMED-v1 channels,
+    ADR-0013/R4 quality.gate split, + 4 Wave 4 NEW channels --
+    entity.graph.versioned.v1/claim.evidence.versioned.v1/
+    experiment.registered.v1/experiment.anchored.v1).
   - each channel's `event_type` const == its channel address (1:1).
-  - exactly 3 channels carry `x-saena-engine-id-required: true`.
-  - every one of the 12 channels' message payload declares
+  - exactly 5 channels carry `x-saena-engine-id-required: true` (3
+    CONFIRMED-v1 + experiment.registered.v1/experiment.anchored.v1).
+  - every one of the 16 channels' message payload declares
     `schemaFormat: application/schema+json;version=draft-2020-12` (M2
     regression guard -- critic finding that payload MUST be a Multi
     Format Schema Object, not a bare schemaFormat sibling on Message).
   - engine-id glob guard: IF any schema file exists under
     packages/contracts/json-schema/event/{observation-*,citation-*,
     experiment-*}/ THEN its schema MUST allOf-include the engine-id
-    engine_required_payload fragment. Currently zero such files exist
-    (all three are envelope-only P1-deferred channels per the AsyncAPI
-    doc's own channel descriptions) -- the guard passes trivially on
-    real data, but its LOGIC is proven live via a synthetic tmp_path
-    fixture that plants a fake matching file and asserts the guard
-    fires, so an empty-glob pass here can never be mistaken for the
-    guard function being untested.
+    engine_required_payload fragment. As of w4-10, 4 such directories now
+    exist for real (observation-captured, citation-normalized,
+    experiment-registered, experiment-anchored -- all landed with the
+    engine_required_payload $ref) -- the guard now runs genuinely, not
+    vacuously, on real data; its LOGIC is additionally proven live via a
+    synthetic tmp_path fixture that plants a fake matching file and
+    asserts the guard fires, so real-data coverage and synthetic-detector
+    coverage are both exercised independently.
 """
 
 from __future__ import annotations
@@ -51,11 +56,23 @@ EXPECTED_CHANNEL_ADDRESSES: frozenset[str] = frozenset(
         "quality.gate.failed.v1",
         "experiment.outcome.observed.v1",
         "strategy.card.eligible.v1",
+        # Wave 4 NEW channels (w4-10 Contracts Steward,
+        # docs/architecture/wave4-plan.md "Existing vs new events").
+        "entity.graph.versioned.v1",
+        "claim.evidence.versioned.v1",
+        "experiment.registered.v1",
+        "experiment.anchored.v1",
     }
 )
 
 EXPECTED_ENGINE_ID_REQUIRED_CHANNELS: frozenset[str] = frozenset(
-    {"observation.captured.v1", "citation.normalized.v1", "experiment.outcome.observed.v1"}
+    {
+        "observation.captured.v1",
+        "citation.normalized.v1",
+        "experiment.outcome.observed.v1",
+        "experiment.registered.v1",
+        "experiment.anchored.v1",
+    }
 )
 
 EXPECTED_SCHEMA_FORMAT = "application/schema+json;version=draft-2020-12"
@@ -98,7 +115,12 @@ def test_asyncapi_parses_as_yaml() -> None:
     assert document.get("asyncapi", "").startswith("3.0")
 
 
-def test_channel_set_matches_exact_12_allowlist() -> None:
+def test_channel_set_matches_exact_16_allowlist() -> None:
+    """12 CONFIRMED-v1 channels + 4 Wave 4 NEW channels (w4-10 Contracts
+    Steward) = 16. demand.graph.versioned.v1/observation.captured.v1/
+    citation.normalized.v1 were already among the original 12 and only
+    gained their payload $ref in Wave 4 -- no channel-count change from
+    those three."""
     document = _load_yaml(ASYNCAPI_PATH)
     channels = _channels(document)
     actual_addresses = {ch["address"] for ch in channels.values()}
@@ -106,7 +128,7 @@ def test_channel_set_matches_exact_12_allowlist() -> None:
         f"channel set mismatch: missing={EXPECTED_CHANNEL_ADDRESSES - actual_addresses}, "
         f"extra={actual_addresses - EXPECTED_CHANNEL_ADDRESSES}"
     )
-    assert len(channels) == 12
+    assert len(channels) == 16
 
 
 def test_each_channel_has_exactly_one_message() -> None:
@@ -128,7 +150,11 @@ def test_event_type_const_matches_channel_address_1_to_1() -> None:
         )
 
 
-def test_exactly_3_channels_require_engine_id() -> None:
+def test_exactly_5_channels_require_engine_id() -> None:
+    """3 CONFIRMED-v1 engine-required channels + 2 Wave 4 NEW engine-required
+    channels (experiment.registered.v1/experiment.anchored.v1 -- ADR-0013
+    'observation·citation·experiment 계열' rule covers the whole family,
+    including the registration/anchor notifications) = 5."""
     document = _load_yaml(ASYNCAPI_PATH)
     channels = _channels(document)
     flagged = {
@@ -139,10 +165,10 @@ def test_exactly_3_channels_require_engine_id() -> None:
         f"x-saena-engine-id-required channel set mismatch: {flagged_addresses} != "
         f"{EXPECTED_ENGINE_ID_REQUIRED_CHANNELS}"
     )
-    assert len(flagged) == 3
+    assert len(flagged) == 5
 
 
-def test_all_12_channels_use_draft_2020_12_schema_format() -> None:
+def test_all_16_channels_use_draft_2020_12_schema_format() -> None:
     """M2 regression guard: every message payload must be a Multi Format
     Schema Object (payload.schemaFormat + payload.schema), schemaFormat
     pinned to draft-2020-12 -- not a bare sibling key on Message.
@@ -206,30 +232,37 @@ def find_engine_family_schemas_missing_engine_id_fragment(
     return violations
 
 
-def test_engine_id_glob_guard_passes_trivially_on_current_catalog() -> None:
-    """No observation-*/citation-*/experiment-* payload schema files exist
-    yet (all 3 are envelope-only P1-deferred channels) -- the guard must
-    pass with zero violations, not error out on an empty glob.
+def test_engine_id_glob_guard_passes_genuinely_on_current_catalog() -> None:
+    """w4-10: observation-captured, citation-normalized, experiment-registered,
+    and experiment-anchored payload schema files now exist for real (all 4
+    were envelope-only P1-deferred/not-yet-landed pre-Wave-4) and each
+    allOf-includes the engine_required_payload fragment -- the guard must
+    pass with zero violations GENUINELY (not vacuously) on real data.
     """
     event_dir = CONTRACTS_JSON_SCHEMA_DIR / "event"
     violations = find_engine_family_schemas_missing_engine_id_fragment(event_dir)
     assert violations == [], f"unexpected engine-family guard violations: {violations}"
 
 
-def test_no_engine_family_schema_directories_exist_yet() -> None:
-    """Meta-assertion documenting WHY the guard above passes trivially --
-    if this ever starts failing (a real observation-*/citation-*/
-    experiment-* directory landed), the guard above stops being trivial
-    and must be re-verified against real content, not silently trusted.
+def test_engine_family_schema_directories_match_w4_10_expected_set() -> None:
+    """Meta-assertion documenting exactly which observation-*/citation-*/
+    experiment-* directories exist post-w4-10 -- if this set ever drifts
+    (a new engine-family contract lands, or one is renamed/removed), this
+    fails loudly rather than the guard above silently covering an
+    unexpected set.
     """
     event_dir = CONTRACTS_JSON_SCHEMA_DIR / "event"
-    matching = [
-        d for d in event_dir.iterdir() if d.is_dir() and d.name.startswith(_ENGINE_FAMILY_PREFIXES)
-    ]
-    assert matching == [], (
-        f"found engine-family directories the guard's 'trivial pass' assumption did not "
-        f"account for: {matching}"
-    )
+    matching = {
+        d.name
+        for d in event_dir.iterdir()
+        if d.is_dir() and d.name.startswith(_ENGINE_FAMILY_PREFIXES)
+    }
+    assert matching == {
+        "observation-captured",
+        "citation-normalized",
+        "experiment-registered",
+        "experiment-anchored",
+    }, f"engine-family directory set drifted from w4-10 expectations: {matching}"
 
 
 def test_engine_id_glob_guard_fires_on_synthetic_missing_fragment(tmp_path: Path) -> None:

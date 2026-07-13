@@ -15,7 +15,8 @@ judgment functions (`check_name_major_unique`, etc.) live in
 `harness.registry` (w1-10, single implementation, tests/contract/README.md
 ownership split); this module only calls them and asserts on their output.
 
-Registry currently has 26 active entries (Wave 1 first release). This
+Registry currently has 38 active entries (26 from Wave 1 first release +
+12 landed by w4-10 Contracts Steward: 7 event + 5 domain contracts). This
 module is parametrize-ready: `iter_entries()` drives every per-entry
 assertion against the live registry.
 """
@@ -47,7 +48,7 @@ def test_registry_populated_state_invariants() -> None:
     """w1-15: registry carries all hand-authored contracts. Every relational
     check must run clean on the REAL entry list (no longer vacuous)."""
     entries = registry_mod.load_registry()
-    assert len(entries) == 26
+    assert len(entries) == 38
     closed = {e.name for e in entries if e.compat_class == "closed"}
     assert {"change-plan", "approval-decision"} <= closed
     assert all((not e.signed) or e.compat_class == "closed" for e in entries)

@@ -22,9 +22,21 @@ import saena_schemas.context.workspace_context_v1 as workspace_context_v1
 import saena_schemas.domain.approval_decision_v1 as approval_decision_v1
 import saena_schemas.domain.audit_event_v1 as audit_event_v1
 import saena_schemas.domain.change_plan_v1 as change_plan_v1
+import saena_schemas.domain.entity_record_v1 as entity_record_v1
+import saena_schemas.domain.evidence_record_v1 as evidence_record_v1
+import saena_schemas.domain.experiment_registration_v1 as experiment_registration_v1
+import saena_schemas.domain.extracted_claim_v1 as extracted_claim_v1
 import saena_schemas.domain.patch_artifact_v1 as patch_artifact_v1
+import saena_schemas.domain.platform_observation_v1 as platform_observation_v1
 import saena_schemas.domain.source_snapshot_v1 as source_snapshot_v1
 import saena_schemas.domain.verification_result_v1 as verification_result_v1
+import saena_schemas.event.citation_normalized_v1 as citation_normalized_v1
+import saena_schemas.event.claim_evidence_versioned_v1 as claim_evidence_versioned_v1
+import saena_schemas.event.demand_graph_versioned_v1 as demand_graph_versioned_v1
+import saena_schemas.event.entity_graph_versioned_v1 as entity_graph_versioned_v1
+import saena_schemas.event.experiment_anchored_v1 as experiment_anchored_v1
+import saena_schemas.event.experiment_registered_v1 as experiment_registered_v1
+import saena_schemas.event.observation_captured_v1 as observation_captured_v1
 import saena_schemas.event.patch_unit_completed_v1 as patch_unit_completed_v1
 import saena_schemas.event.plan_contract_approved_v1 as plan_contract_approved_v1
 import saena_schemas.event.plan_contract_proposed_v1 as plan_contract_proposed_v1
@@ -198,6 +210,39 @@ BINDINGS: dict[str, ContractBinding] = {
             {"system-scope-with-tenant-id.json", "tenant-scope-without-tenant-id.json"}
         ),
     ),
+    "entity-record": ContractBinding(
+        schema_path=DOMAIN_DIR / "entity-record" / "v1" / "entity-record.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=entity_record_v1.EntityRecord,
+        fixture_dir=FIXTURES_ROOT / "entity-record",
+    ),
+    "extracted-claim": ContractBinding(
+        schema_path=DOMAIN_DIR / "extracted-claim" / "v1" / "extracted-claim.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=extracted_claim_v1.ExtractedClaim,
+        fixture_dir=FIXTURES_ROOT / "extracted-claim",
+    ),
+    "evidence-record": ContractBinding(
+        schema_path=DOMAIN_DIR / "evidence-record" / "v1" / "evidence-record.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=evidence_record_v1.EvidenceRecord,
+        fixture_dir=FIXTURES_ROOT / "evidence-record",
+    ),
+    "platform-observation": ContractBinding(
+        schema_path=DOMAIN_DIR / "platform-observation" / "v1" / "platform-observation.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=platform_observation_v1.PlatformObservation,
+        fixture_dir=FIXTURES_ROOT / "platform-observation",
+    ),
+    "experiment-registration": ContractBinding(
+        schema_path=DOMAIN_DIR
+        / "experiment-registration"
+        / "v1"
+        / "experiment-registration.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=experiment_registration_v1.QueryexperimentRegistration,
+        fixture_dir=FIXTURES_ROOT / "experiment-registration",
+    ),
 }
 
 # Event payload contracts (fixtures live under fixtures/event-payloads/<name>/).
@@ -246,5 +291,59 @@ EVENT_PAYLOAD_BINDINGS: dict[str, ContractBinding] = {
         extra_resource_paths=(IDENTIFIERS_SCHEMA,),
         model_cls=site_inventory_completed_v1.SiteInventoryCompletedV1Payload,
         fixture_dir=FIXTURES_ROOT / "event-payloads" / "site-inventory-completed",
+    ),
+    "demand-graph-versioned": ContractBinding(
+        schema_path=EVENT_DIR
+        / "demand-graph-versioned"
+        / "v1"
+        / "demand-graph-versioned.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=demand_graph_versioned_v1.DemandGraphVersionedV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "demand-graph-versioned",
+    ),
+    "entity-graph-versioned": ContractBinding(
+        schema_path=EVENT_DIR
+        / "entity-graph-versioned"
+        / "v1"
+        / "entity-graph-versioned.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=entity_graph_versioned_v1.EntityGraphVersionedV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "entity-graph-versioned",
+    ),
+    "claim-evidence-versioned": ContractBinding(
+        schema_path=EVENT_DIR
+        / "claim-evidence-versioned"
+        / "v1"
+        / "claim-evidence-versioned.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=claim_evidence_versioned_v1.ClaimEvidenceVersionedV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "claim-evidence-versioned",
+    ),
+    "citation-normalized": ContractBinding(
+        schema_path=EVENT_DIR / "citation-normalized" / "v1" / "citation-normalized.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=citation_normalized_v1.CitationNormalizedV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "citation-normalized",
+    ),
+    "observation-captured": ContractBinding(
+        schema_path=EVENT_DIR / "observation-captured" / "v1" / "observation-captured.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=observation_captured_v1.ObservationCapturedV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "observation-captured",
+    ),
+    "experiment-registered": ContractBinding(
+        schema_path=EVENT_DIR
+        / "experiment-registered"
+        / "v1"
+        / "experiment-registered.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=experiment_registered_v1.ExperimentRegisteredV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "experiment-registered",
+    ),
+    "experiment-anchored": ContractBinding(
+        schema_path=EVENT_DIR / "experiment-anchored" / "v1" / "experiment-anchored.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=experiment_anchored_v1.ExperimentAnchoredV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "experiment-anchored",
     ),
 }

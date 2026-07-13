@@ -1,0 +1,6 @@
+{
+  "experiment_id": "exp-0001",
+  "canonical_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "previous_hash": null,
+  "_expected_violation": "engine_id is required (ADR-0013 'observation\u00b7citation\u00b7experiment \uacc4\uc5f4' engine_required_payload activation fragment); this instance omits it."
+}

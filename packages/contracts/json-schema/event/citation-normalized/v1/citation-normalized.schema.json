@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/citation-normalized/v1/citation-normalized.schema.json",
+  "title": "citation.normalized.v1 payload",
+  "description": "Payload of the citation.normalized.v1 event — notification that citation-intelligence-service normalized a citation observed in a ChatGPT Search response. Thin notification projection; raw response content is never carried here.",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024). Authority: docs/architecture/wave4-plan.md 'Existing vs new events' (w4-10 Contracts Steward deliverable); docs/architecture/api-event-contracts.md CONFIRMED topic list (citation.normalized.v1); packages/contracts/asyncapi/saena-events/v1/asyncapi.yaml channel (already CONFIRMED envelope-only P1-deferred, x-saena-engine-id-required: true — this schema fills the payload). Producer citation-intelligence-service (services/intelligence/citation-intelligence-service/README.md 'Published events'); consumes observation.captured.v1. engine_id REQUIRED per ADR-0013 'engine_id: observation·citation·experiment 계열 이벤트 payload에 필수' — composed via allOf $ref to common/engine-id/v1's engine_required_payload activation fragment (the fragment's own $comment: 'Reusable activation fragment for P1 payload families (observation/citation/experiment events)'), NOT redeclared inline. normalized_uri uses uri_ref (query/fragment forbidden, ADR-0024(f) presigned-token smuggling defense) since a normalized citation URL is an object reference to the cited resource, not raw content. content_hash is the sole ledger anchor for the full citation-record artifact (mirrors repo-intaken.content_hash pattern) — no citation-record domain contract exists in this catalog (docs/architecture/contract-catalog.md P1 table has no 'CitationRecord' row), so this payload stays self-contained per the w4-10 mission's own fallback instruction.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../../../common/engine-id/v1/engine-id.schema.json#/$defs/engine_required_payload"
+    }
+  ],
+  "required": [
+    "citation_id",
+    "normalized_uri",
+    "content_hash"
+  ],
+  "properties": {
+    "citation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque identifier for the normalized citation record, mirrors common/identifiers/v1 opaque-id shape (workspace_id/project_id/site_id/actor_id/run_id) but not promoted to that shared file — citation_id is not one of the 6 CONFIRMED core business identifiers (api-event-contracts.md 'Core business identifiers')."
+    },
+    "normalized_uri": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+      "$comment": "Normalized citation URL as an object reference — query/fragment forbidden (ADR-0024(f))."
+    },
+    "content_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Content-addressed hash of the fuller citation-record artifact (sole ledger anchor, mirrors repo-intaken.content_hash)."
+    }
+  }
+}

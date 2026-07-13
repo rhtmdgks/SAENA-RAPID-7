@@ -1,0 +1,22 @@
+{
+  "tenant_id": "acme-corp",
+  "run_id": "run-0001",
+  "engine_id": "chatgpt-search",
+  "experiment_id": "exp-0001",
+  "design_type": "treatment_control",
+  "query_cluster_ids": [],
+  "metric_defs": [
+    {"metric_id": "citation_rate", "definition": "share of observed responses citing the tenant's domain"}
+  ],
+  "locale": "en-US",
+  "browser_policy": "default-headless-v1",
+  "repeat_count": 5,
+  "asset_hash": "sha256:460f01e2f995d4c47f40353c9143f11c3db55955a69643872cfdebd1678a8ea8",
+  "code_version_hash": "sha256:03ecd344632db40e49dad76d45baf0003cde06129203fd7936fddff3e8861380",
+  "created_by": "actor-analyst-01",
+  "approved_by": "actor-lead-02",
+  "registered_at": "2026-07-13T09:14:32Z",
+  "canonical_hash": "sha256:2d44a4e816a9b3aefc03f87e273046060c40be7c8fd5da83d52db4c24bf133e6",
+  "previous_hash": null,
+  "_expected_violation": "query_cluster_ids requires minItems:1; this instance is empty."
+}

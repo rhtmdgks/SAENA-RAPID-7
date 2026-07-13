@@ -45,6 +45,7 @@ _GAP_FIXTURE_NAMES_BY_CONTRACT: dict[str, frozenset[str]] = {
     "tenant-context": frozenset({"namespace-mismatch.json"}),
     "audit-event": frozenset({"payload-credential-like-value.json"}),
     "patch-unit-completed": frozenset({"tenant-id-in-payload-gap.json"}),
+    "experiment-registered": frozenset({"outcome-field-gap.json"}),
 }
 
 

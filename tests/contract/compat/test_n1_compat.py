@@ -12,11 +12,12 @@ For each `packages/contracts/registry.json` entry:
        - leg 2: harness.rules.judge() on the structural diff between the
          previous-tag schema and the current schema.
 
-Registry currently has 26 active entries (Wave 1 first release). Because
-no prior `contracts/{name}/v*` tags exist yet, every entry takes the
-explicit first-release skip path (pytest.skip per entry — not a silent
-pass). A dedicated meta-test still exercises the empty-registry
-bootstrap-skip branch so an empty registry can never silently green.
+Registry currently has 38 active entries (26 from Wave 1 first release +
+12 landed by w4-10 Contracts Steward). Because no prior
+`contracts/{name}/v*` tags exist yet, every entry takes the explicit
+first-release skip path (pytest.skip per entry — not a silent pass). A
+dedicated meta-test still exercises the empty-registry bootstrap-skip
+branch so an empty registry can never silently green.
 """
 
 from __future__ import annotations

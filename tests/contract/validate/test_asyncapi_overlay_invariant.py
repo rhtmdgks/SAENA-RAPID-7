@@ -17,9 +17,10 @@ worse, one that leaks a branch-specific field into a schema shape that
 looks valid for instances of a DIFFERENT branch -- neither failure mode
 is guaranteed to be caught by a single hand-picked instance fixture.
 
-This module instead does a purely STRUCTURAL check: for each of the 12
-channels, extract the overlay's (`allOf[1]`) `properties` key set and
-assert it is a SUBSET of each of the envelope's 3 `$defs` oneOf branches'
+This module instead does a purely STRUCTURAL check: for each of the 16
+channels (12 CONFIRMED-v1 + 4 Wave 4 NEW, w4-10 Contracts Steward),
+extract the overlay's (`allOf[1]`) `properties` key set and assert it is
+a SUBSET of each of the envelope's 3 `$defs` oneOf branches'
 (`tenantContextEnvelope`, `systemContextEnvelope`,
 `aggregateContextEnvelope`) own `properties` key sets -- i.e. the overlay
 never declares a property name that is not already envelope-branch
@@ -71,6 +72,11 @@ ALL_CHANNEL_NAMES: tuple[str, ...] = (
     "quality.gate.failed.v1",
     "experiment.outcome.observed.v1",
     "strategy.card.eligible.v1",
+    # Wave 4 NEW channels (w4-10 Contracts Steward).
+    "entity.graph.versioned.v1",
+    "claim.evidence.versioned.v1",
+    "experiment.registered.v1",
+    "experiment.anchored.v1",
 )
 
 
@@ -138,7 +144,7 @@ def test_envelope_has_exactly_3_oneof_branches() -> None:
 @pytest.mark.parametrize("channel_name", ALL_CHANNEL_NAMES)
 def test_overlay_properties_are_subset_of_every_envelope_branch(channel_name: str) -> None:
     """The R8 structural invariant itself: overlay properties keys ⊆
-    EVERY envelope oneOf branch's properties keys, for all 12 channels.
+    EVERY envelope oneOf branch's properties keys, for all 16 channels.
     """
     schema = _load_json(ENVELOPE_SCHEMA_PATH)
     branch_keysets = envelope_branch_property_keysets(schema)
@@ -155,9 +161,9 @@ def test_overlay_properties_are_subset_of_every_envelope_branch(channel_name: st
     )
 
 
-def test_overlay_subset_check_covers_all_12_channels() -> None:
+def test_overlay_subset_check_covers_all_16_channels() -> None:
     """Meta-test: prove the parametrized check above actually iterates all
-    12 channels, not a truncated/typo'd subset.
+    16 channels, not a truncated/typo'd subset.
     """
     asyncapi_doc = _load_yaml(ASYNCAPI_PATH)
     actual_channel_names = frozenset(asyncapi_doc["channels"].keys())

@@ -1,0 +1,7 @@
+{
+  "engine_id": "chatgpt-search",
+  "experiment_id": "exp-0001",
+  "canonical_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "lift_pct": 4.2,
+  "_note": "wave4-plan.md 'Forbidden in W4' BANS outcome/DiD/causal/lift fields in the registration event, but this is an open-class payload schema (no additionalProperties:false) that cannot itself reject an undeclared extra key -- this is a policy-gate/review obligation (same class of gap as ADR-0024(e)-1 tenant-id-in-payload), not schema-enforceable. Must remain schema-VALID."
+}
