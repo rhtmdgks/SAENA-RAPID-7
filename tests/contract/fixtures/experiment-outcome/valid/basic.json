@@ -1,0 +1,58 @@
+{
+  "engine_id": "chatgpt-search",
+  "experiment_id": "exp-0001",
+  "registration_canonical_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "window": {
+    "started_at": "2026-07-07T00:00:00Z",
+    "ended_at": "2026-07-14T00:00:00Z",
+    "clock_anchor": "deployment_confirmed"
+  },
+  "deployment_confirmation_ref": "dep-0001",
+  "per_signal_results": [
+    {
+      "outcome_layer": "citation",
+      "metric_id": "citation_share",
+      "evidence_basis_id": "basis-citation-1",
+      "treatment_raw_delta": 0.12,
+      "control_raw_delta": 0.02,
+      "net_of_control_lift": 0.10,
+      "sample_counts": {
+        "treatment": 120,
+        "control": 118
+      },
+      "insufficient": false
+    },
+    {
+      "outcome_layer": "prominence",
+      "metric_id": "answer_prominence",
+      "evidence_basis_id": "basis-prominence-1",
+      "treatment_raw_delta": 0.08,
+      "control_raw_delta": 0.01,
+      "net_of_control_lift": 0.07,
+      "sample_counts": {
+        "treatment": 120,
+        "control": 118
+      },
+      "insufficient": false
+    }
+  ],
+  "b_verdict": "pass",
+  "undetermined_reason": [],
+  "raw_view": {
+    "citation_share_treatment": 0.42
+  },
+  "control_adjusted_view": {
+    "citation_share_net": 0.10
+  },
+  "confidence": 0.86,
+  "evidence_bundle_ref": {
+    "manifest_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact_ref": "https://evidence.example.com/bundles/exp-0001"
+  },
+  "grs_policy": {
+    "version": "grs-v1",
+    "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "provenance": "test_fixture"
+  },
+  "determinism_note": "Identical (registration_canonical_hash + observation set + grs_policy.hash) reproduce identical net_of_control_lift and b_verdict (E3, 3x determinism)."
+}

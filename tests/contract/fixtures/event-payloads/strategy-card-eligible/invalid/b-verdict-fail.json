@@ -1,0 +1,8 @@
+{
+  "card_candidate_ref": "card-cand-0001",
+  "source_outcome": {
+    "b_verdict": "fail",
+    "evidence_bundle_manifest_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "_expected_violation": "source_outcome.b_verdict 'fail' violates the const 'pass' — a strategy card can only become eligible from a B-VERIFIED (pass) outcome (fail-closed intake, E7). Rejected by both the schema (const) and the generated Literal['pass'] pydantic field."
+}

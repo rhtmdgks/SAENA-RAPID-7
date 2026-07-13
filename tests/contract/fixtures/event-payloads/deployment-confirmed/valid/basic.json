@@ -1,0 +1,18 @@
+{
+  "deployment_id": "dep-0001",
+  "registration_ref": {
+    "experiment_id": "exp-0001",
+    "registration_canonical_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "deployed_commit_sha": "abcdef0123456789abcdef0123456789abcdef01",
+  "deployment_target": {
+    "kind": "site",
+    "identifier": "primary-site"
+  },
+  "confirmer": {
+    "identity": "customer-ci-bot",
+    "method": "ci_pipeline",
+    "signature_ref": "https://evidence.example.com/sig/dep-0001"
+  },
+  "confirmed_at": "2026-07-14T00:00:00Z"
+}

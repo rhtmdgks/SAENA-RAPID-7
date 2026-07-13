@@ -46,6 +46,13 @@ _GAP_FIXTURE_NAMES_BY_CONTRACT: dict[str, frozenset[str]] = {
     "audit-event": frozenset({"payload-credential-like-value.json"}),
     "patch-unit-completed": frozenset({"tenant-id-in-payload-gap.json"}),
     "experiment-registered": frozenset({"outcome-field-gap.json"}),
+    # w5-02: b_verdict=pass with a single per_signal_results layer VIOLATES the
+    # B-gate >=2-independent-layer policy, but an open-class event payload
+    # cannot schema-reject it (JSON Schema cannot express ">=2 entries with
+    # distinct evidence_basis_id" as a PASS precondition) -- schema-VALID,
+    # policy-gate obligation (w5-06). Same gap class as experiment-registered's
+    # outcome-field-gap and patch-unit-completed's tenant-id-in-payload-gap.
+    "experiment-outcome-observed": frozenset({"single-layer-pass-gap.json"}),
 }
 
 

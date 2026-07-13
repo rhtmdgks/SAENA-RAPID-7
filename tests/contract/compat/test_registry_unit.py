@@ -21,12 +21,13 @@ def test_real_registry_loads_and_validates() -> None:
     must load and validate cleanly against the actual registry.schema.json.
     """
     entries = registry_mod.load_registry()
-    assert len(entries) == 38, (
+    assert len(entries) == 43, (
         "w1-15 populated 26 entries (24 json-schema + openapi + asyncapi); "
-        "w4-10 landed 12 more (7 event + 5 domain json-schema contracts)"
+        "w4-10 landed 12 more (7 event + 5 domain json-schema contracts); "
+        "w5-02 landed 5 more (3 event payloads + 2 domain measurement records)"
     )
     names = [e.name for e in entries]
-    assert len(set((e.name, e.major) for e in entries)) == 38, "name+major unique"
+    assert len(set((e.name, e.major) for e in entries)) == 43, "name+major unique"
     assert "event-envelope" in names and "change-plan" in names
 
 

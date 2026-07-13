@@ -1,0 +1,18 @@
+{
+  "deployment_id": "dep-0001",
+  "registration_ref": {
+    "experiment_id": "exp-0001",
+    "registration_canonical_hash": "not-a-sha256-hash"
+  },
+  "artifact_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "deployment_target": {
+    "kind": "site",
+    "identifier": "primary-site"
+  },
+  "confirmer": {
+    "identity": "customer-ci-bot",
+    "method": "ci_pipeline"
+  },
+  "confirmed_at": "2026-07-14T00:00:00Z",
+  "_expected_violation": "registration_ref.registration_canonical_hash 'not-a-sha256-hash' violates the common/identifiers sha256_ref pattern (^sha256:[0-9a-f]{64}$) — rejected by both the schema validator and the generated Sha256Ref pydantic model."
+}

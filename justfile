@@ -162,7 +162,7 @@ contracts-validate:
 codegen:
     #!/bin/sh
     set -eu
-    OPEN_CONTRACTS="context/workspace_context_v1 context/project_context_v1 context/site_context_v1 context/run_context_lifecycle_v1 domain/verification_result_v1 event/patch_unit_completed_v1 event/quality_gate_result_v1 event/plan_contract_proposed_v1 event/plan_contract_approved_v1 event/repo_intaken_v1 event/site_inventory_completed_v1 event/demand_graph_versioned_v1 event/entity_graph_versioned_v1 event/claim_evidence_versioned_v1 event/citation_normalized_v1 event/observation_captured_v1 event/experiment_registered_v1 event/experiment_anchored_v1"
+    OPEN_CONTRACTS="context/workspace_context_v1 context/project_context_v1 context/site_context_v1 context/run_context_lifecycle_v1 domain/verification_result_v1 event/patch_unit_completed_v1 event/quality_gate_result_v1 event/plan_contract_proposed_v1 event/plan_contract_approved_v1 event/repo_intaken_v1 event/site_inventory_completed_v1 event/demand_graph_versioned_v1 event/entity_graph_versioned_v1 event/claim_evidence_versioned_v1 event/citation_normalized_v1 event/observation_captured_v1 event/experiment_registered_v1 event/experiment_anchored_v1 event/deployment_confirmed_v1 event/experiment_outcome_observed_v1 event/strategy_card_eligible_v1"
     NESTED_ALLOW="envelope/event_envelope_v1:Payload"
     PKG_ROOT=packages/schemas/saena_schemas
     rm -rf "$PKG_ROOT"/context "$PKG_ROOT"/domain "$PKG_ROOT"/event "$PKG_ROOT"/envelope "$PKG_ROOT"/common

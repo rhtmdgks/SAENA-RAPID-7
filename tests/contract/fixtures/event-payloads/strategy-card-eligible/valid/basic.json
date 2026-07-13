@@ -1,0 +1,7 @@
+{
+  "card_candidate_ref": "card-cand-0001",
+  "source_outcome": {
+    "b_verdict": "pass",
+    "evidence_bundle_manifest_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

@@ -3,14 +3,16 @@ proof (w1-11, approved plan §2 "API 문서" AsyncAPI row / §6 "asyncapi" gate;
 extended w4-10 Contracts Steward for the 4 Wave 4 NEW channels).
 
 Asserts:
-  - channel set == exact 16-channel allowlist (12 CONFIRMED-v1 channels,
+  - channel set == exact 17-channel allowlist (12 CONFIRMED-v1 channels,
     ADR-0013/R4 quality.gate split, + 4 Wave 4 NEW channels --
     entity.graph.versioned.v1/claim.evidence.versioned.v1/
-    experiment.registered.v1/experiment.anchored.v1).
+    experiment.registered.v1/experiment.anchored.v1, + 1 Wave 5 NEW channel
+    -- deployment.confirmed.v1, w5-02 channel #17).
   - each channel's `event_type` const == its channel address (1:1).
   - exactly 5 channels carry `x-saena-engine-id-required: true` (3
-    CONFIRMED-v1 + experiment.registered.v1/experiment.anchored.v1).
-  - every one of the 16 channels' message payload declares
+    CONFIRMED-v1 + experiment.registered.v1/experiment.anchored.v1);
+    deployment.confirmed.v1 is deliberately NOT among them.
+  - every one of the 17 channels' message payload declares
     `schemaFormat: application/schema+json;version=draft-2020-12` (M2
     regression guard -- critic finding that payload MUST be a Multi
     Format Schema Object, not a bare schemaFormat sibling on Message).
@@ -62,6 +64,11 @@ EXPECTED_CHANNEL_ADDRESSES: frozenset[str] = frozenset(
         "claim.evidence.versioned.v1",
         "experiment.registered.v1",
         "experiment.anchored.v1",
+        # Wave 5 NEW channel (w5-02 Contracts Steward, channel #17 —
+        # docs/architecture/wave5-plan.md deliverable 2: the sole 7-day-clock
+        # start authority). NOT engine-id-required (deployment confirmation is
+        # a customer/CI-CD signal, not a ChatGPT-Search observation).
+        "deployment.confirmed.v1",
     }
 )
 
@@ -115,12 +122,14 @@ def test_asyncapi_parses_as_yaml() -> None:
     assert document.get("asyncapi", "").startswith("3.0")
 
 
-def test_channel_set_matches_exact_16_allowlist() -> None:
-    """12 CONFIRMED-v1 channels + 4 Wave 4 NEW channels (w4-10 Contracts
-    Steward) = 16. demand.graph.versioned.v1/observation.captured.v1/
-    citation.normalized.v1 were already among the original 12 and only
-    gained their payload $ref in Wave 4 -- no channel-count change from
-    those three."""
+def test_channel_set_matches_exact_17_allowlist() -> None:
+    """12 CONFIRMED-v1 channels + 4 Wave 4 NEW channels (w4-10) + 1 Wave 5 NEW
+    channel (w5-02: deployment.confirmed.v1, channel #17) = 17.
+    demand.graph.versioned.v1/observation.captured.v1/citation.normalized.v1
+    were already among the original 12 and only gained their payload $ref in
+    Wave 4; experiment.outcome.observed.v1/strategy.card.eligible.v1 were among
+    the original 12 and only gained their payload $ref in Wave 5 -- no
+    channel-count change from any of those five."""
     document = _load_yaml(ASYNCAPI_PATH)
     channels = _channels(document)
     actual_addresses = {ch["address"] for ch in channels.values()}
@@ -128,7 +137,7 @@ def test_channel_set_matches_exact_16_allowlist() -> None:
         f"channel set mismatch: missing={EXPECTED_CHANNEL_ADDRESSES - actual_addresses}, "
         f"extra={actual_addresses - EXPECTED_CHANNEL_ADDRESSES}"
     )
-    assert len(channels) == 16
+    assert len(channels) == 17
 
 
 def test_each_channel_has_exactly_one_message() -> None:
@@ -154,7 +163,10 @@ def test_exactly_5_channels_require_engine_id() -> None:
     """3 CONFIRMED-v1 engine-required channels + 2 Wave 4 NEW engine-required
     channels (experiment.registered.v1/experiment.anchored.v1 -- ADR-0013
     'observation·citation·experiment 계열' rule covers the whole family,
-    including the registration/anchor notifications) = 5."""
+    including the registration/anchor notifications) = 5. Wave 5's new
+    deployment.confirmed.v1 is deliberately NOT in this set (deployment
+    confirmation is a customer/CI-CD signal, not a ChatGPT-Search observation
+    -- wave5-plan.md deliverable 2), so the count stays 5, not 6."""
     document = _load_yaml(ASYNCAPI_PATH)
     channels = _channels(document)
     flagged = {
@@ -168,7 +180,23 @@ def test_exactly_5_channels_require_engine_id() -> None:
     assert len(flagged) == 5
 
 
-def test_all_16_channels_use_draft_2020_12_schema_format() -> None:
+def test_deployment_confirmed_is_not_engine_id_required() -> None:
+    """Explicit guard (wave5-plan.md deliverable 2): deployment.confirmed.v1 is
+    a customer/CI-CD deployment signal, NOT a per-engine observation, so it must
+    NOT carry x-saena-engine-id-required. A future accidental addition of that
+    flag (which would wrongly force an engine_id into the deployment signal)
+    fails here loudly, independent of the exact-set assertion above."""
+    document = _load_yaml(ASYNCAPI_PATH)
+    channels = _channels(document)
+    deployment = channels["deployment.confirmed.v1"]
+    assert "x-saena-engine-id-required" not in deployment, (
+        "deployment.confirmed.v1 must NOT declare x-saena-engine-id-required "
+        "(it is not an engine observation)"
+    )
+    assert "deployment.confirmed.v1" not in EXPECTED_ENGINE_ID_REQUIRED_CHANNELS
+
+
+def test_all_17_channels_use_draft_2020_12_schema_format() -> None:
     """M2 regression guard: every message payload must be a Multi Format
     Schema Object (payload.schemaFormat + payload.schema), schemaFormat
     pinned to draft-2020-12 -- not a bare sibling key on Message.
@@ -244,12 +272,15 @@ def test_engine_id_glob_guard_passes_genuinely_on_current_catalog() -> None:
     assert violations == [], f"unexpected engine-family guard violations: {violations}"
 
 
-def test_engine_family_schema_directories_match_w4_10_expected_set() -> None:
+def test_engine_family_schema_directories_match_expected_set() -> None:
     """Meta-assertion documenting exactly which observation-*/citation-*/
-    experiment-* directories exist post-w4-10 -- if this set ever drifts
-    (a new engine-family contract lands, or one is renamed/removed), this
-    fails loudly rather than the guard above silently covering an
-    unexpected set.
+    experiment-* directories exist -- if this set ever drifts (a new
+    engine-family contract lands, or one is renamed/removed), this fails
+    loudly rather than the guard above silently covering an unexpected set.
+    w5-02 adds experiment-outcome-observed (an experiment-family event that
+    IS engine-id-required and correctly includes the engine_required_payload
+    fragment). Note: deployment-confirmed does NOT match these prefixes and is
+    (correctly) absent -- it is not engine-id-required.
     """
     event_dir = CONTRACTS_JSON_SCHEMA_DIR / "event"
     matching = {
@@ -262,7 +293,9 @@ def test_engine_family_schema_directories_match_w4_10_expected_set() -> None:
         "citation-normalized",
         "experiment-registered",
         "experiment-anchored",
-    }, f"engine-family directory set drifted from w4-10 expectations: {matching}"
+        # w5-02 (Wave 5): experiment-family, engine-id-required.
+        "experiment-outcome-observed",
+    }, f"engine-family directory set drifted from expectations: {matching}"
 
 
 def test_engine_id_glob_guard_fires_on_synthetic_missing_fragment(tmp_path: Path) -> None:

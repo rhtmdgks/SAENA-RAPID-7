@@ -48,7 +48,9 @@ def test_registry_populated_state_invariants() -> None:
     """w1-15: registry carries all hand-authored contracts. Every relational
     check must run clean on the REAL entry list (no longer vacuous)."""
     entries = registry_mod.load_registry()
-    assert len(entries) == 38
+    # w1-15: 26 (24 json-schema + openapi + asyncapi); w4-10: +12 (7 event +
+    # 5 domain); w5-02 (Wave 5): +5 (3 event payloads + 2 domain records) = 43.
+    assert len(entries) == 43
     closed = {e.name for e in entries if e.compat_class == "closed"}
     assert {"change-plan", "approval-decision"} <= closed
     assert all((not e.signed) or e.compat_class == "closed" for e in entries)

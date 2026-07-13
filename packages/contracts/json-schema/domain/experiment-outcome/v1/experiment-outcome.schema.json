@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/experiment-outcome/v1/experiment-outcome.schema.json",
+  "title": "ExperimentOutcome (DiD decision record)",
+  "description": "Internal decision record of a Difference-in-Differences (DiD) measurement for a registered experiment over its 7-day window, plus the B-layer verdict. This is the CLOSED internal record (additionalProperties:false) mirroring the fields projected by event/experiment-outcome-observed/v1; the event is the thin notification, this domain contract is the fuller stored decision. Determinism: the DiD computation is deterministic — given identical registered inputs, observation set, and GRS policy hash, the net_of_control_lift and b_verdict are byte-reproducible (wave5-plan.md E3 '3x determinism'; ALG §11.3 reproducibility 100%).",
+  "$comment": "compat_class: closed (additionalProperties:false at root, like every other domain record — audit-event, entity-record, experiment-registration), signed: false (this is an internal DiD decision record, NOT a human-signature artifact; contrast domain/experiment-registration signed:true which carries created_by/approved_by human approval). Authority: docs/architecture/wave5-plan.md deliverables 1-4 (DiD, B-gate, evidence), E3/E4, Human decisions H3 (independent-layer definition) and H4 (outcome_layer enum). Fields mirror event/experiment-outcome-observed/v1 (the notification projection) with an added undetermined_reason typed-code array for the UNDETERMINED branch (E4: insufficient/contaminated/late => UNDETERMINED + reason code). engine_id root-referenced (chatgpt-search only) like domain/experiment-registration and domain/platform-observation (root $ref usage, not the payload activation fragment). All refs/hashes are content-addressed anchors — NO raw customer content inline (wave5-plan.md non-scope). The B-gate >=2-independent-layer PASS rule and the duplicate-basis-counted-once rule (H3) are applied by the w5-06 b_gate guard over per_signal_results[]; this schema stores the result, it does not itself enforce the >=2 policy (an in-schema count constraint would still not capture 'independent' — distinct evidence_basis_id — so the guard is the sole authority, honestly).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "engine_id",
+    "experiment_id",
+    "registration_canonical_hash",
+    "window",
+    "deployment_confirmation_ref",
+    "per_signal_results",
+    "b_verdict",
+    "raw_view",
+    "control_adjusted_view",
+    "confidence",
+    "evidence_bundle_ref",
+    "grs_policy",
+    "determinism_note"
+  ],
+  "properties": {
+    "engine_id": {
+      "$ref": "../../../common/engine-id/v1/engine-id.schema.json",
+      "$comment": "chatgpt-search only (root type reference, mirrors domain/experiment-registration.engine_id usage)."
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "registration_canonical_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Immutable preregistration canonical hash this outcome is measured against."
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "ended_at",
+        "clock_anchor"
+      ],
+      "properties": {
+        "started_at": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc"
+        },
+        "ended_at": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc"
+        },
+        "clock_anchor": {
+          "const": "deployment_confirmed",
+          "$comment": "Sole clock-start authority = deployment.confirmed.v1 (ALG §7.3:483)."
+        }
+      }
+    },
+    "deployment_confirmation_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "deployment_id of the deployment.confirmed.v1 signal that started the window clock."
+    },
+    "per_signal_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome_layer",
+          "metric_id",
+          "evidence_basis_id",
+          "treatment_raw_delta",
+          "control_raw_delta",
+          "net_of_control_lift",
+          "sample_counts",
+          "insufficient"
+        ],
+        "properties": {
+          "outcome_layer": {
+            "type": "string",
+            "enum": [
+              "discovery",
+              "citation",
+              "absorption",
+              "prominence",
+              "referral"
+            ],
+            "$comment": "H4 enum (ALG §3.5:159); 'absorption' = data-model value only, not P1 model activation; conversion excluded."
+          },
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_basis_id": {
+            "type": "string",
+            "minLength": 1,
+            "$comment": "Distinct evidence basis (H3): the B-gate counts a layer toward its >=2-independent requirement only with a distinct evidence_basis_id (duplicate basis counted once)."
+          },
+          "treatment_raw_delta": {
+            "type": "number"
+          },
+          "control_raw_delta": {
+            "type": "number"
+          },
+          "net_of_control_lift": {
+            "type": "number",
+            "$comment": "Deterministic DiD estimate: treatment delta net of control delta (w5-05)."
+          },
+          "sample_counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "treatment",
+              "control"
+            ],
+            "properties": {
+              "treatment": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "control": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "insufficient": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "b_verdict": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "undetermined"
+      ]
+    },
+    "undetermined_reason": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "$comment": "Typed reason codes (H7 code-level enum v1, snake_case) explaining an UNDETERMINED verdict (e.g. insufficient_sample, contaminated_control, late_deployment). Present/meaningful for b_verdict=undetermined; the canonical vocabulary is a w5-06 obligation."
+    },
+    "raw_view": {
+      "type": "object",
+      "$comment": "Raw un-adjusted view — MUST accompany control_adjusted_view (ALG §11.3:674-676). Interior open by design (nested per-metric raw figures); root of THIS domain record stays closed."
+    },
+    "control_adjusted_view": {
+      "type": "object",
+      "$comment": "Control-adjusted (net-of-control) view — MUST accompany raw_view. Interior open by design."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "evidence_bundle_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_hash",
+        "artifact_ref"
+      ],
+      "properties": {
+        "manifest_hash": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref"
+        },
+        "artifact_ref": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref"
+        }
+      }
+    },
+    "grs_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "hash",
+        "provenance"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hash": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref"
+        },
+        "provenance": {
+          "type": "string",
+          "enum": [
+            "production",
+            "test_fixture"
+          ]
+        }
+      }
+    },
+    "determinism_note": {
+      "type": "string",
+      "minLength": 1,
+      "$comment": "Human/audit note asserting the DiD determinism invariant for this record: identical (registration hash + observation set + grs_policy.hash) reproduce identical net_of_control_lift and b_verdict (E3, 3x determinism)."
+    }
+  }
+}

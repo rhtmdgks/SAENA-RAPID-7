@@ -187,6 +187,8 @@ ALL_CHANNEL_NAMES = [
     "claim.evidence.versioned.v1",
     "experiment.registered.v1",
     "experiment.anchored.v1",
+    # Wave 5 NEW channel (w5-02 Contracts Steward, channel #17).
+    "deployment.confirmed.v1",
 ]
 
 TENANT_ENVELOPE_COMMON: dict[str, Any] = {
@@ -343,12 +345,78 @@ _CHANNEL_INSTANCE_SPECS: dict[str, tuple[dict[str, Any], str, dict[str, Any]]] =
     "experiment.outcome.observed.v1": (
         TENANT_ENVELOPE_COMMON,
         "experiment.outcome.observed.v1",
-        {},
+        {
+            "engine_id": "chatgpt-search",
+            "experiment_id": "exp-0001",
+            "registration_canonical_hash": "sha256:" + "f" * 64,
+            "window": {
+                "started_at": "2026-07-07T00:00:00Z",
+                "ended_at": "2026-07-14T00:00:00Z",
+                "clock_anchor": "deployment_confirmed",
+            },
+            "deployment_confirmation_ref": "dep-0001",
+            "per_signal_results": [
+                {
+                    "outcome_layer": "citation",
+                    "metric_id": "citation_share",
+                    "evidence_basis_id": "basis-citation-1",
+                    "treatment_raw_delta": 0.12,
+                    "control_raw_delta": 0.02,
+                    "net_of_control_lift": 0.10,
+                    "sample_counts": {"treatment": 120, "control": 118},
+                    "insufficient": False,
+                },
+                {
+                    "outcome_layer": "prominence",
+                    "metric_id": "answer_prominence",
+                    "evidence_basis_id": "basis-prominence-1",
+                    "treatment_raw_delta": 0.08,
+                    "control_raw_delta": 0.01,
+                    "net_of_control_lift": 0.07,
+                    "sample_counts": {"treatment": 120, "control": 118},
+                    "insufficient": False,
+                },
+            ],
+            "b_verdict": "pass",
+            "raw_view": {"citation_share_treatment": 0.42},
+            "control_adjusted_view": {"citation_share_net": 0.10},
+            "confidence": 0.86,
+            "evidence_bundle_ref": {
+                "manifest_hash": "sha256:" + "a" * 64,
+                "artifact_ref": "https://evidence.example.com/bundles/exp-0001",
+            },
+            "grs_policy": {
+                "version": "grs-v1",
+                "hash": "sha256:" + "b" * 64,
+                "provenance": "test_fixture",
+            },
+        },
     ),
     "strategy.card.eligible.v1": (
         AGGREGATE_ENVELOPE_COMMON,
         "strategy.card.eligible.v1",
-        {"engine_id": "chatgpt-search", "strategy_card_id": "card-0142"},
+        {
+            "card_candidate_ref": "card-cand-0142",
+            "source_outcome": {
+                "b_verdict": "pass",
+                "evidence_bundle_manifest_hash": "sha256:" + "a" * 64,
+            },
+        },
+    ),
+    "deployment.confirmed.v1": (
+        TENANT_ENVELOPE_COMMON,
+        "deployment.confirmed.v1",
+        {
+            "deployment_id": "dep-0001",
+            "registration_ref": {
+                "experiment_id": "exp-0001",
+                "registration_canonical_hash": "sha256:" + "f" * 64,
+            },
+            "deployed_commit_sha": "abcdef0123456789abcdef0123456789abcdef01",
+            "deployment_target": {"kind": "site", "identifier": "primary-site"},
+            "confirmer": {"identity": "customer-ci-bot", "method": "ci_pipeline"},
+            "confirmed_at": "2026-07-14T00:00:00Z",
+        },
     ),
 }
 

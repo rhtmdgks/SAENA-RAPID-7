@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/domain/evidence-bundle-manifest/v1/evidence-bundle-manifest.schema.json",
+  "title": "EvidenceBundleManifest",
+  "description": "Closed manifest of the ordered evidence entries that back a DiD experiment outcome (the reproducible evidence bundle — ALG §3.7-3:196, §11.3:674-676; k3s Gate C:540). The manifest is an ORDERED list of content-addressed entries (registration, deployment confirmation, baseline/treatment/control observations, DiD inputs/outputs, B-gate decision, GRS policy, missingness/remediation/rollback) plus the bundle's own manifest_hash. PRIVACY (wave5-plan.md non-scope, H10): entries carry content HASHES and object REFS ONLY — never raw customer query/content/screenshots/secrets inline. Tenant scoping is carried by the surrounding context/envelope (ADR-0013/ADR-0024(e)), NOT re-projected into this record.",
+  "$comment": "compat_class: closed (additionalProperties:false at root and on every entry, like all domain records), signed: false (internal evidence index, not a human-signature artifact). Authority: docs/architecture/wave5-plan.md deliverable 4 (evidence bundle) + E5 (complete + tamper/reorder/splice-evident; no raw customer content/secrets). The entries[] ORDER is significant (reorder-evident): the manifest_hash is computed over the canonical serialization of the ordered entries (reuse saena_domain.audit canonical hashing — wave5-plan.md 'no new hashing rule'), so any reorder/splice changes manifest_hash. entry.content_hash uses the common/identifiers sha256_ref shape ('sha256:'-prefixed lowercase hex) for catalog consistency — every hash in this catalog is sha256_ref-shaped; entry.ref uses uri_ref (query/fragment forbidden — presigned-token smuggling defense, ADR-0024 R9-5). kind enum enumerates exactly the evidence-bundle component classes the DiD pipeline must include for reproducibility. NO tenant_id/run_id field here — tenant scoping is contextual (ADR-0024(e)).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entries",
+    "manifest_hash",
+    "created_at"
+  ],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "content_hash",
+          "ref"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "registration",
+              "deployment_confirmation",
+              "baseline_observation",
+              "treatment_observation",
+              "control_observation",
+              "raw_observation_ref",
+              "did_inputs",
+              "did_outputs",
+              "b_gate_decision",
+              "grs_policy",
+              "missingness_report",
+              "remediation",
+              "rollback"
+            ],
+            "$comment": "Evidence component class (ALG §3.7-3 snapshot+citation+timestamp+client-code-version+asset-hash decomposed into the pipeline's reproducibility inputs/outputs). Enum widening/narrowing = major (ADR-0012)."
+          },
+          "content_hash": {
+            "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+            "$comment": "sha256:-prefixed lowercase-hex content hash of the referenced evidence artifact — the tamper-evidence anchor. NO raw content inline (H10)."
+          },
+          "ref": {
+            "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+            "$comment": "Content-addressed object reference to where the evidence artifact is stored (ref ONLY — query/fragment forbidden, ADR-0024 R9-5)."
+          }
+        }
+      },
+      "$comment": "Ordered evidence entries (order is reorder/splice-evident via manifest_hash)."
+    },
+    "manifest_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Hash over the canonical serialization of the ordered entries[] (reuse saena_domain.audit canonical hashing — no new hashing rule). Any reorder/splice/mutation of entries changes this hash (E5 tamper-evidence)."
+    },
+    "created_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "Manifest creation timestamp (RFC3339 UTC, Z-canonical)."
+    }
+  }
+}

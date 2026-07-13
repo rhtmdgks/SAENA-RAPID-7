@@ -1,0 +1,21 @@
+{
+  "entries": [
+    {
+      "kind": "registration",
+      "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "ref": "https://evidence.example.com/exp-0001/registration"
+    },
+    {
+      "kind": "deployment_confirmation",
+      "content_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "ref": "https://evidence.example.com/exp-0001/deployment"
+    },
+    {
+      "kind": "did_outputs",
+      "content_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "ref": "https://evidence.example.com/exp-0001/did-outputs"
+    }
+  ],
+  "manifest_hash": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+  "created_at": "2026-07-14T00:00:00Z"
+}

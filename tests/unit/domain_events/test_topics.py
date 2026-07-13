@@ -27,13 +27,16 @@ def test_real_catalog_contains_patch_unit_completed() -> None:
     assert info.expected_producer == "agent-runner-service"
 
 
-def test_real_catalog_has_sixteen_channels() -> None:
-    # 12 CONFIRMED-v1 channels + 4 Wave 4 intelligence channels carrying a
-    # message overlay (w4-10: entity.graph / claim.evidence / experiment.
-    # registered / experiment.anchored; the other 3 W4 events — demand.graph,
-    # citation.normalized, observation.captured — were already catalog names).
+def test_real_catalog_has_seventeen_channels() -> None:
+    # 12 CONFIRMED-v1 channels + 4 Wave 4 intelligence channels (w4-10:
+    # entity.graph / claim.evidence / experiment.registered / experiment.
+    # anchored) + 1 Wave 5 channel (w5-02: deployment.confirmed.v1, channel
+    # #17). The other W4/W5 payload-add events — demand.graph, citation.
+    # normalized, observation.captured, experiment.outcome.observed,
+    # strategy.card.eligible — were already catalog names (only gained a
+    # payload $ref, no channel-count change).
     catalog = load_topic_catalog()
-    assert len(catalog) == 16
+    assert len(catalog) == 17
 
 
 def test_real_catalog_every_entry_has_a_producer() -> None:
@@ -63,6 +66,16 @@ def test_real_catalog_engine_id_required_flag_for_observation_citation_experimen
 def test_real_catalog_engine_id_not_required_for_patch_unit_completed() -> None:
     catalog = load_topic_catalog()
     assert catalog["patch.unit.completed.v1"].engine_id_required is False
+
+
+def test_real_catalog_deployment_confirmed_producer_and_not_engine_required() -> None:
+    """w5-02: deployment.confirmed.v1 (channel #17) is produced by the
+    forge-console-api ingress gateway and is NOT engine-id-required (it is a
+    customer/CI-CD deployment signal, not a ChatGPT-Search observation)."""
+    catalog = load_topic_catalog()
+    info = catalog["deployment.confirmed.v1"]
+    assert info.expected_producer == "forge-console-api-service"
+    assert info.engine_id_required is False
 
 
 def test_fixture_catalog_adds_system_channel() -> None:
