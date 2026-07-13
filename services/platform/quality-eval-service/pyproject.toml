@@ -1,0 +1,22 @@
+[project]
+name = "saena-quality-eval"
+version = "0.1.0"
+description = "SAENA quality-eval-service — deterministic Release Gate quality-gate engine (JobKind.QUALITY_EVAL, Algorithm §11.1, W3)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "saena-domain",
+    "saena-schemas",
+    "saena-shared",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_quality_eval"]
+
+[tool.uv.sources]
+saena-domain = { workspace = true }
+saena-schemas = { workspace = true }
+saena-shared = { workspace = true }
