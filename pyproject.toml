@@ -28,6 +28,7 @@ members = [
     "services/intelligence/claim-evidence-service",
     "services/intelligence/citation-intelligence-service",
     "services/experimentation/experiment-attribution-service",
+    "services/experimentation/strategy-skill-bank-service",
     "services/platform/quality-eval-service",
     "services/foundation/tenant-control-service",
     "services/foundation/policy-gate-service",
@@ -74,6 +75,7 @@ dev = [
     "saena-claim-evidence",
     "saena-citation-intelligence",
     "saena-experiment-attribution",
+    "saena-strategy-skill-bank",
     "saena-repository-intake",
     "saena-quality-eval",
     "saena-chatgpt-observer",
@@ -110,6 +112,7 @@ saena-entity-resolution = { workspace = true }
 saena-claim-evidence = { workspace = true }
 saena-citation-intelligence = { workspace = true }
 saena-experiment-attribution = { workspace = true }
+saena-strategy-skill-bank = { workspace = true }
 saena-repository-intake = { workspace = true }
 saena-quality-eval = { workspace = true }
 saena-chatgpt-observer = { workspace = true }

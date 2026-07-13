@@ -29,6 +29,7 @@ members = [
     "saena-schemas",
     "saena-shared",
     "saena-site-discovery",
+    "saena-strategy-skill-bank",
     "saena-tenant-control",
     "saena-testing",
     "saena-vector-store",
@@ -1537,6 +1538,7 @@ dev = [
     { name = "saena-schemas" },
     { name = "saena-shared" },
     { name = "saena-site-discovery" },
+    { name = "saena-strategy-skill-bank" },
     { name = "saena-tenant-control" },
     { name = "saena-testing" },
     { name = "saena-vector-store" },
@@ -1584,6 +1586,7 @@ dev = [
     { name = "saena-schemas", editable = "packages/schemas" },
     { name = "saena-shared", editable = "packages/shared" },
     { name = "saena-site-discovery", editable = "services/acquisition/site-discovery-service" },
+    { name = "saena-strategy-skill-bank", editable = "services/experimentation/strategy-skill-bank-service" },
     { name = "saena-tenant-control", editable = "services/foundation/tenant-control-service" },
     { name = "saena-testing", editable = "packages/testing" },
     { name = "saena-vector-store", editable = "packages/vector-store" },
@@ -1756,6 +1759,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "saena-domain", editable = "packages/domain" }]
+
+[[package]]
+name = "saena-strategy-skill-bank"
+version = "0.1.0"
+source = { editable = "services/experimentation/strategy-skill-bank-service" }
+dependencies = [
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+]
 
 [[package]]
 name = "saena-tenant-control"

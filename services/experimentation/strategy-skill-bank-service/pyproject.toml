@@ -1,0 +1,35 @@
+[project]
+name = "saena-strategy-skill-bank"
+version = "0.1.0"
+description = "SAENA strategy-skill-bank-service — B-verified-only intake boundary (fail-closed, W5, w5-16)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "saena-domain",
+    "saena-schemas",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_strategy_skill_bank"]
+
+[tool.uv.sources]
+saena-domain = { workspace = true }
+saena-schemas = { workspace = true }
+
+# NOTE (w5-16): this package is NOT YET a member of the root workspace
+# (root pyproject.toml `[tool.uv.workspace].members` / dev dependency-group)
+# — per this repo's established Wave-3/4/5 parallel-unit convention (see
+# services/intelligence/claim-evidence-service/pyproject.toml's identical
+# NOTE, and services/acquisition/site-discovery-service/pyproject.toml before
+# it), each new package patch unit's own exclusive paths never include root
+# pyproject.toml: registering a new workspace member is the Integrator's job
+# at merge time (CLAUDE.md "독점 수정 경로" / "단일 owner" — root
+# pyproject.toml is shared infrastructure every parallel wave unit would
+# otherwise collide on). Until that registration happens, this package is
+# NOT `uv sync`-installed/importable as a real distribution — this unit's
+# own tests (`tests/unit/svc_strategy_skill_bank/conftest.py`) import it by
+# inserting `src/` directly onto `sys.path` instead, exactly like that same
+# conftest pattern already does for `saena_claim_evidence`/`saena_site_discovery`.

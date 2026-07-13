@@ -23,6 +23,7 @@ root_packages =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
     saena_hooks_runtime
     saena_analytics_clickhouse
@@ -70,6 +71,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
 
 [importlinter:contract:schemas-is-a-leaf]
 name = saena_schemas must not import other saena packages
@@ -99,6 +101,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
 
 [importlinter:contract:domain-below-services]
@@ -127,6 +130,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
 
 [importlinter:contract:observability-below-services]
@@ -155,6 +159,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
 
 [importlinter:contract:forgectl-is-a-standalone-leaf]
@@ -185,6 +190,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
 
 [importlinter:contract:nothing-imports-forgectl]
 name = domain, observability and services must not import saena_forgectl
@@ -211,6 +217,7 @@ source_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
 forbidden_modules =
     saena_forgectl
 
@@ -243,6 +250,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
 
 [importlinter:contract:nothing-imports-hooks-runtime]
@@ -270,6 +278,7 @@ source_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
 forbidden_modules =
     saena_hooks_runtime
@@ -299,6 +308,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
     saena_hooks_runtime
     saena_analytics_clickhouse
@@ -328,6 +338,7 @@ forbidden_modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
     saena_forgectl
     saena_hooks_runtime
 
@@ -353,3 +364,4 @@ modules =
     saena_claim_evidence
     saena_citation_intelligence
     saena_experiment_attribution
+    saena_strategy_skill_bank
