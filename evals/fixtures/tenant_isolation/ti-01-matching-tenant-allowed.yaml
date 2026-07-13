@@ -1,0 +1,15 @@
+fixture_id: ti-01-matching-tenant-allowed
+axis: tenant_isolation
+seed: 4001
+tag: nominal
+description: >
+  Header X-Saena-Tenant-Id matches the pod's own SAENA_TENANT_ID -> read
+  allowed.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  header_tenant_id: acme-co
+  pod_tenant_id: acme-co
+  expected_tenant_id: acme-co
+  expect_denied: false

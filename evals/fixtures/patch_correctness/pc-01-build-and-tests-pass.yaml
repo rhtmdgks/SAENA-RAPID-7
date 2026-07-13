@@ -1,0 +1,20 @@
+fixture_id: pc-01-build-and-tests-pass
+axis: patch_correctness
+seed: 1001
+tag: nominal
+description: >
+  Both critical gates (build, tests) pass -> patch_correctness passes.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  patch_unit_id: PU-01
+  worktree_commit: abc1234
+  evaluated_at: "2026-07-13T00:00:00Z"
+  gates:
+    - gate_id: build
+      passed: true
+    - gate_id: tests
+      passed: true

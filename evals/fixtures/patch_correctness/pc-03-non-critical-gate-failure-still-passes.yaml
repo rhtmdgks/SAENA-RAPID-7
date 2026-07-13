@@ -1,0 +1,29 @@
+fixture_id: pc-03-non-critical-gate-failure-still-passes
+axis: patch_correctness
+seed: 1003
+tag: false_positive_guard
+description: >
+  A non-critical gate (lint) fails while both critical gates (build, tests)
+  pass. A naive "any gate fails -> whole patch fails" scorer would wrongly
+  FAIL this fixture; the correct scorer only gates on build+tests and must
+  PASS.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  patch_unit_id: PU-01
+  worktree_commit: abc1234
+  evaluated_at: "2026-07-13T00:00:00Z"
+  gates:
+    - gate_id: build
+      passed: true
+    - gate_id: tests
+      passed: true
+    - gate_id: lint
+      passed: false
+      failure:
+        error_code: saena.internal.lint_failed
+        summary: "2 lint warnings (non-blocking for patch_correctness)"
+        retryable: true

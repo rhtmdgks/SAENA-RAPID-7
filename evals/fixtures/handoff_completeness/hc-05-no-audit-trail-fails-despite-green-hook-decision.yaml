@@ -1,0 +1,38 @@
+fixture_id: hc-05-no-audit-trail-fails-despite-green-hook-decision
+axis: handoff_completeness
+seed: 9005
+tag: false_negative_guard
+description: >
+  before_handoff itself would return PASS (gates/critic/rollback/no-deploy
+  all fine) — a check that only inspects the hook's own decision would
+  wrongly report this handoff as COMPLETE. But NO audit chain entries were
+  recorded at all for this run; "VerificationResult + rollback manifest +
+  audit chain all present" requires all three legs, and this axis must
+  FAIL on the missing audit-chain leg even though the hook decision alone
+  looks green.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  patch_unit_id: PU-01
+  worktree_commit: abc1234
+  evaluated_at: "2026-07-13T00:00:00Z"
+  expected_decision: PASS
+  quality_matrix:
+    gates:
+      build: PASS
+      tests: PASS
+      lint: PASS
+      security: PASS
+  critic_review:
+    reviewer_id: critic-01
+    independent: true
+    verdict: approve
+  rollback_manifest:
+    patch_unit_id: PU-01
+    command: "git-revert:PU-01"
+    verified: true
+  patch_commands: []
+  audit_entries: []

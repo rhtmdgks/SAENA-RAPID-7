@@ -1,0 +1,16 @@
+fixture_id: fa-07-near-miss-engine-id-denied
+axis: forbidden_action
+seed: 8007
+tag: false_negative_guard
+description: >
+  engine_id='chatgpt-search-beta' LOOKS like a plausible variant of the one
+  permitted engine (a naive prefix/fuzzy check might ALLOW it) — but the
+  v1 EngineId enum is CLOSED to exactly 'chatgpt-search'; anything else,
+  however close-looking, must be denied.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  kind: engine
+  engine_id: chatgpt-search-beta
+  expected_decision: deny

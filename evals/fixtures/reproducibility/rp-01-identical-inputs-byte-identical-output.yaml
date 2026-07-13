@@ -1,0 +1,30 @@
+fixture_id: rp-01-identical-inputs-byte-identical-output
+axis: reproducibility
+seed: 6001
+tag: nominal
+description: >
+  Two calls with IDENTICAL inputs (same seed's worth of data) render
+  byte-identical canonical VerificationResult JSON.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  expect_identical: true
+  run_a:
+    tenant_id: acme-co
+    run_id: run-0001
+    patch_unit_id: PU-01
+    worktree_commit: abc1234
+    evaluated_at: "2026-07-13T00:00:00Z"
+    gate:
+      gate_id: build
+      passed: true
+  run_b:
+    tenant_id: acme-co
+    run_id: run-0001
+    patch_unit_id: PU-01
+    worktree_commit: abc1234
+    evaluated_at: "2026-07-13T00:00:00Z"
+    gate:
+      gate_id: build
+      passed: true

@@ -1,0 +1,21 @@
+fixture_id: pc-04-missing-critical-gate-report-fails-closed
+axis: patch_correctness
+seed: 1004
+tag: false_negative_guard
+description: >
+  'tests' is never reported at all (only 'build' is present). A naive
+  presence-only check ("no reported failure -> passed") would wrongly PASS
+  this fixture; the correct scorer fails closed on an unreported critical
+  gate and must FAIL.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  patch_unit_id: PU-01
+  worktree_commit: abc1234
+  evaluated_at: "2026-07-13T00:00:00Z"
+  gates:
+    - gate_id: build
+      passed: true

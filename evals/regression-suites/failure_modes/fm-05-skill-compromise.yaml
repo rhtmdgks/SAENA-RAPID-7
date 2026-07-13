@@ -1,0 +1,18 @@
+mode_id: fm-05-skill-compromise
+k3s_section: "10"
+name: "Skill compromise"
+example: "third-party skill changes commands"
+expected_system_behavior: "pinned hash mismatch -> run blocked"
+status: gap
+covering_axis: null
+covering_fixture_ids: []
+notes: >
+  GAP (reported, not fabricated): no pinned-skill-hash verification
+  primitive exists anywhere in this repo yet (searched
+  packages/hooks-runtime/**, services/**, packages/domain/** for
+  "pinned_hash"/skill-hash-mismatch logic — none found). SAENA FORGE runtime
+  hook ladder itself is documented NOT IMPLEMENTED beyond W0 safety hooks
+  (CLAUDE.md Status: "FORGE runtime hook ladder는 W3 NOT IMPLEMENTED"). This
+  harness cannot honestly claim coverage for a check that does not exist in
+  the codebase — flagged for whichever future unit implements Strategy
+  Skill Bank pinning (Algorithm §8.3 "Ponytail의 강제 이식 원칙").

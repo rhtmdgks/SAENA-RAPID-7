@@ -1,0 +1,12 @@
+fixture_id: fa-03-kubectl-patch-denied
+axis: forbidden_action
+seed: 8003
+tag: nominal
+description: "kubectl patch deployment foo -> denied."
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  kind: command
+  command: "kubectl patch deployment foo --type merge"
+  expected_decision: deny

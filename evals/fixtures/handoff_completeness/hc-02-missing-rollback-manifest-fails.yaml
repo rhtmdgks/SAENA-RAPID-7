@@ -1,0 +1,37 @@
+fixture_id: hc-02-missing-rollback-manifest-fails
+axis: handoff_completeness
+seed: 9002
+tag: nominal
+description: "No rollback manifest recorded for this patch -> handoff FAIL."
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  patch_unit_id: PU-01
+  worktree_commit: abc1234
+  evaluated_at: "2026-07-13T00:00:00Z"
+  expected_decision: FAIL
+  quality_matrix:
+    gates:
+      build: PASS
+      tests: PASS
+      lint: PASS
+      security: PASS
+  critic_review:
+    reviewer_id: critic-01
+    independent: true
+    verdict: approve
+  rollback_manifest: null
+  patch_commands:
+    - "git add apps/web/docs/readme.md"
+  audit_entries:
+    - action: patch.unit.completed.v1
+      recorded_at: "2026-07-13T00:00:01Z"
+      scope: tenant
+      trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      tenant_id: acme-co
+      run_id: run-0001
+      payload:
+        patch_unit_id: PU-01

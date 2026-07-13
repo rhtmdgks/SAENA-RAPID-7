@@ -1,0 +1,16 @@
+fixture_id: ti-04-prefix-substring-tenant-denied
+axis: tenant_isolation
+seed: 4004
+tag: false_negative_guard
+description: >
+  Header claims tenant 'acme' while the pod is scoped to 'acme-co' — a
+  naive prefix/substring matcher would wrongly ALLOW this (the header IS a
+  prefix of the env value). reconcile_tenant does plain exact-string
+  equality and must DENY.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  header_tenant_id: acme
+  pod_tenant_id: acme-co
+  expect_denied: true

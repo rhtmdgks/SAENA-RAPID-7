@@ -1,0 +1,19 @@
+fixture_id: fr-03-unusual-category-retryable-still-recovers
+axis: failure_recovery
+seed: 5003
+tag: false_positive_guard
+description: >
+  retryable=true with an UNUSUAL error category (rate_limited, not the more
+  typical 'unavailable'). A naive category-based heuristic ("only
+  'unavailable' errors are really retryable") would wrongly DENY recovery
+  here — the domain's actual rule is the `retryable` BOOLEAN flag alone,
+  independent of category, so this MUST recover via a new job.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  error:
+    error_code: saena.rate_limited.upstream_quota_exceeded
+    summary: "upstream engine rate limit hit"
+    retryable: true
+  recovery_strategy: new_job
