@@ -114,6 +114,9 @@ printf '%s\n' "$_segments" | while IFS= read -r _seg; do
                     _push_rest="$(printf '%s' "$_seg" | awk '{$1=""; $2=""; print}')"
                     for _push_tok in $_push_rest; do
                         case "$_push_tok" in
+                            *\>*|\<*)
+                                : # shell redirection (2>&1, >file, <in) — no push semantics
+                                ;;
                             -u|--set-upstream)
                                 : # upstream tracking on first checkpoint push — harmless
                                 ;;
