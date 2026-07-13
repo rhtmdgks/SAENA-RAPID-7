@@ -42,3 +42,16 @@ a0d05f0b2d5f199cf3acb53440162c3adced7f2c:tests/unit/svc_quality_eval/test_covera
 # real credential. Suppressed by exact fingerprint per ADR-0020.
 12e40411950d2a08077f51cf8209e0447bc0dce9:tests/unit/domain_execution/test_skill_bundle.py:aws-access-token:136
 12e40411950d2a08077f51cf8209e0447bc0dce9:tests/unit/domain_execution/test_skill_bundle.py:aws-access-token:138
+
+# Wave 4 verified false positives (2026-07-13): planted fake secret-shaped
+# strings in the intelligence secret-rejection guard tests — their whole
+# purpose is to assert the guards fail-closed on AWS-/JWT-shaped values. No
+# real credentials. Suppressed by exact fingerprint per ADR-0020 (path
+# allowlisting remains FORBIDDEN).
+#   - test_guard.py (w4-06): ClickHouse `guard_row_fields` corpus — a row
+#     carrying a secret-shaped string is rejected before insert.
+#   - test_rollback_fail_closed.py (w4-18): the artifact gateway refuses an
+#     AWS-shaped value embedded in an opaque object ref.
+7100d9c53d53be3a509990613d2becf0241b6419:tests/integration/intelligence_failure/test_rollback_fail_closed.py:aws-access-token:208
+7100d9c53d53be3a509990613d2becf0241b6419:tests/integration/intelligence_failure/test_rollback_fail_closed.py:aws-access-token:226
+be36856f81c68c479e49ddcfa537a524518c4067:tests/unit/analytics_clickhouse/test_guard.py:jwt:44
