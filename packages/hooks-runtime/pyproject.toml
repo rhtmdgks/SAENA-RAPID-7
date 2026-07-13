@@ -1,0 +1,25 @@
+[project]
+name = "saena-hooks-runtime"
+version = "0.1.0"
+description = "SAENA FORGE runtime hook ladder (w3-06) — session_start / pre_tool_use / post_tool_use / subagent_start / before_handoff decision engine, B-department prompt package v1 §11"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_hooks_runtime"]
+
+# Packaging note (mirrors tools/forgectl/pyproject.toml, w2-19/w2-20
+# precedent — see this package's README.md "Packaging note" section for the
+# full rationale): this package is DELIBERATELY NOT a `uv` workspace member.
+# Registering it (root pyproject.toml `[tool.uv.workspace]` members +
+# `[tool.uv.sources]` + dev-group dependency `saena-hooks-runtime`,
+# `[tool.mypy]` files, `[tool.coverage.run]` source, `.importlinter`
+# `root_packages` / leaf-or-boundary contract) requires editing root config
+# files outside this patch unit's (w3-06) exclusive write paths
+# (packages/hooks-runtime/**, tests/unit/hooks_runtime/** only) — that is
+# Integrator/Wave-exit work, tracked in this package's README "Integrator
+# action needed" section.
