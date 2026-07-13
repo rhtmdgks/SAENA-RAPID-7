@@ -262,6 +262,11 @@ MEASUREMENT_ATTRIBUTE_NAMES: frozenset[str] = frozenset(
 #: and naming the *operation* of computing a DiD attribution is legitimate
 #: (see module docstring "Divergence" note). The magnitude-VALUE tokens
 #: below stay forbidden; `test_measurement.py` pins both halves.
+#: NOTE (w5-17 critic S1): this is a CURATED BLOCKLIST backstopping
+#: single-owner review of registry changes — not an exhaustive semantic
+#: guard. Substring matching is done on ``_<name.lower()>_``.
+#: ``att`` is deliberately absent: it would false-positive the legitimate
+#: operation name ``saena.measurement.compute_did_attribution``.
 FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS: tuple[str, ...] = (
     "lift",
     "uplift",
@@ -273,7 +278,22 @@ FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS: tuple[str, ...] = (
     "pvalue",
     "significance",
     "observed_value",
+    # w5-17 critic S1 widening (collision-checked against every registered
+    # measurement name):
+    "value",
+    "magnitude",
+    "score",
+    "point",
+    "coefficient",
 )
+
+#: Executable mirror of the closed 3-value verdict enum documented on the
+#: ``saena.measurement.verdict`` registry attribute (w5-17 critic S2).
+#: The vocabulary OWNER for verdicts and reason codes is the domain layer
+#: (``saena_domain.measurement.b_gate`` / ``saena_domain.measurement
+#: .reason_codes``); emitters enforce membership — this constant makes the
+#: registry's closedness claim testable instead of purely aspirational.
+MEASUREMENT_VERDICT_ENUM: frozenset[str] = frozenset({"pass", "fail", "undetermined"})
 
 # Fail collection (not just at first call) if any name above regresses on
 # the `saena.<domain>.<name>` / `saena.<capability>.<operation>` naming
@@ -288,6 +308,7 @@ del _metric_name, _span_name
 __all__ = [
     "FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS",
     "MEASUREMENT_ATTRIBUTE_NAMES",
+    "MEASUREMENT_VERDICT_ENUM",
     "MEASUREMENT_METRIC_NAMES",
     "MEASUREMENT_SPAN_NAMES",
     "METRIC_B_VERDICTS_TOTAL",

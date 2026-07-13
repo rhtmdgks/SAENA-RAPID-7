@@ -38,6 +38,7 @@ from saena_observability.measurement import (
     MEASUREMENT_ATTRIBUTE_NAMES,
     MEASUREMENT_METRIC_NAMES,
     MEASUREMENT_SPAN_NAMES,
+    MEASUREMENT_VERDICT_ENUM,
 )
 from saena_observability.naming import is_valid_metric_name, is_valid_span_name
 from saena_observability.redaction import RedactionAction, decide_redaction
@@ -385,6 +386,31 @@ class TestNoForbiddenOutcomeMagnitudeTokenInAnyName:
         # The true magnitude-VALUE tokens stay banned.
         for token in ("lift", "uplift", "effect", "causal", "estimate", "p_value"):
             assert token in FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS
+
+    def test_critic_s1_widened_tokens_are_forbidden(self) -> None:
+        # w5-17 critic S1: widened generic magnitude words (collision-checked).
+        for token in ("value", "magnitude", "score", "point", "coefficient"):
+            assert token in FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS
+        # `att` deliberately excluded — would false-positive the legitimate
+        # span saena.measurement.compute_did_attribution.
+        assert "att" not in FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS
+        # Adversarial names the widened set must now catch:
+        for bad in ("did_value_total", "did_magnitude_total", "did_score_total"):
+            lowered = f"_{bad.lower()}_"
+            assert any(token in lowered for token in FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS), bad
+
+    def test_verdict_enum_is_executable_and_exactly_three(self) -> None:
+        """w5-17 critic S2: the registry's closed-verdict claim is executable.
+
+        The vocabulary owner is the domain layer (saena_domain.measurement
+        .b_gate / .reason_codes); this pins the registry-side mirror so the
+        attributes.yaml description cannot silently drift from the contract.
+        """
+        assert frozenset({"pass", "fail", "undetermined"}) == MEASUREMENT_VERDICT_ENUM
+        # The registry description must name every enum member.
+        entry = load_attribute_registry()["saena.measurement.verdict"]
+        for member in MEASUREMENT_VERDICT_ENUM:
+            assert member in entry.description, member
 
     def test_did_operation_token_is_deliberately_allowed(self) -> None:
         # `did` is NOT in the Wave-5 magnitude-token set (unlike Wave 4's
