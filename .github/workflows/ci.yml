@@ -473,9 +473,11 @@ jobs:
       - run: uv run just measurement-privacy
 
   measurement-e2e:
-    # w5-12/w5-13: attribution boundary + fail-closed pipeline through the
-    # integrated stack + Temporal time-skipping. (Full real-container E2E
-    # harness w5-19 is residual — see wave5-exit-report.md.)
+    # w5-19/c5-01: the REAL composed measurement E2E — real Postgres 16 +
+    # ClickHouse 24.8 + Temporal time-skipping — plus w5-12/w5-13 boundary +
+    # fail-closed pipeline. The `just measurement-e2e` recipe arms
+    # SAENA_MEASUREMENT_E2E_REQUIRED=1, so an infra-absent/all-skipped run is a
+    # HARD FAILURE (exit 6), never a green "0 passed, N skipped".
     needs: [unit]
     runs-on: ubuntu-latest
     steps:

@@ -19,7 +19,7 @@ Algorithm §3.7/§7.3; k3s Gate C; ADR-0002 rev.3/0003/0007/0013). Engine scope:
 `deployment.confirmed.v1` 7-day clock, `outcome_layer` ≥2-independent-layer
 B-gate, evidence bundle, GRS policy mechanism (production values human-gated).
 
-## Delivered (21/24 seed units, all critic-verified, `just verify` green)
+## Delivered (24/24 seed units, all critic-verified, `just verify` green 3×)
 
 - **Contracts** (w5-02): `deployment.confirmed.v1` (channel #17), payloads for
   the envelope-only `experiment.outcome.observed.v1` / `strategy.card.eligible.v1`,
@@ -41,12 +41,22 @@ B-gate, evidence bundle, GRS policy mechanism (production values human-gated).
 
 ## Exact SHAs
 
-Integration commits per unit are in `docs/architecture/wave5-exit-report.md`
-(one table row each). Branch HEAD: `80530a8` (+ w5-23 docs commit).
+Base main: `156568c`. Per-unit integration commits are in
+`docs/architecture/wave5-exit-report.md` (one table row each). The current
+branch tip is the PR #7 head shown on GitHub — the authoritative moving value;
+this doc does not hardcode it (a commit cannot reference its own future SHA).
+
+## Required-gate fail-closed contract (Wave 5 Closure Final Remediation)
+
+Both required integration gates hard-fail (exit 6) — never a green "0 passed,
+N skipped" — when Docker/ClickHouse/Temporal is absent, any required test is
+skipped, or zero collected, with the required env var armed by the recipe (SSOT).
+Docker-present: `measurement-e2e` 35 pass / `measurement-failure-modes` 34 pass,
+real containers, skipped=0. Optional/local (flag unset): honest skip.
 
 ## Evidence
 
-- Unit lane 5259+ tests; per-unit 100% (or ≥99%) module coverage; global
+- Unit lane 5297 tests; per-unit 100% (or ≥99%) module coverage; global
   coverage ratchet held at 99%.
 - **Real containers**: Postgres `16-alpine` (39 tests RAN), ClickHouse
   `24.8-alpine` (14 RAN), Temporal time-skipping (9 RAN, 3× identical, zero

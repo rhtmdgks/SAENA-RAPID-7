@@ -1,9 +1,12 @@
 # Wave 5 (Measurement·B-Layer) — exit report
 
-Branch: `wave5-measurement` (from `main` = `156568c`, W4 PR #5 + remediation PR #6).
-Plan/DAG: `docs/architecture/wave5-plan.md` (commit `6e40907`).
-Final branch HEAD: **`dab5e9a`** (Wave 5 Closure complete).
-Engine scope: ChatGPT Search ONLY. Date: 2026-07-14.
+Branch: `wave5-measurement` (from base `main` = `156568c`, W4 PR #5 + remediation
+PR #6). Plan/DAG: `docs/architecture/wave5-plan.md` (commit `6e40907`).
+**Current PR #7 head is the GitHub PR/branch tip — the authoritative moving
+value; this document deliberately does NOT hardcode it (a commit cannot
+reference its own future SHA).** Stable historical SHAs below name specific
+integrating commits, not "the final HEAD". Engine scope: ChatGPT Search ONLY.
+Date: 2026-07-14.
 
 ## Status
 
@@ -77,12 +80,28 @@ records a run-distinguishing, fingerprint-only evidence entry).
   CI-vacuity + no-fake-mock independently). Every other unit has an independent
   critic that did not author it.
 
+### Wave 5 Closure Final Remediation (required-gate fail-open)
+
+A follow-up closure closed a **fail-open in both required integration gates**:
+on a Docker-absent host the `measurement-e2e` and `measurement-failure-modes`
+lanes collected their real-container scenarios, skipped ALL of them, and exited
+0 — a green "0 passed, N skipped". The zero-collected guard caught only *zero
+collected*, not *collected-but-all-skipped*. Fixed with a required-mode no-skip
+guard (`pytest_sessionfinish`) in both conftests: when the lane's required env
+var is set, any skipped required test — or zero passed — is a HARD FAILURE
+(exit 6). The `just` recipes set the env var internally (SSOT), so a caller
+cannot drop the required semantics. Proven: both recipes exit 6 on Docker-absent
+via the real `just` invocation; both pass with real containers. Guard
+self-tests updated to this contract (E2E 7, failure 3). Stale "w5-19/w5-20
+residual" comments in `justfile`/`ci.yml` were also corrected.
+
 ### Original wave (pre-closure) status, superseded
 
 The initial pass reached PARTIAL PASS (21/24) with w5-19/w5-20/w5-21 residual;
-that state is superseded by this Closure. Stale per-commit verification claims
-against the earlier `80530a8`/`f52e566` heads have been reconciled to the final
-`dab5e9a`.
+that state is fully superseded. All three units are integrated and verified.
+Earlier per-commit verification claims against intermediate heads
+(`80530a8`, `dab5e9a`, …) are historical; the authoritative current state is the
+PR #7 head + its green CI, not any single hardcoded SHA.
 
 ## Delivered units (integrated on wave5-measurement)
 
@@ -252,13 +271,24 @@ commit(s); envelope + the pre-W5 38 contracts + registration ledger untouched
 (only additive registry entries). Helm untouched. No existing runtime path
 altered — measurement services consume events only when wired.
 
-## Verification
+## Verification (Wave 5 Closure Final Remediation)
 
-`uv run just verify` green at HEAD (`80530a8`): lint, typecheck (mypy 370
-files), unit lane (5259+ passed), coverage ratchet held at 99% (temporalio +
-workflow shell absorbed), boundaries (11 import contracts kept), contracts +
-registry validate. 8 W5 named gates individually green. ci↔justfile parity
-test green.
+`uv run just verify` green 3× (deterministic): lint, typecheck, unit lane
+(5297 passed), coverage ratchet held (99%), boundaries (11 import contracts
+kept), contracts + registry validate. All 8 W5 named gates individually green;
+ci↔justfile parity green.
+
+**Required-gate fail-closed contract, proven end-to-end:**
+
+| Gate | Docker present | Docker absent (required env armed) | Optional (flag unset) |
+|---|---|---|---|
+| `just measurement-e2e` | e2e 35 pass (real PG16 + CH24.8 + Temporal time-skipping), skipped=0 | **exit 6 HARD FAILURE** (never green "0 passed, N skipped") | honest skip, exit 0 |
+| `just measurement-failure-modes` | failure matrix 34 pass (31 real-PG rows + 3 guard proofs), skipped=0 | **exit 6 HARD FAILURE** | honest skip, exit 0 |
+
+Real-container lanes green 2× each; guard self-tests: E2E 7 passed, failure 3
+passed. No wall-clock sleep stabilizes Temporal (time-skipping only).
+Failure-mode matrix: every declared node exists + is collectible + ran; primary
+and recovery both run; skipped=0 in required mode.
 
 ## DO NOT AUTO-MERGE
 

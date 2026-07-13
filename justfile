@@ -144,10 +144,10 @@ measurement-privacy:
     uv run pytest tests/unit/svc_experiment_attribution_boundary -q
     uv run pytest -q -m integration tests/integration/measurement_pg tests/integration/clickhouse_outcome -p no:cacheprovider
 
-# w5-12/w5-13: experiment-attribution boundary + fail-closed measurement
-# pipeline (registration→DiD→B-gate→evidence→outcome). E2E through the
-# integrated stack; the full real-container E2E harness (w5-19) + broader
-# failure-mode suite (w5-20) are residual (see wave5-exit-report.md).
+# w5-19/c5-01: experiment-attribution boundary + fail-closed pipeline + the
+# REAL composed measurement E2E (real Postgres 16 + ClickHouse 24.8 + Temporal
+# time-skipping). SAENA_MEASUREMENT_E2E_REQUIRED=1 arms the required-lane guard:
+# an infra-absent/all-skipped run is a HARD FAILURE (exit 6), never a silent pass.
 measurement-e2e:
     uv run pytest tests/unit/svc_experiment_attribution_boundary tests/unit/svc_experiment_attribution_pipeline -q
     # The REAL composed E2E (w5-19/c5-01): real Postgres 16 + ClickHouse 24.8 +
