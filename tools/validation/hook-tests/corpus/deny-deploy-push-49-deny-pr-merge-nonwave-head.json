@@ -1,0 +1,15 @@
+{
+  "hook": "deny-deploy-push",
+  "description": "nonstop-directive: gh pr merge of a non-wave head branch (mocked feature branch) stays denied",
+  "stdin": {
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "gh pr merge 9 --squash"
+    }
+  },
+  "env": {
+    "HOOK_TEST_MOCK_PR_HEAD": "feature/foo",
+    "HOOK_TEST_MOCK_PR_BASE": "main"
+  },
+  "expect_exit": 2
+}
