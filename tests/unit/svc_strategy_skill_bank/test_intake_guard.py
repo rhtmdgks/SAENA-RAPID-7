@@ -342,8 +342,20 @@ def test_reject_raw_content_field_smuggled(field_name: str, value: str) -> None:
     assert IntakeRejectReason.RAW_CONTENT_FIELD in decision.reject_reasons
 
 
-def test_reject_secret_shaped_value_even_under_innocuous_field_name() -> None:
-    decision = IntakeGuard().evaluate(_candidate(extra_payload_fields={"note": "sk-" + "x" * 30}))
+@pytest.mark.parametrize(
+    "sentinel",
+    [
+        "sk-" + "x" * 30,  # bare OpenAI-style prefix
+        "sk-live-AUDITORPROBE1234567890abcdef",  # hyphen-infix Stripe (c5-06 audit A-1)
+        "rk-test-0123456789abcdefghij",  # hyphen-infix restricted key
+        "sk_live_0123456789abcdefghij",  # underscore-infix Stripe
+    ],
+)
+def test_reject_secret_shaped_value_even_under_innocuous_field_name(sentinel: str) -> None:
+    """A secret-shaped value must NOT be ADMITTED into the (production) candidate
+    pool under an innocuous field name — the c5-06 audit found the hyphen-infix
+    convention (sk-live-…) slipping through; this pins it on the ADMIT path."""
+    decision = IntakeGuard().evaluate(_candidate(extra_payload_fields={"note": sentinel}))
 
     assert decision.status is IntakeDecisionStatus.REJECT
     assert IntakeRejectReason.RAW_CONTENT_FIELD in decision.reject_reasons

@@ -70,6 +70,10 @@ _SECRET_SHAPED_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),  # JWT
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),  # PEM private key
     re.compile(r"ghp_[A-Za-z0-9]{36}"),  # GitHub personal access token
+    re.compile(r"\b[sr]k_(live|test)_[A-Za-z0-9]{10,}"),  # Stripe-style (underscore)
+    re.compile(
+        r"\b[sr]k-(live|test)-[A-Za-z0-9]{10,}"
+    ),  # hyphen-infix variant (sk-live-…, c5-06 audit)
 )
 
 

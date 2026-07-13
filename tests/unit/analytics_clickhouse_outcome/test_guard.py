@@ -49,6 +49,18 @@ class TestForbiddenFieldNameRejection:
         with pytest.raises(RawContentRejectedError):
             make_measurement_outcome_row(reason_codes=("ghp_" + "a" * 36,))
 
+    @pytest.mark.parametrize(
+        "sentinel",
+        [
+            "sk-live-AUDITORPROBE1234567890abcdef",  # hyphen-infix Stripe (c5-06 audit A-1)
+            "rk-test-0123456789abcdefghij",
+            "sk_live_0123456789abcdefghij",  # underscore-infix
+        ],
+    )
+    def test_hyphen_and_underscore_infix_secret_shapes_rejected(self, sentinel: str) -> None:
+        with pytest.raises(RawContentRejectedError):
+            make_measurement_outcome_row(evidence_basis_id=sentinel)
+
     def test_error_never_echoes_the_offending_value(self) -> None:
         secret = "sk-" + "z" * 40
         with pytest.raises(RawContentRejectedError) as exc_info:

@@ -217,6 +217,9 @@ _SECRET_SHAPED_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),
     re.compile(r"AIza[0-9A-Za-z_-]{35}"),
     re.compile(r"\b[sr]k_(live|test)_[A-Za-z0-9]{10,}"),
+    re.compile(
+        r"\b[sr]k-(live|test)-[A-Za-z0-9]{10,}"
+    ),  # hyphen-infix variant (sk-live-…, c5-06 audit)
 )
 
 

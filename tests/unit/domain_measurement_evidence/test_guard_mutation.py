@@ -103,6 +103,19 @@ def test_mutation_recursive_walk_active() -> None:
         guard_evidence_fields({"outer": {"inner": "sk-" + "Q" * 30}})
 
 
+@pytest.mark.parametrize(
+    "sentinel",
+    [
+        "sk-live-AUDITORPROBE1234567890abcdef",  # hyphen-infix Stripe (c5-06 audit A-1)
+        "rk-test-0123456789abcdefghij",
+        "sk_live_0123456789abcdefghij",  # underscore-infix
+    ],
+)
+def test_hyphen_and_underscore_infix_secret_shapes_rejected(sentinel: str) -> None:
+    with pytest.raises(RawContentRejectedError):
+        guard_evidence_fields({"note": sentinel})
+
+
 def test_mutation_observation_provenance_required() -> None:
     # delete the observation-kind provenance check → bare metadata passes (bug)
     with pytest.raises(EvidenceDomainError):
