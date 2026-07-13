@@ -28,6 +28,7 @@ fake executor) and the real-container integration lane (`ClickHouseConnectExecut
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from saena_analytics_clickhouse.executor import ClickHouseExecutor
 from saena_analytics_clickhouse.identifiers import validate_tenant_id
@@ -121,7 +122,7 @@ def _experiment_registration_fields(row: ExperimentRegistrationRow) -> dict[str,
     }
 
 
-def _coerce_utc(value: object) -> datetime | None:
+def _coerce_utc(value: datetime) -> datetime:
     """Reattach `tzinfo=UTC` to a NAIVE `datetime` returned by a real
     ClickHouse driver.
 
@@ -142,10 +143,10 @@ def _coerce_utc(value: object) -> datetime | None:
     """
     if isinstance(value, datetime) and value.tzinfo is None:
         return value.replace(tzinfo=UTC)
-    return value  # type: ignore[return-value]
+    return value
 
 
-def _observation_from_values(values: tuple[object, ...]) -> ObservationRow:
+def _observation_from_values(values: tuple[Any, ...]) -> ObservationRow:
     (
         tenant_id,
         id_,
@@ -172,7 +173,7 @@ def _observation_from_values(values: tuple[object, ...]) -> ObservationRow:
     )
 
 
-def _citation_from_values(values: tuple[object, ...]) -> CitationRow:
+def _citation_from_values(values: tuple[Any, ...]) -> CitationRow:
     (
         tenant_id,
         id_,
@@ -199,7 +200,7 @@ def _citation_from_values(values: tuple[object, ...]) -> CitationRow:
     )
 
 
-def _experiment_registration_from_values(values: tuple[object, ...]) -> ExperimentRegistrationRow:
+def _experiment_registration_from_values(values: tuple[Any, ...]) -> ExperimentRegistrationRow:
     (
         tenant_id,
         id_,

@@ -85,19 +85,25 @@ class ClickHouseConnectExecutor:
     `get_client` twice.
     """
 
-    def __init__(self, client: Any) -> None:
+    def __init__(self, client: Any) -> None:  # pragma: no cover - real driver, integration lane
         self._client = client
 
-    def execute(self, sql: str, params: Mapping[str, Any] | None = None) -> None:
+    def execute(
+        self, sql: str, params: Mapping[str, Any] | None = None
+    ) -> (
+        None
+    ):  # pragma: no cover - real clickhouse_connect; covered by tests/integration/clickhouse
         self._client.command(sql, parameters=dict(params) if params else None)
 
-    def query(self, sql: str, params: Mapping[str, Any] | None = None) -> Sequence[tuple[Any, ...]]:
+    def query(
+        self, sql: str, params: Mapping[str, Any] | None = None
+    ) -> Sequence[tuple[Any, ...]]:  # pragma: no cover - real driver, integration lane
         result = self._client.query(sql, parameters=dict(params) if params else None)
         return list(result.result_rows)
 
     def insert_rows(
         self, table: str, columns: Sequence[str], rows: Sequence[Sequence[Any]]
-    ) -> None:
+    ) -> None:  # pragma: no cover - real driver, integration lane
         if not rows:
             return
         self._client.insert(table, list(rows), column_names=list(columns))
@@ -119,7 +125,7 @@ def create_executor(
     that as a package-native, structured error rather than letting an
     `ImportError` leak straight out of a lazy import.
     """
-    try:
+    try:  # pragma: no cover - real driver import, integration lane
         import clickhouse_connect
     except ImportError as exc:  # pragma: no cover - exercised only when the
         # optional runtime dependency is genuinely absent; see module
@@ -129,7 +135,7 @@ def create_executor(
             "ClickHouseConnectExecutor (see pyproject.toml Integrator note)",
             context={"host": host, "port": port},
         ) from exc
-    client = clickhouse_connect.get_client(
+    client = clickhouse_connect.get_client(  # pragma: no cover - real driver, integration lane
         host=host,
         port=port,
         username=username,
@@ -137,7 +143,7 @@ def create_executor(
         database=database,
         secure=secure,
     )
-    return ClickHouseConnectExecutor(client)
+    return ClickHouseConnectExecutor(client)  # pragma: no cover - real driver, integration lane
 
 
 __all__ = [

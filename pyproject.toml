@@ -17,6 +17,7 @@ members = [
     "packages/schemas",
     "packages/domain",
     "packages/observability",
+    "packages/analytics-clickhouse",
     "packages/hooks-runtime",
     "services/acquisition/repository-intake-service",
     "services/acquisition/chatgpt-observer-service",
@@ -60,6 +61,7 @@ dev = [
     "saena-agent-runner",
     "saena-forgectl",
     "saena-hooks-runtime",
+    "saena-analytics-clickhouse",
     "saena-repository-intake",
     "saena-quality-eval",
     "saena-chatgpt-observer",
@@ -89,6 +91,7 @@ saena-engine-gateway = { workspace = true }
 saena-agent-runner = { workspace = true }
 saena-forgectl = { workspace = true }
 saena-hooks-runtime = { workspace = true }
+saena-analytics-clickhouse = { workspace = true }
 saena-repository-intake = { workspace = true }
 saena-quality-eval = { workspace = true }
 saena-chatgpt-observer = { workspace = true }
@@ -115,6 +118,13 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = true
 files = ["packages", "services", "tools/forgectl/src"]
+
+[[tool.mypy.overrides]]
+# clickhouse-connect ships no py.typed marker / stubs (w4-06). The
+# saena_analytics_clickhouse adapter isolates it behind the ClickHouseExecutor
+# Protocol; treat the driver as untyped at its import boundary only.
+module = "clickhouse_connect.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "tests"]
