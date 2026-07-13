@@ -11,6 +11,8 @@ from hooks_runtime_factories import (
     TENANT_ID,
     TRACE_ID,
     TS,
+    VALID_SKILL_BUNDLE_HASH,
+    make_allowing_skill_bundle_port,
     make_budget,
     make_contract,
 )
@@ -41,6 +43,8 @@ def test_session_start_overrun_is_deny() -> None:
             policy_signature_valid=True,
             secret_findings=(),
             budget=make_budget("session_start", expired=True),
+            expected_skill_bundle_hash=VALID_SKILL_BUNDLE_HASH,
+            skill_bundle_port=make_allowing_skill_bundle_port(),
         )
     )
     assert result.decision == Decision.DENY

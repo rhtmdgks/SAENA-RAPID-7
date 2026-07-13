@@ -23,6 +23,8 @@ _PIN = "sha256:" + "a" * 64
 
 
 def _input(**overrides: object) -> SessionStartInput:
+    # pin + port are REQUIRED fields (no default) — the base supplies None so
+    # a test can construct the input; each test overrides with its scenario.
     defaults: dict[str, object] = dict(
         ts=TS,
         run_id=RUN_ID,
@@ -33,6 +35,8 @@ def _input(**overrides: object) -> SessionStartInput:
         policy_signature_valid=True,
         secret_findings=(),
         budget=make_budget("session_start"),
+        expected_skill_bundle_hash=None,
+        skill_bundle_port=None,
     )
     defaults.update(overrides)
     return SessionStartInput(**defaults)  # type: ignore[arg-type]
@@ -53,17 +57,24 @@ def test_no_pin_denies_even_with_a_wired_port() -> None:
     assert d.reason_code == ReasonCode.SKILL_BUNDLE_INTEGRITY
 
 
-def test_explicit_waiver_allows_a_declared_non_bundle_session() -> None:
-    # The ONLY way to skip the gate: an explicit skill_bundle_required=False,
-    # for a genuinely non-executing session. Never set by production wiring.
-    d = session_start(
-        _input(
-            expected_skill_bundle_hash=None,
-            skill_bundle_port=None,
-            skill_bundle_required=False,
+def test_session_start_input_cannot_be_constructed_without_bundle_fields() -> None:
+    # There is NO opt-out: the input type REQUIRES the bundle fields, so a
+    # session cannot even be expressed without them (construction fails).
+    import pytest
+
+    with pytest.raises(TypeError):
+        SessionStartInput(  # type: ignore[call-arg]
+            ts=TS,
+            run_id=RUN_ID,
+            tenant_id=TENANT_ID,
+            trace_id=TRACE_ID,
+            contract=make_contract(),
+            worktree_dirty=False,
+            policy_signature_valid=True,
+            secret_findings=(),
+            budget=make_budget("session_start"),
+            # expected_skill_bundle_hash / skill_bundle_port deliberately omitted
         )
-    )
-    assert d.decision == Decision.ALLOW
 
 
 def test_pin_with_ok_port_allows_and_consults_port() -> None:

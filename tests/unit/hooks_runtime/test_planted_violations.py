@@ -9,7 +9,16 @@ fixture.
 
 from __future__ import annotations
 
-from hooks_runtime_factories import RUN_ID, TENANT_ID, TRACE_ID, TS, make_budget, make_contract
+from hooks_runtime_factories import (
+    RUN_ID,
+    TENANT_ID,
+    TRACE_ID,
+    TS,
+    VALID_SKILL_BUNDLE_HASH,
+    make_allowing_skill_bundle_port,
+    make_budget,
+    make_contract,
+)
 from saena_hooks_runtime.fakes import FailingAuditSink
 from saena_hooks_runtime.hooks.before_handoff import (
     BeforeHandoffInput,
@@ -36,6 +45,8 @@ def test_planted_violation_session_start_missing_contract_must_deny() -> None:
             policy_signature_valid=True,
             secret_findings=(),
             budget=make_budget("session_start"),
+            expected_skill_bundle_hash=VALID_SKILL_BUNDLE_HASH,
+            skill_bundle_port=make_allowing_skill_bundle_port(),
         )
     )
     assert result.decision == Decision.DENY
