@@ -178,8 +178,15 @@ files; `__init__.py` exports = Integrator at merge.)
   `tests/e2e/measurement/**`, `tests/integration/measurement_e2e/**`
 - w5-20 failure/replay/rollback/rebuild/idempotency + F-9 adopt/supersede mapping:
   `tests/integration/measurement_failure/**`, evals failure-mode updates
-- w5-21 Helm/forgectl wiring — **BLOCKED(human)**: deploy/** protected-path approval
-  NOT granted (consolidated request unanswered). Documented only.
+- w5-21 Helm/forgectl wiring — **APPROVED (human, 2026-07-14, Wave 5 Closure)**:
+  the user explicitly granted protected-path authorization for Wave 5
+  measurement/B-layer deployment wiring under `deploy/charts/saena-forge/**`,
+  `deploy/policies/**`, `deploy/README.md`, `tests/unit/deploy/**`,
+  `tests/integration/deploy/**` (SecretRef/external secrets only; no plaintext
+  values). This resolves H8 below. Live cluster install/rollback stays
+  production-only OPEN; static chart correctness (lint/template/kubeconform/
+  forgectl preflight) is in-scope. (Prior state, superseded: BLOCKED(human),
+  approval unanswered.)
 - w5-22 named CI gates (justfile recipes + ci fragments → Integrator applies .github):
   justfile (Integrator), `tools/validation/ci-jobs/w5-*.yml`
 - w5-23 exit report + PR body + living status + final verification:
@@ -219,7 +226,7 @@ assumptions below are the directive-endorsed shapes; production values stay BLOC
 | H5 | deployment.confirmed.v1 confirmer trust model | ADR-0003 pattern: signed external identity → policy-gate-first → direct signal; server receive-time anchor | production confirmer identity/keys |
 | H6 | 7-day timer mechanism | Temporal durable timer + time-skipping tests | — |
 | H7 | Reason-code vocabulary | typed code-level enum v1 (ADR-proposed doc) | spec adoption |
-| H8 | deploy/** (w5-21 Helm) | not approved → BLOCKED | approval |
+| H8 | deploy/** (w5-21 Helm) | **APPROVED (human, 2026-07-14 Wave 5 Closure)** — static chart wiring/validation in scope; live install/rollback stays production-only OPEN | RESOLVED (grant recorded) |
 | H9 | W5 exit matrix sign-off | E1–E12 above | sign-off |
 | H10 | PII-vs-audit legal (W4 carry) | bundle carries hashes/refs only, no raw content | legal sign-off |
 
