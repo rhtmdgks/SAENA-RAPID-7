@@ -16,6 +16,7 @@ members = [
     "saena-orchestrator",
     "saena-plan-contract",
     "saena-policy-gate",
+    "saena-quality-eval",
     "saena-repository-intake",
     "saena-schemas",
     "saena-shared",
@@ -1351,6 +1352,7 @@ dev = [
     { name = "saena-orchestrator" },
     { name = "saena-plan-contract" },
     { name = "saena-policy-gate" },
+    { name = "saena-quality-eval" },
     { name = "saena-repository-intake" },
     { name = "saena-schemas" },
     { name = "saena-shared" },
@@ -1387,6 +1389,7 @@ dev = [
     { name = "saena-orchestrator", editable = "services/platform/agent-orchestrator-service" },
     { name = "saena-plan-contract", editable = "services/foundation/plan-contract-service" },
     { name = "saena-policy-gate", editable = "services/foundation/policy-gate-service" },
+    { name = "saena-quality-eval", editable = "services/platform/quality-eval-service" },
     { name = "saena-repository-intake", editable = "services/acquisition/repository-intake-service" },
     { name = "saena-schemas", editable = "packages/schemas" },
     { name = "saena-shared", editable = "packages/shared" },
@@ -1491,6 +1494,23 @@ requires-dist = [
     { name = "saena-schemas", editable = "packages/schemas" },
     { name = "saena-shared", editable = "packages/shared" },
     { name = "uvicorn", specifier = ">=0.32,<1" },
+]
+
+[[package]]
+name = "saena-quality-eval"
+version = "0.1.0"
+source = { editable = "services/platform/quality-eval-service" }
+dependencies = [
+    { name = "saena-domain" },
+    { name = "saena-schemas" },
+    { name = "saena-shared" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "saena-domain", editable = "packages/domain" },
+    { name = "saena-schemas", editable = "packages/schemas" },
+    { name = "saena-shared", editable = "packages/shared" },
 ]
 
 [[package]]
