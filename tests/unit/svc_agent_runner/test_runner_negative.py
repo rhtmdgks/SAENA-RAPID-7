@@ -17,6 +17,7 @@ from runner_factories import (
     PATCH_UNIT_ID,
     TENANT_A,
     TENANT_B,
+    VALID_SKILL_BUNDLE_PIN,
     build_approval_decision,
     build_change_plan,
 )
@@ -35,12 +36,15 @@ from saena_domain.execution import JobStatus
 
 
 def _runner(worktree_factory, command_executor, artifact_gateway, audit_chain, clock):
+    from runner_factories import make_skill_bundle_source
+
     return PatchUnitRunner(
         worktree_factory=worktree_factory,
         command_executor=command_executor,
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
 
@@ -127,6 +131,7 @@ def test_patch_unit_not_named_in_approval_refused_without_touching_worktree(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[PatchUnitRequest(patch_unit_id="PU-99-not-approved")],
     )
     outcome = result.outcomes[0]
@@ -168,6 +173,7 @@ def test_out_of_scope_write_denied_and_rolled_back(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -214,6 +220,7 @@ def test_protected_path_write_denied_regardless_of_scope(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -261,6 +268,7 @@ def test_diff_over_budget_denied_and_rolled_back(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -295,6 +303,7 @@ def test_non_allowlisted_command_denied(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -349,6 +358,7 @@ def test_deploy_or_push_command_in_patch_unit_denied_even_if_contract_allows_it(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[PatchUnitRequest(patch_unit_id=PATCH_UNIT_ID, commands=(forbidden_argv,))],
     )
     outcome = result.outcomes[0]
@@ -405,6 +415,7 @@ def test_symlink_traversal_escape_write_denied(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -419,12 +430,15 @@ def test_symlink_traversal_escape_write_denied(
 
 
 def runner_with_factory(worktree_factory, command_executor, artifact_gateway, audit_chain, clock):
+    from runner_factories import make_skill_bundle_source
+
     return PatchUnitRunner(
         worktree_factory=worktree_factory,
         command_executor=command_executor,
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
 
@@ -464,6 +478,7 @@ def test_cross_tenant_worktree_access_denied(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,
@@ -509,6 +524,7 @@ def test_base_commit_mismatch_denied(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[PatchUnitRequest(patch_unit_id=PATCH_UNIT_ID)],
     )
     outcome = result.outcomes[0]

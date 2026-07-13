@@ -88,12 +88,28 @@ def make_budget(hook: str, *, expired: bool = False) -> TimeoutBudget:
     return budget
 
 
+#: A valid F-5 skill-bundle pin for tests whose focus is NOT the bundle gate
+#: (they represent a normal execution session that HAS passed bundle
+#: verification). session_start's bundle gate is MANDATORY, so any test that
+#: expects to reach secret_scan / ALLOW must carry a valid pin + an allowing
+#: port. Tests that specifically exercise the bundle gate override these.
+VALID_SKILL_BUNDLE_HASH = "sha256:" + "a" * 64
+
+
+def make_allowing_skill_bundle_port() -> object:
+    from saena_hooks_runtime.hooks.session_start import AllowingSkillBundlePort
+
+    return AllowingSkillBundlePort()
+
+
 __all__ = [
     "REPO_COMMIT",
     "RUN_ID",
     "TENANT_ID",
     "TRACE_ID",
     "TS",
+    "VALID_SKILL_BUNDLE_HASH",
+    "make_allowing_skill_bundle_port",
     "make_budget",
     "make_contract",
     "make_patch_unit",

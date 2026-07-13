@@ -20,7 +20,13 @@ API in this package merges two worktrees together.
 
 from __future__ import annotations
 
-from runner_factories import CONTRACT_HASH, build_approval_decision, build_change_plan
+from runner_factories import (
+    CONTRACT_HASH,
+    VALID_SKILL_BUNDLE_PIN,
+    build_approval_decision,
+    build_change_plan,
+    make_skill_bundle_source,
+)
 from saena_agent_runner.approval import parse_approval_decision
 from saena_agent_runner.artifact import FakeArtifactRegistryGateway
 from saena_agent_runner.clock import FakeClock
@@ -82,6 +88,7 @@ def test_two_agents_writing_the_same_route_get_fully_isolated_worktrees(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     result = runner.run(
@@ -89,6 +96,7 @@ def test_two_agents_writing_the_same_route_get_fully_isolated_worktrees(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=AGENT_A_UNIT,
@@ -170,6 +178,7 @@ def test_a_patch_unit_cannot_write_a_file_outside_its_own_declared_files_list(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     result = runner.run(
@@ -177,6 +186,7 @@ def test_a_patch_unit_cannot_write_a_file_outside_its_own_declared_files_list(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=AGENT_A_UNIT,

@@ -19,8 +19,10 @@ import pytest
 from runner_factories import (
     CONTRACT_HASH,
     PATCH_UNIT_ID,
+    VALID_SKILL_BUNDLE_PIN,
     build_approval_decision,
     build_change_plan,
+    make_skill_bundle_source,
 )
 from saena_agent_runner.approval import parse_approval_decision
 from saena_agent_runner.artifact import FakeArtifactRegistryGateway
@@ -50,12 +52,14 @@ def _run_one_denied_unit(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
     return runner.run(
         job_context=job_context,
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[PatchUnitRequest(patch_unit_id="PU-NOT-APPROVED")],
     )
 
@@ -150,6 +154,7 @@ def test_forged_approval_decision_never_reaches_the_ledger_as_executed(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     with pytest.raises(ApprovalContractHashMismatchError):

@@ -1,11 +1,23 @@
 from __future__ import annotations
 
-from hooks_runtime_factories import RUN_ID, TENANT_ID, TRACE_ID, TS, make_budget, make_contract
+from hooks_runtime_factories import (
+    RUN_ID,
+    TENANT_ID,
+    TRACE_ID,
+    TS,
+    VALID_SKILL_BUNDLE_HASH,
+    make_allowing_skill_bundle_port,
+    make_budget,
+    make_contract,
+)
 from saena_hooks_runtime.hooks.session_start import SecretFinding, SessionStartInput, session_start
 from saena_hooks_runtime.models import Decision, ReasonCode
 
 
 def _base_input(**overrides: object) -> SessionStartInput:
+    # A normal, valid execution session — carries a valid F-5 pin + allowing
+    # port so the (mandatory) bundle gate passes; these tests focus on the
+    # contract/policy/secret checks, not the bundle gate itself.
     defaults: dict[str, object] = dict(
         ts=TS,
         run_id=RUN_ID,
@@ -16,6 +28,8 @@ def _base_input(**overrides: object) -> SessionStartInput:
         policy_signature_valid=True,
         secret_findings=(),
         budget=make_budget("session_start"),
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_HASH,
+        skill_bundle_port=make_allowing_skill_bundle_port(),
     )
     defaults.update(overrides)
     return SessionStartInput(**defaults)  # type: ignore[arg-type]

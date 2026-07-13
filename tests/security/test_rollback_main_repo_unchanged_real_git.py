@@ -24,8 +24,10 @@ from pathlib import Path
 from runner_factories import (
     CONTRACT_HASH,
     PATCH_UNIT_ID,
+    VALID_SKILL_BUNDLE_PIN,
     build_approval_decision,
     build_change_plan,
+    make_skill_bundle_source,
 )
 from saena_agent_runner.approval import parse_approval_decision
 from saena_agent_runner.artifact import FakeArtifactRegistryGateway
@@ -119,12 +121,14 @@ def test_main_source_repo_is_byte_identical_after_a_denied_and_rolled_back_attem
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
     result = runner.run(
         job_context=job_context,
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,

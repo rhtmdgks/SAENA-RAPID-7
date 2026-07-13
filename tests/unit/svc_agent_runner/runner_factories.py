@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from saena_domain.execution import JobContext
+from saena_domain.execution import JobContext, compute_skill_bundle_hash
 
 TENANT_A = "acme-co"
 TENANT_B = "globex-co"
@@ -20,6 +20,22 @@ PATCH_UNIT_ID = "PU-01"
 BASE_COMMIT = "a" * 40
 CONTRACT_HASH = "sha256:" + "b" * 64
 EVIDENCE_LEDGER_HASH = "sha256:" + "c" * 64
+
+# A valid, verified skill bundle for tests that reach execution. The
+# agent-runner F-5 gate is MANDATORY, so any test that passes approval and
+# executes must carry a real bundle + its pin (tests that exercise the F-5
+# gate itself override these with a tampered/absent bundle).
+VALID_SKILL_BUNDLE = {
+    "claude/skill.md": b"# skill\nrun approved-command\n",
+    "portable/allowlist.txt": b"approved-command\n",
+}
+VALID_SKILL_BUNDLE_PIN = compute_skill_bundle_hash(dict(VALID_SKILL_BUNDLE))
+
+
+def make_skill_bundle_source() -> object:
+    from saena_agent_runner.skill_bundle import InMemorySkillBundleSource
+
+    return InMemorySkillBundleSource(bundle=dict(VALID_SKILL_BUNDLE))
 
 
 def build_job_context(

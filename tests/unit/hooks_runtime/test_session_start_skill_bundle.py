@@ -38,8 +38,31 @@ def _input(**overrides: object) -> SessionStartInput:
     return SessionStartInput(**defaults)  # type: ignore[arg-type]
 
 
-def test_no_pin_allows_without_a_port() -> None:
+def test_no_pin_denies_fail_closed() -> None:
+    # MANDATORY gate: a write session with no skill_bundle_hash pinned (and no
+    # port) is DENY — not a skip. (Reversed from the former permissive test.)
     d = session_start(_input(expected_skill_bundle_hash=None, skill_bundle_port=None))
+    assert d.decision == Decision.DENY
+    assert d.reason_code == ReasonCode.SKILL_BUNDLE_INTEGRITY
+
+
+def test_no_pin_denies_even_with_a_wired_port() -> None:
+    port = StubSkillBundlePort(result=SkillBundleIntegrityResult(ok=True))
+    d = session_start(_input(expected_skill_bundle_hash=None, skill_bundle_port=port))
+    assert d.decision == Decision.DENY
+    assert d.reason_code == ReasonCode.SKILL_BUNDLE_INTEGRITY
+
+
+def test_explicit_waiver_allows_a_declared_non_bundle_session() -> None:
+    # The ONLY way to skip the gate: an explicit skill_bundle_required=False,
+    # for a genuinely non-executing session. Never set by production wiring.
+    d = session_start(
+        _input(
+            expected_skill_bundle_hash=None,
+            skill_bundle_port=None,
+            skill_bundle_required=False,
+        )
+    )
     assert d.decision == Decision.ALLOW
 
 

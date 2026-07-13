@@ -54,6 +54,7 @@ from fastapi.testclient import TestClient
 from git_worktree_adapter import GitSyntheticRepo, GitWorktreeFactory
 from saena_agent_runner import (
     FileWrite,
+    InMemorySkillBundleSource,
     PatchUnitRequest,
     PatchUnitRunner,
     parse_approval_decision,
@@ -63,7 +64,12 @@ from saena_agent_runner.clock import SystemClock
 from saena_agent_runner.worktree import FakeCommandExecutor
 from saena_domain.audit import InMemoryAuditChain
 from saena_domain.audit.lineage import is_lineage_ref, make_lineage_ref
-from saena_domain.execution import JobContext, JobStatus, build_repo_intaken_payload
+from saena_domain.execution import (
+    JobContext,
+    JobStatus,
+    build_repo_intaken_payload,
+    compute_skill_bundle_hash,
+)
 from saena_domain.identity import TenantId
 from saena_domain.identity.http import TENANT_HEADER_NAME
 from saena_domain.persistence import InMemoryArtifactManifestStore
@@ -105,6 +111,14 @@ PROPOSER = "actor-proposer-e2e"
 APPROVER_1 = "actor-approver-e2e-1"
 PATCH_FILE = "apps/web/docs/new-page.md"
 PATCH_CONTENT = b"# New synthetic tenant page\n\nAdded by the W3 E2E patch unit.\n"
+
+# The pinned, verified skill bundle this synthetic run executes (F-5 gate is
+# mandatory — the run cannot execute without a valid pin + source).
+_E2E_SKILL_BUNDLE = {
+    "claude/skill.md": b"# e2e skill\nrun approved-command\n",
+    "portable/allowlist.txt": b"approved-command\n",
+}
+_E2E_SKILL_BUNDLE_PIN = compute_skill_bundle_hash(dict(_E2E_SKILL_BUNDLE))
 
 
 def _tenant_create_body(tenant_id: str) -> dict:
@@ -340,12 +354,14 @@ def test_synthetic_tenant_full_execution_e2e(
         artifact_gateway=artifact_gateway,
         audit_chain=agent_runner_audit_chain,
         clock=SystemClock(),
+        skill_bundle_source=InMemorySkillBundleSource(bundle=dict(_E2E_SKILL_BUNDLE)),
     )
     run_result = runner.run(
         job_context=job_context,
         contract=contract,
         expected_contract_hash=contract_hash,
         approval=approval,
+        expected_skill_bundle_hash=_E2E_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,

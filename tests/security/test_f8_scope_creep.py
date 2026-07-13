@@ -28,8 +28,10 @@ from factories import build_gate_input_bundle, build_quality_eval_request
 from runner_factories import (
     CONTRACT_HASH,
     PATCH_UNIT_ID,
+    VALID_SKILL_BUNDLE_PIN,
     build_approval_decision,
     build_change_plan,
+    make_skill_bundle_source,
 )
 from saena_agent_runner.approval import parse_approval_decision
 from saena_agent_runner.artifact import FakeArtifactRegistryGateway
@@ -77,6 +79,7 @@ def test_agent_runner_denies_and_rolls_back_the_unrelated_refactor_write(
         artifact_gateway=artifact_gateway,
         audit_chain=audit_chain,
         clock=clock,
+        skill_bundle_source=make_skill_bundle_source(),
     )
 
     result = runner.run(
@@ -84,6 +87,7 @@ def test_agent_runner_denies_and_rolls_back_the_unrelated_refactor_write(
         contract=contract,
         expected_contract_hash=CONTRACT_HASH,
         approval=approval,
+        expected_skill_bundle_hash=VALID_SKILL_BUNDLE_PIN,
         requests=[
             PatchUnitRequest(
                 patch_unit_id=PATCH_UNIT_ID,

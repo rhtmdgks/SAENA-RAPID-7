@@ -88,12 +88,20 @@ class SessionStartInput:
     policy_signature_valid: bool
     secret_findings: tuple[SecretFinding, ...]
     budget: TimeoutBudget
-    #: F-5 pin for this run, or None if the run carries no skill bundle.
+    #: F-5 pin for this run's skill bundle (`sha256:<hex>`). REQUIRED for any
+    #: session where `skill_bundle_required` is True (the default) — a None pin
+    #: there is a fail-closed DENY.
     expected_skill_bundle_hash: str | None = None
-    #: Injected verifier (wraps saena_domain.execution.skill_bundle). When a
-    #: skill-bundle hash is pinned but no port is wired, session_start
-    #: fail-closed denies (cannot prove integrity).
+    #: Injected verifier (wraps saena_domain.execution.skill_bundle). REQUIRED
+    #: (non-None) whenever `skill_bundle_required` is True — a None port is a
+    #: fail-closed DENY (cannot prove integrity).
     skill_bundle_port: SkillBundleIntegrityPort | None = None
+    #: Whether this session must pass the F-5 skill-bundle gate. Default True
+    #: (fail-closed): a write session that will run skill-derived commands MUST
+    #: verify its bundle. Set False ONLY for a genuinely non-executing session
+    #: that legitimately has no bundle — an explicit, auditable waiver a
+    #: production execution wiring never sets.
+    skill_bundle_required: bool = True
 
 
 def verify_run_context(input: SessionStartInput) -> ReasonCode | None:
@@ -116,12 +124,24 @@ def verify_policy_signature(input: SessionStartInput) -> ReasonCode | None:
 
 
 def check_skill_bundle_integrity(input: SessionStartInput) -> tuple[ReasonCode | None, str]:
-    """F-5 dedicated skill-bundle integrity gate (fail-closed). Only enforced
-    when the run pins an `expected_skill_bundle_hash`; a run with no pin is
-    not gated here (nothing to verify). A pinned run with no wired port, or a
-    port that raises, is a DENY (cannot prove integrity)."""
-    if input.expected_skill_bundle_hash is None:
+    """F-5 dedicated skill-bundle integrity gate — MANDATORY, fail-closed.
+
+    A `session_start` guards a write session that will run skill-derived
+    commands, so it MUST carry a valid `expected_skill_bundle_hash` pin AND a
+    wired `skill_bundle_port`. A missing pin (None), a missing port, or a port
+    that raises is a DENY — there is NO "no pin → skip" path (that would be
+    fail-open: a session with an unverified/absent bundle could proceed).
+
+    The rare genuinely-non-executing session that legitimately has no bundle
+    must set `skill_bundle_required=False` explicitly — an auditable, opt-in
+    waiver that a production execution wiring never sets."""
+    if not input.skill_bundle_required:
         return None, ""
+    if input.expected_skill_bundle_hash is None:
+        return (
+            ReasonCode.SKILL_BUNDLE_INTEGRITY,
+            "no skill_bundle_hash pinned for a write session — fail-closed",
+        )
     port = input.skill_bundle_port
     if port is None:
         return (

@@ -25,7 +25,16 @@ from __future__ import annotations
 
 import pytest
 from factories import build_gate_input_bundle, build_quality_eval_request
-from hooks_runtime_factories import RUN_ID, TENANT_ID, TRACE_ID, TS, make_budget, make_contract
+from hooks_runtime_factories import (
+    RUN_ID,
+    TENANT_ID,
+    TRACE_ID,
+    TS,
+    VALID_SKILL_BUNDLE_HASH,
+    make_allowing_skill_bundle_port,
+    make_budget,
+    make_contract,
+)
 from intake_factories import (
     FakeContentHashVerifier,
     FakeSecretScanner,
@@ -67,6 +76,8 @@ def test_session_start_denies_and_redacts_dotenv_referenced_secret() -> None:
                 ),
             ),
             budget=make_budget("session_start"),
+            expected_skill_bundle_hash=VALID_SKILL_BUNDLE_HASH,
+            skill_bundle_port=make_allowing_skill_bundle_port(),
         )
     )
     assert decision.decision == Decision.DENY

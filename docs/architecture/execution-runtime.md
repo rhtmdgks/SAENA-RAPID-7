@@ -129,17 +129,27 @@ fails closed on byte change / file add / delete / rename / missing bundle /
 missing-or-malformed pin / symlink / traversal.
 
 It is enforced at **two boundaries**, each fail-closed and BEFORE any tool /
-worktree / executor:
+worktree / executor. The gate is **MANDATORY**: a *missing* pin is a DENY, not
+a skip — there is no "no bundle → proceed" path (that would be fail-open: a run
+with an unverified/absent bundle could execute).
 
 - **agent-runner** (`saena_agent_runner.skill_bundle.enforce_skill_bundle_
   integrity`, called inside `PatchUnitRunner.run` after approval, before the
   first worktree). agent-runner imports the pure verifier directly (services →
-  `saena_domain` is allowed).
+  `saena_domain` is allowed). Because an agent-runner run always executes
+  skill-derived commands, the pin AND source are UNCONDITIONALLY required:
+  `expected_skill_bundle_hash=None` → `SkillBundleHashMissingError`; a None
+  `skill_bundle_source` → `SkillBundleMissingError`; both DENY before any
+  worktree. There is no waiver.
 - **hooks-runtime `session_start`** — via an injected `SkillBundleIntegrityPort`.
   hooks-runtime is a stdlib-only leaf and CANNOT import `saena_domain`, so the
   concrete adapter (wrapping `verify_skill_bundle`) is supplied by the runtime
-  host; hooks-runtime only defines the Port + the fail-closed enforcement (a
-  pinned run with no wired port, or a raising adapter, denies).
+  host; hooks-runtime defines the Port + the fail-closed enforcement. Here the
+  gate is on by default (`skill_bundle_required=True`): a missing pin, a missing
+  port, or a raising adapter all DENY. A genuinely non-executing session may
+  set `skill_bundle_required=False` — an explicit, auditable waiver a production
+  execution wiring never sets. (agent-runner has no such flag — it always
+  executes.)
 
 The `contract_hash` pin is retained as a complementary defense; it does not
 substitute for bundle verification. Wiring the two independent implementations
