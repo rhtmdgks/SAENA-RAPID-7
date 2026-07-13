@@ -78,6 +78,30 @@ test-experiment-integrity:
     uv run pytest tests/unit/domain_experiment -q
     uv run pytest -q -m integration tests/integration/intelligence_failure/test_experiment_ledger_tamper.py -p no:cacheprovider
 
+# ---- Wave 4 REMEDIATION named required checks (ADR-0018 stable check names) ----
+# Concurrency/integrity/privacy gates the original W4 CI missed. Container legs
+# honest-skip when Docker is unreachable; same belt-and-suspenders shape as the
+# W3/W4 named checks above.
+
+# r4-01: pgvector concurrent-upsert integrity (advisory lock + partial unique index)
+vector-concurrency:
+    uv run pytest tests/unit/vector_store -q
+    uv run pytest -q -m integration tests/integration/vector -p no:cacheprovider
+
+# r4-02: ClickHouse distributed idempotency (server-side dedup token, multi-writer)
+analytics-idempotency:
+    uv run pytest tests/unit/analytics_clickhouse -q
+    uv run pytest -q -m integration tests/integration/clickhouse/test_idempotency_distributed.py -p no:cacheprovider
+
+# r4-03: experiment ledger chain-entry hash commits previous_hash (reorder/relink adversarial)
+experiment-chain-adversarial:
+    uv run pytest tests/unit/domain_experiment/test_ledger.py -q
+
+# r4-04: query privacy boundary (raw query never persisted; keyed tenant-scoped ref)
+intelligence-privacy:
+    uv run pytest tests/unit/analytics_clickhouse/test_query_privacy.py -q
+    uv run pytest -q -m integration tests/integration/clickhouse/test_query_privacy_boundary.py -p no:cacheprovider
+
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
 helm-smoke:

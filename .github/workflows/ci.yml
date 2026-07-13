@@ -304,6 +304,75 @@ jobs:
       - run: uv sync --locked
       - run: uv run just test-intelligence-e2e
 
+  # ---- Wave 4 REMEDIATION named required checks (ADR-0018 stable check names) ----
+
+  vector-concurrency:
+    # r4-01 pgvector concurrent-upsert integrity — real pgvector testcontainer.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just vector-concurrency
+
+  analytics-idempotency:
+    # r4-02 ClickHouse distributed idempotency — real ClickHouse testcontainer,
+    # ≥20 concurrent independent writers.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just analytics-idempotency
+
+  experiment-chain-adversarial:
+    # r4-03 experiment ledger chain-entry hash commits previous_hash —
+    # reorder/relink/splice/deletion adversarial suite.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just experiment-chain-adversarial
+
+  intelligence-privacy:
+    # r4-04 query privacy boundary — raw query never persisted; keyed
+    # tenant-scoped ref proven against a real ClickHouse testcontainer.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just intelligence-privacy
+
   helm-smoke:
     # W3 offline chart packaging gate (w2-23/w3-07 chart). No cluster contact:
     # helm lint + template + kubeconform static validation + forgectl preflight.
