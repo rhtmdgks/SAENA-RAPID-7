@@ -1,12 +1,16 @@
 {{- /*
-Non-secret CONNECTION config for PG/Temporal/MinIO/Redpanda (host/port/db/
-endpoint) — credential values themselves are never here, only *SecretRef
-names a service's Deployment env carries as plain env vars (pointing at the
-ExternalSecret-managed Secret object name, not a value — see
-templates/services/deployments.yaml env `*_CREDENTIALS_SECRET_REF` entries
-and templates/config/external-secret-refs.yaml). This mirrors k3s spec §6.1:
-"secret은 Helm values, ConfigMap ... 에 절대 저장하지 않는다" — only
-non-secret endpoint metadata lives in this ConfigMap.
+Non-secret CONNECTION config for PG/Temporal/MinIO/Redpanda/ClickHouse
+(host/port/db/endpoint) — credential values themselves are never here, only
+*SecretRef names a service's Deployment env carries as plain env vars
+(pointing at the ExternalSecret-managed Secret object name, not a value —
+see templates/services/deployments.yaml env `*_CREDENTIALS_SECRET_REF`
+entries and templates/config/external-secret-refs.yaml). This mirrors k3s
+spec §6.1: "secret은 Helm values, ConfigMap ... 에 절대 저장하지 않는다" —
+only non-secret endpoint metadata lives in this ConfigMap. ClickHouse
+(w4-14, data-ownership.md "도입 시점 = Wave 4") follows the identical
+shape; vectorStore (pgvector-backend) needs no separate host/port here —
+it reuses the `postgres` connection above (see values.yaml
+`vectorStore.usesPostgresConnection` comment).
 */ -}}
 apiVersion: v1
 kind: ConfigMap
@@ -28,3 +32,9 @@ data:
   EVENT_BUS_TYPE: {{ .Values.eventBus.type | quote }}
   EVENT_BUS_BROKERS: {{ join "," .Values.eventBus.brokers | quote }}
   OTEL_COLLECTOR_ENDPOINT: {{ .Values.observability.otelCollectorEndpoint | quote }}
+  {{- if .Values.clickhouse }}
+  CLICKHOUSE_HOST: {{ .Values.clickhouse.host | quote }}
+  CLICKHOUSE_PORT: {{ .Values.clickhouse.port | quote }}
+  CLICKHOUSE_DATABASE: {{ .Values.clickhouse.database | quote }}
+  CLICKHOUSE_USE_TLS: {{ .Values.clickhouse.useTLS | quote }}
+  {{- end }}

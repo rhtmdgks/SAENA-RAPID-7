@@ -97,13 +97,31 @@ class TestFiveJobAndBrowserPoolServiceAccountsRendered:
     ) -> None:
         """Proves this unit's change is additive — the pre-existing 8
         long-running service SAs still default to automount: true (they
-        need it, unlike the 5 job/browser-pool SAs above)."""
+        need it, unlike the 5 job/browser-pool SAs above).
+
+        w4-14 adds 2 more service-shaped SAs on top of these 8:
+        `saena-forge-intelligence-worker-sa` (keeps automount: true, same
+        reasoning as the original 8 — see
+        test_intelligence_workloads.py::TestIntelligenceWorkerHasNoKubernetesApiAccess)
+        and `saena-forge-chatgpt-observer-sa` (the NEW browser-pool
+        coordinator SA, deliberately automount: false — READ-ONLY per
+        w4-14's named MUST constraint, see
+        test_intelligence_workloads.py::TestChatgptObserverCoordinatorIsReadOnlyWithNoGitCredential).
+        Both new SAs are excluded from this specific "unaffected 8"
+        assertion by name (rather than widening `JOB_AND_BROWSER_POOL_SA_NAMES`,
+        which names the 5 Job-kind SAs specifically, not either of these 2
+        new Deployment-backed SAs)."""
+        w4_14_new_service_sa_names = {
+            "saena-forge-intelligence-worker-sa",
+            "saena-forge-chatgpt-observer-sa",
+        }
         docs = _rendered_docs(chart_dir)
         service_sas = [
             d
             for d in docs
             if d["kind"] == "ServiceAccount"
             and d["metadata"]["name"] not in JOB_AND_BROWSER_POOL_SA_NAMES
+            and d["metadata"]["name"] not in w4_14_new_service_sa_names
         ]
         assert len(service_sas) == 8
         for sa in service_sas:
