@@ -748,6 +748,82 @@ def test_secret_sentinel_absent_from_conflicting_confirmation_reason_codes(
     assert _SECRET_SENTINEL not in outcome.canonical_payload()
 
 
+def test_secret_sentinel_absent_from_raised_exception_strings(postgres_url: str) -> None:
+    """SHOULD-FIX (c5-01 critic): the sentinel sweep must cover RAISED-EXCEPTION
+    message strings too, not only events/logs/evidence/rows. Force a REAL
+    store-level fail-closed rejection whose triggering content carries a
+    secret-shaped sentinel, and assert the sentinel appears in NEITHER
+    `str(exc)` NOR `repr(exc)` NOR the exception's structured `context` dict.
+
+    Two independent real-adapter rejection paths are exercised:
+
+    (a) `IdempotencyConflictError` — a same-tenant/same-key confirmation whose
+        DIFFERING content embeds the sentinel (the raw
+        `ConfirmationStore.put_confirmation` conflict, exercised DIRECTLY here
+        rather than through the seam that would otherwise absorb it into an
+        UNDETERMINED outcome, so the raw exception itself is inspectable).
+    (b) `TenantIsolationError` — a forged cross-tenant confirmation record
+        whose payload embeds the sentinel.
+    """
+    from saena_domain.measurement.errors import (
+        IdempotencyConflictError,
+        TenantIsolationError,
+    )
+    from saena_domain.measurement.ports import ConfirmationRecord
+
+    ports = make_pg_ports(postgres_url)
+    key = "c5e2e:exc-secret:0001"
+
+    # (a) First store a benign confirmation, then a same-key conflicting one
+    # whose payload embeds the sentinel — the raw adapter raises
+    # IdempotencyConflictError (fail-closed, no overwrite).
+    ports.confirmation_store.put_confirmation(
+        TENANT_1,
+        key,
+        ConfirmationRecord(
+            tenant_id=TENANT_1,
+            confirmation_key=key,
+            measurement_kind="deployment_confirmation",
+            payload={"commit": "a" * 40},
+        ),
+    )
+    with pytest.raises(IdempotencyConflictError) as conflict_exc:
+        ports.confirmation_store.put_confirmation(
+            TENANT_1,
+            key,
+            ConfirmationRecord(
+                tenant_id=TENANT_1,
+                confirmation_key=key,
+                measurement_kind="deployment_confirmation",
+                payload={"commit": _SECRET_SENTINEL},
+            ),
+        )
+    exc = conflict_exc.value
+    assert _SECRET_SENTINEL not in str(exc)
+    assert _SECRET_SENTINEL not in repr(exc)
+    assert _SECRET_SENTINEL not in str(exc.context)
+    assert _SECRET_SENTINEL not in str(exc.to_dict())
+
+    # (b) A forged cross-tenant record carrying the sentinel — the raw adapter
+    # rejects it with TenantIsolationError BEFORE any statement runs; the
+    # rejection must not echo the forged payload's secret.
+    forged = ConfirmationRecord(
+        tenant_id="attacker-tenant",
+        confirmation_key="c5e2e:exc-secret:tenant",
+        measurement_kind="deployment_confirmation",
+        payload={"commit": _SECRET_SENTINEL},
+    )
+    with pytest.raises(TenantIsolationError) as tenant_exc:
+        ports.confirmation_store.put_confirmation(
+            "victim-tenant", "c5e2e:exc-secret:tenant", forged
+        )
+    exc = tenant_exc.value
+    assert _SECRET_SENTINEL not in str(exc)
+    assert _SECRET_SENTINEL not in repr(exc)
+    assert _SECRET_SENTINEL not in str(exc.context)
+    assert _SECRET_SENTINEL not in str(exc.to_dict())
+
+
 # --------------------------------------------------------------------------- #
 # 11. Zero/common-trend synthetic effect -> never falsely promoted.
 # --------------------------------------------------------------------------- #

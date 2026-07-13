@@ -124,17 +124,110 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    this_dir_items = [
-        item for item in items if _THIS_DIR in Path(str(item.fspath)).resolve().parents
-    ]
+def _this_dir_is_an_invocation_target(config: pytest.Config) -> bool:
+    """True iff this directory (or something inside it) was named on the
+    command line — i.e. this lane is (part of) what the invoker asked to run.
+
+    The zero-collected HARD FAILURE below must fire ONLY when this directory
+    is a deliberate target: a broad repo-wide `pytest` run that simply does
+    not select anything here (e.g. `-m 'not integration'`) is NOT a failure
+    of THIS lane — it never asked for it. But `pytest tests/integration/
+    measurement_e2e ...` that ends up with zero collected items IS a failure,
+    because the required real-container lane was explicitly targeted and
+    silently contributed nothing (naming typo, `-k`/`-m` mismatch, or an
+    import/collection error that pytest would otherwise report only as the
+    bare exit-code 5 a CI wrapper might tolerate)."""
+    for raw_arg in config.invocation_params.args:
+        # Strip any `::node-id` / `-k`-style suffix noise; only the leading
+        # path component matters for target detection.
+        arg_path_str = raw_arg.split("::", 1)[0]
+        if not arg_path_str or arg_path_str.startswith("-"):
+            continue
+        try:
+            arg_path = Path(arg_path_str).resolve()
+        except OSError:
+            continue
+        if arg_path == _THIS_DIR or _THIS_DIR in arg_path.parents or arg_path in _THIS_DIR.parents:
+            return True
+    return False
+
+
+def _this_dir_items(items: list[pytest.Item]) -> list[pytest.Item]:
+    return [item for item in items if _THIS_DIR in Path(str(item.fspath)).resolve().parents]
+
+
+def pytest_collection_finish(session: pytest.Session) -> None:
+    """Runs ONCE after collection is FULLY complete — after every
+    `pytest_collection_modifyitems` hook (including pytest's OWN internal
+    `-k`/`-m` deselection) has run, and ALWAYS, even when the final selection
+    is EMPTY. This is the correct home for the zero-collected HARD FAILURE:
+    a session-scoped autouse fixture only instantiates when ≥1 test is
+    actually selected (so it is silent on an empty selection — dead code for
+    exactly the case it must catch), and `pytest_collection_modifyitems`
+    fires BEFORE deselection (so it still sees the not-yet-deselected items).
+    `session.items` here reflects the FINAL, post-deselection selection.
+
+    Distinct from the Docker-absent honest skip (in
+    `pytest_collection_modifyitems` below): a Docker-absent environment still
+    COLLECTS every item (they are merely marked skipped), so the final
+    selection is non-empty there. Zero items collected FROM a
+    deliberately-targeted invocation of this directory instead means a naming
+    typo, a `-k`/`-m` mismatch, or an import/collection error silently
+    produced nothing — a hard, non-5 failure, never a tolerated exit-5.
+    """
+    if _this_dir_items(session.items):
+        return
+    if not _this_dir_is_an_invocation_target(session.config):
+        # A broad repo-wide run that simply did not select anything here (e.g.
+        # `-m 'not integration'`) is NOT a failure of THIS lane — it never
+        # asked for it. Only a deliberate target with zero result is a failure.
+        return
+    raise pytest.UsageError(
+        "tests/integration/measurement_e2e collected ZERO test items despite "
+        "being an explicit invocation target — this is the REQUIRED "
+        "real-container measurement E2E lane (wave5-plan.md E9); zero "
+        "collection is a HARD FAILURE (returncode != 0, != 5), never an "
+        "honest skip. A Docker-absent environment still COLLECTS these items "
+        "(it only skips them individually with a reason); zero collection "
+        "instead signals a naming typo, a -k/-m mismatch, or an "
+        "import/collection error that must not silently pass."
+    )
+
+
+#: Test module (basename) whose items exercise the zero-collected GUARD
+#: MECHANISM itself via subprocess + exit-code assertions — they need NO
+#: Docker/ClickHouse/Temporal, only a Python interpreter, so they are EXEMPT
+#: from the Docker/ClickHouse honest-skip below and run (proving the guard) on
+#: every host, including Docker-absent CI.
+_CONTAINER_FREE_GUARD_MODULE = "test_zero_collected_guard.py"
+
+
+def _needs_containers(item: pytest.Item) -> bool:
+    return Path(str(item.fspath)).name != _CONTAINER_FREE_GUARD_MODULE
+
+
+def pytest_collection_modifyitems(
+    session: pytest.Session, config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    """Hosts the honest per-item Docker/ClickHouse skips. The zero-collected
+    HARD FAILURE lives in `pytest_collection_finish` above (which runs after
+    `-k`/`-m` deselection and even on an empty selection); this hook fires
+    BEFORE deselection, so it is NOT a reliable place to count final items.
+
+    The container-free guard-mechanism module is EXEMPT from these skips: it
+    proves the zero-collected guard via subprocess exit codes and needs no
+    real infrastructure, so it must run even on a Docker-absent host."""
+    container_items = [item for item in _this_dir_items(items) if _needs_containers(item)]
+    if not container_items:
+        return
+
     if not _DOCKER_AVAILABLE:
         skip_marker = pytest.mark.skip(
             reason="Docker daemon not reachable — honest skip (ADR-0017); this is the "
             "REQUIRED real-container measurement E2E lane and MUST run on any CI host "
             "with Docker present (c5-05 wiring)"
         )
-        for item in this_dir_items:
+        for item in container_items:
             item.add_marker(skip_marker)
         return
     if not _CLICKHOUSE_CONNECT_AVAILABLE:
@@ -143,48 +236,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             "registered root workspace member (see pyproject.toml Integrator note); "
             "honest skip, distinct from a Docker-unreachable skip"
         )
-        for item in this_dir_items:
+        for item in container_items:
             item.add_marker(skip_marker)
-
-
-def pytest_collectstart(collector: pytest.Collector) -> None:
-    # No-op hook retained only to document intent: collection ERRORS (as
-    # opposed to zero collected items) already fail pytest's exit status on
-    # their own; the explicit hard-failure guard lives in the session-scoped
-    # `_require_nonzero_collection` fixture below (autouse), which is the
-    # simplest reliable place to assert "this directory collected at least
-    # one test item" without fighting pytest's own collection-error reporting.
-    return
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _require_nonzero_collection(request: pytest.FixtureRequest) -> Iterator[None]:
-    """Hard-fail (not skip) if this directory collected ZERO test items.
-
-    An honest per-item Docker/Temporal skip (above) still COLLECTS the item —
-    it just marks it skipped, which is the correct, visible outcome for a
-    genuinely Docker-absent local machine. What this guard catches is the
-    OTHER failure mode: an import error, a naming typo (`test_*` mis-spelled),
-    or a collection-time exception that makes pytest report "0 tests ran"
-    with NO skip reason at all — which must never be mistaken for a passing
-    lane. `session.testscollected` reflects the whole session's collected
-    item count; this fixture is autouse + session-scoped so it evaluates once
-    regardless of which test in this directory runs first.
-    """
-    yield
-    session = request.session
-    collected_here = [
-        item for item in session.items if _THIS_DIR in Path(str(item.fspath)).resolve().parents
-    ]
-    if not collected_here:
-        pytest.fail(
-            "tests/integration/measurement_e2e collected ZERO test items — "
-            "this is the REQUIRED real-container measurement E2E lane "
-            "(wave5-plan.md E9); zero collection is a hard failure, never an "
-            "honest skip (a Docker-absent environment still COLLECTS items, "
-            "it only skips them individually)",
-            pytrace=False,
-        )
 
 
 def run_async(coro):  # noqa: ANN001, ANN201
