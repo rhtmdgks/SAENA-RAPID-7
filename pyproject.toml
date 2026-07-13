@@ -25,6 +25,7 @@ members = [
     "services/acquisition/site-discovery-service",
     "services/intelligence/demand-graph-service",
     "services/intelligence/entity-resolution-service",
+    "services/intelligence/claim-evidence-service",
     "services/platform/quality-eval-service",
     "services/foundation/tenant-control-service",
     "services/foundation/policy-gate-service",
@@ -68,6 +69,7 @@ dev = [
     "saena-vector-store",
     "saena-demand-graph",
     "saena-entity-resolution",
+    "saena-claim-evidence",
     "saena-repository-intake",
     "saena-quality-eval",
     "saena-chatgpt-observer",
@@ -101,6 +103,7 @@ saena-analytics-clickhouse = { workspace = true }
 saena-vector-store = { workspace = true }
 saena-demand-graph = { workspace = true }
 saena-entity-resolution = { workspace = true }
+saena-claim-evidence = { workspace = true }
 saena-repository-intake = { workspace = true }
 saena-quality-eval = { workspace = true }
 saena-chatgpt-observer = { workspace = true }
