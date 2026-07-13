@@ -110,6 +110,9 @@ from saena_domain.measurement.ports import (
     OutcomeDecisionRecord,
     PutOutcome,
 )
+from saena_domain.measurement.ports import (
+    MeasurementWindow as PortsMeasurementWindow,
+)
 from saena_domain.measurement.reason_codes import ReasonCode
 
 from .errors import PipelineError
@@ -475,7 +478,7 @@ def _signal_result(signal: did_mod.SignalDiD) -> b_gate_mod.SignalResult | None:
     treatment_raw = signal.treatment_raw_delta if signal.treatment_raw_delta is not None else 0.0
     control_raw = signal.control_raw_delta if signal.control_raw_delta is not None else 0.0
     has_lift = signal.net_of_control_lift is not None
-    net_lift = signal.net_of_control_lift if has_lift else 0.0
+    net_lift = signal.net_of_control_lift if signal.net_of_control_lift is not None else 0.0
     return b_gate_mod.SignalResult(
         layer=layer,
         evidence_basis_id=signal.evidence_basis_id,
@@ -751,9 +754,7 @@ def _measurement_window_record(
     inputs: MeasurementInputs,
     window: clock_mod.MeasurementWindow,
     policies: MeasurementPolicies,
-) -> object:
-    from saena_domain.measurement.ports import MeasurementWindow as PortsMeasurementWindow
-
+) -> PortsMeasurementWindow:
     return PortsMeasurementWindow(
         tenant_id=inputs.tenant_id,
         experiment_id=inputs.experiment_id,
