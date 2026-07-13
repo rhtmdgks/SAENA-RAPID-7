@@ -177,6 +177,15 @@ externalSecrets:
   - name: saena-temporal-credentials
     source: external-secrets-operator
     valueFrom: ClusterSecretStore
+  # w5-21: the SIGNED GRS policy bundle (version + signed thresholds) is
+  # injected as an external secret and loaded fail-closed at runtime
+  # (saena_domain.measurement.grs.load_policy_bundle). NO GRS threshold/SLA/
+  # credit VALUES exist in this chart — production values stay BLOCKED(human,
+  # design §13-7); a missing/unsigned bundle makes GRS eligibility DENY/
+  # UNDETERMINED fail-closed, never PASS.
+  - name: saena-grs-policy-bundle
+    source: external-secrets-operator
+    valueFrom: ClusterSecretStore
 
 # egressProxy — the k3s spec §6.1/§6.2 egress allowlist proxy is an
 # out-of-band dependency NOT rendered by this chart. Default off so the
@@ -578,6 +587,75 @@ services:
       create: true
       automountServiceAccountToken: false
 
+  # --- Wave 5 measurement/B-layer workloads (w5-21) --------------------------
+  # experiment-attribution — the measurement plane's worker-host Deployment
+  # (service-catalog.md experiment-attribution-service #19; ADR-0002 rev.3:
+  # measurement lives as a MODULE-SET inside the optimization-worker
+  # deployment unit — persistence (w5-10) + event boundary (w5-12) + fail-
+  # closed pipeline (w5-13) + durable 7-day Temporal measurement workflow
+  # worker (w5-14) — and stays a SINGLE Deployment/pod until an ADR-0002
+  # rev.3 extraction trigger fires; no trigger is met in W5, so exactly one
+  # Deployment hosts all measurement modules, mirroring how
+  # `intelligenceWorker` above hosts its 4 modules in one pod). Reads/writes
+  # ONLY its own Postgres measurement schema (saena_experiment_attribution),
+  # projects to ClickHouse (measurement_outcome), and runs the Temporal
+  # measurement workflow worker against the existing external Temporal —
+  # every connection via the ALREADY-DECLARED external SecretRefs
+  # (saena-postgres/clickhouse/temporal/redpanda-credentials) + the new
+  # saena-grs-policy-bundle SecretRef below (the SIGNED GRS policy bundle is
+  # injected as an external secret — NO GRS threshold/SLA/credit VALUES ever
+  # live in this chart; those stay BLOCKED(human, design §13-7)). ZERO
+  # Kubernetes API access (never reads the K8s API) → `rbac.rules: []`
+  # renders no Role/RoleBinding (least-privilege-by-omission, same as
+  # intelligenceWorker/chatgptObserver). ChatGPT Search only — this workload
+  # never speaks to any engine directly; observation goes through the
+  # already-rendered chatgpt-observer, engine scope is enforced globally by
+  # `engineScope`/`engine_flags` (Google/Gemini rejected at schema +
+  # forgectl preflight regardless of any per-service field).
+  experimentAttribution:
+    enabled: true
+    nameSuffix: experiment-attribution
+    namespace: saena-system
+    domain: experimentation
+    image:
+      repository: experiment-attribution-service
+      digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      signature: "cosign-bundle:experiment-attribution@sha256:aaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    replicaCount: 2
+    resources:
+      # Hosts persistence + boundary + pipeline + a durable Temporal workflow
+      # worker (DiD compute over signal series) — wider than a thin API
+      # service, narrower than the intelligence retrieval worker.
+      requests: { cpu: 300m, memory: 512Mi }
+      limits: { cpu: "1500m", memory: 1Gi }
+    rbac:
+      rules: []
+
+  # strategy-skill-bank — the B-verified-only intake boundary Deployment
+  # (service-catalog.md strategy-skill-bank-service; w5-16). Consumes ONLY
+  # experiment.outcome.observed.v1 events whose B-gate verdict passed
+  # (fail-closed intake — no approve/promote/share/learn surface exists;
+  # full learning/promotion/global-sharing is Future/P1, NOT deployed).
+  # Event-only I/O via Redpanda (saena-redpanda-credentials); aggregate-only
+  # candidate corpus in its own store. ZERO Kubernetes API access →
+  # `rbac.rules: []`. No customer raw content ever crosses this boundary
+  # (aggregate-only guard, w5-16).
+  strategySkillBank:
+    enabled: true
+    nameSuffix: strategy-skill-bank
+    namespace: saena-system
+    domain: experimentation
+    image:
+      repository: strategy-skill-bank-service
+      digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      signature: "cosign-bundle:strategy-skill-bank@sha256:aaaaccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    replicaCount: 2
+    resources:
+      requests: { cpu: 200m, memory: 256Mi }
+      limits: { cpu: "1", memory: 512Mi }
+    rbac:
+      rules: []
+
 # images[] — flat mirror list forgectl's image_digest_signature check reads
 # (k3s spec §7 skeleton shape / tests/unit/forgectl/fixtures/values-passing.yaml).
 # Kept in sync with `services.*.image` above; templates render from
@@ -612,6 +690,12 @@ images:
   - name: intelligence-worker
     digest: "sha256:9999999999999999999999999999999999999999999999999999999999999999"
     signature: "cosign-bundle:intelligence-worker@sha256:aaaa999999999999999999999999999999999999999999999999999999"
+  - name: experiment-attribution-service
+    digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    signature: "cosign-bundle:experiment-attribution@sha256:aaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  - name: strategy-skill-bank-service
+    digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    signature: "cosign-bundle:strategy-skill-bank@sha256:aaaaccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   - name: chatgpt-observer-service
     digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     signature: "cosign-bundle:chatgpt-observer@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

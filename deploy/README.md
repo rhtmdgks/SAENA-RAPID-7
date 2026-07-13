@@ -32,3 +32,25 @@ CONFIRMED Helm/OCI packaging intent.
 ## Status
 
 `charts/saena-forge/` IMPLEMENTED (w2-23) / `profiles/`, `policies/` still skeleton, NOT IMPLEMENTED
+
+## Wave 5 (Measurement·B-Layer) wiring (w5-21)
+
+The saena-forge chart adds two measurement-plane Deployments via the generic
+`services.<key>` shape (no shared-template change):
+
+- `experiment-attribution` — worker-host for the measurement modules
+  (persistence w5-10 + event boundary w5-12 + fail-closed pipeline w5-13 +
+  durable 7-day Temporal measurement workflow worker w5-14), one pod per
+  ADR-0002 rev.3 module consolidation (no extraction trigger met). Reads/writes
+  its own Postgres schema, projects to ClickHouse, runs the Temporal worker —
+  all via existing external SecretRefs; ZERO Kubernetes API access.
+- `strategy-skill-bank` — the B-verified-only intake boundary (w5-16),
+  event-only I/O, aggregate-only, no approve/promote/share surface.
+
+Plus the `saena-grs-policy-bundle` ExternalSecret (signed GRS policy bundle;
+NO threshold values — see `deploy/policies/grs-policy-bundle.md`).
+
+Static chart correctness (helm lint/template, kubeconform strict, forgectl
+preflight, values.schema, deploy unit tests, engine-scope negatives) PASS.
+Live cluster install/rollback is production-readiness **OPEN** (no live
+cluster in this environment; not claimed as run).
