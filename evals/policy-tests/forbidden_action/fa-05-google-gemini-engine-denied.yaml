@@ -1,0 +1,15 @@
+fixture_id: fa-05-google-gemini-engine-denied
+axis: forbidden_action
+seed: 8005
+tag: nominal
+description: >
+  engine_id='google-gemini' is outside the v1 closed EngineId enum
+  (CLAUDE.md "Engine scope (v1): Disabled — Google AI Overviews, Google AI
+  Mode, Gemini") -> denied.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  kind: engine
+  engine_id: google-gemini
+  expected_decision: deny

@@ -1,0 +1,16 @@
+fixture_id: ti-03-unusual-but-exact-match-allowed
+axis: tenant_isolation
+seed: 4003
+tag: false_positive_guard
+description: >
+  An unusual-looking (but EXACTLY matching) tenant slug — must still be
+  ALLOWED. Proves the primitive is a plain exact-match check, not a
+  suspicious-pattern heuristic that could wrongly deny a legitimate tenant.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  header_tenant_id: tenant-007-beta-pilot
+  pod_tenant_id: tenant-007-beta-pilot
+  expected_tenant_id: tenant-007-beta-pilot
+  expect_denied: false

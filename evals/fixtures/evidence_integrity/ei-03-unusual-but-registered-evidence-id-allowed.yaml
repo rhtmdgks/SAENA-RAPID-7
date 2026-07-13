@@ -1,0 +1,18 @@
+fixture_id: ei-03-unusual-but-registered-evidence-id-allowed
+axis: evidence_integrity
+seed: 7003
+tag: false_positive_guard
+description: >
+  An unusual-looking evidence_id format that IS exactly present in the
+  registered ledger — must PASS. Proves the check is exact-membership, not
+  a "looks well-formed" heuristic that could wrongly reject a legitimately
+  registered but oddly-formatted id.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  evidence_registry: ["EV-2026-07-13-observer-run-9f2c-citation-3"]
+  claims:
+    - claim_id: C-01
+      evidence_id: "EV-2026-07-13-observer-run-9f2c-citation-3"
+      text: "page X was cited verbatim in a ChatGPT Search response on 2026-07-13"

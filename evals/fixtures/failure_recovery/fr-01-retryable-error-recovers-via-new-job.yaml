@@ -1,0 +1,16 @@
+fixture_id: fr-01-retryable-error-recovers-via-new-job
+axis: failure_recovery
+seed: 5001
+tag: nominal
+description: >
+  A retryable JobError (timed out) recovers via a NEW job at PENDING, which
+  can then progress to RUNNING.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  error:
+    error_code: saena.unavailable.job_timed_out
+    summary: "agent-runner job exceeded its active deadline"
+    retryable: true
+  recovery_strategy: new_job

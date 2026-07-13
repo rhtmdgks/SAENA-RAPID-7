@@ -1,0 +1,12 @@
+mode_id: fm-02-unsupported-claim
+k3s_section: "10"
+name: "Unsupported claim"
+example: "source says \"best-in-class\" without data"
+expected_system_behavior: "block public wording"
+status: covered
+covering_axis: evidence_integrity
+covering_fixture_ids:
+  - ei-02-unsupported-claim-no-evidence-id
+notes: >
+  A claim with no evidence_id is refused (unsupported claim), matching
+  Algorithm §11.1 "Content fidelity: unsupported claim 0건".

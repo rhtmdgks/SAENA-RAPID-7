@@ -1,0 +1,43 @@
+fixture_id: hc-03-self-review-critic-fails
+axis: handoff_completeness
+seed: 9003
+tag: false_negative_guard
+description: >
+  A critic_review OBJECT is present (a naive "review exists -> pass" check
+  would wrongly ALLOW this), but it is a NON-independent self-review — must
+  correctly FAIL ("require_independent_critic": self-review does not
+  count).
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  patch_unit_id: PU-01
+  worktree_commit: abc1234
+  evaluated_at: "2026-07-13T00:00:00Z"
+  expected_decision: FAIL
+  quality_matrix:
+    gates:
+      build: PASS
+      tests: PASS
+      lint: PASS
+      security: PASS
+  critic_review:
+    reviewer_id: author-agent-self
+    independent: false
+    verdict: approve
+  rollback_manifest:
+    patch_unit_id: PU-01
+    command: "git-revert:PU-01"
+    verified: true
+  patch_commands: []
+  audit_entries:
+    - action: patch.unit.completed.v1
+      recorded_at: "2026-07-13T00:00:01Z"
+      scope: tenant
+      trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      tenant_id: acme-co
+      run_id: run-0001
+      payload:
+        patch_unit_id: PU-01

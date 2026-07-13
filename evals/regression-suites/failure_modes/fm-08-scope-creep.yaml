@@ -1,0 +1,15 @@
+mode_id: fm-08-scope-creep
+k3s_section: "10"
+name: "Scope creep"
+example: "agent adds unrelated refactor"
+expected_system_behavior: "Ponytail + patch review rejects"
+status: covered
+covering_axis: regression_suite_native
+covering_test: tests/unit/evals_harness/test_failure_mode_regression_suite.py::test_scope_creep_out_of_scope_write_rejected
+notes: >
+  Not one of the 9 mandatory eval axes (mission scope) — a dedicated
+  regression-suite check over REAL saena_agent_runner.scope.guard_scope: a
+  write target NOT declared in the executing patch unit's own `files` list
+  (an "unrelated refactor" touching a file the contract never named) is
+  refused with OutOfScopeWriteError, regardless of approved_scope glob
+  breadth.

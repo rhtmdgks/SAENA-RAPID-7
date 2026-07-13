@@ -1,0 +1,37 @@
+fixture_id: cc-02-change-plan-missing-rollback-invalid
+axis: contract_compliance
+seed: 2002
+tag: nominal
+description: >
+  A ChangePlan patch_unit missing the required 'rollback' field fails
+  domain/change-plan/v1 validation.
+expected_passed: false
+expected_score: 0.0
+threshold: 1.0
+input:
+  schema_relpath: domain/change-plan/v1/change-plan.schema.json
+  payload:
+    run_id: run-0001
+    tenant_id: acme-co
+    repo_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    approved_scope: ["apps/web/*"]
+    engine_scope: ["chatgpt-search"]
+    hypotheses:
+      - id: H-01
+        query_cluster_ids: ["QC-01"]
+        evidence_ids: ["EV-01"]
+        predicted_layers: ["citation"]
+        expected_effect_distribution: {p_7d: 0.3}
+        risk: low
+    patch_units:
+      - id: PU-01
+        files: ["apps/web/docs/readme.md"]
+        allowed_transformations: ["git add"]
+        tests: ["test-01"]
+    approval_required: true
+    no_deploy: true
+    no_push: true
+    evidence_ledger_hash: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    scope_limits: {max_globs: 5}
+    diff_budget: {max_files: 10, max_lines: 1000}
+    rejected_alternatives: []

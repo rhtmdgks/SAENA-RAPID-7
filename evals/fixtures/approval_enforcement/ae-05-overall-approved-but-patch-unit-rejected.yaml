@@ -1,0 +1,34 @@
+fixture_id: ae-05-overall-approved-but-patch-unit-rejected
+axis: approval_enforcement
+seed: 3005
+tag: false_negative_guard
+description: >
+  ApprovalDecision.decision='approved' overall, but PU-01's OWN
+  patch_unit_decisions entry is 'rejected' (H-7 per-patch-unit granularity).
+  verify_approval does not raise for this — a naive "no exception raised ->
+  fully authorized" check would wrongly treat PU-01 as executable. The
+  correct scorer inspects the RETURNED approved-unit set and must find it
+  EMPTY (PU-01 excluded).
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  repo_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  approved_scope: ["apps/web/docs/*"]
+  patch_unit_id: PU-01
+  expected_contract_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  expected_approved_patch_unit_ids: []
+  approval_decision:
+    contract_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    tenant_id: acme-co
+    run_id: run-0001
+    approver_actor_id: actor-approver
+    decision: approved
+    patch_unit_decisions:
+      - patch_unit_id: PU-01
+        decision: rejected
+    signature: opaque-signature-bytes
+    signature_algorithm: ed25519
+    decided_at: "2026-07-13T00:00:00Z"

@@ -1,0 +1,20 @@
+fixture_id: ae-02-no-approval-object-refused
+axis: approval_enforcement
+seed: 3002
+tag: nominal
+description: >
+  No ApprovalDecision supplied at all (approval_decision: null) -> execution
+  refused with ApprovalMissingError. "No execution without a valid
+  ApprovalDecision" — the core mission assertion for this axis.
+expected_passed: true
+expected_score: 1.0
+threshold: 1.0
+input:
+  tenant_id: acme-co
+  run_id: run-0001
+  repo_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  approved_scope: ["apps/web/docs/*"]
+  patch_unit_id: PU-01
+  expected_contract_hash: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  approval_decision: null
+  expect_error: ApprovalMissingError
