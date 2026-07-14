@@ -177,6 +177,18 @@ fixtures during execution — not from env-var declarations of intent. This is
 a mechanism description only: the remediation has not yet been exercised on a
 green CI run, and that verification is explicitly pending, not claimed here.
 
+**Trust boundary (known limitation, future hardening).** The evidence is not
+cryptographically signed: a hand-forged JSON carrying the *matching* commit_sha
++ github_run_id would render PROVEN. Exploiting this requires the ability to
+inject a `run:` step that writes that file *between* the gate step and the
+render step in the same job — a capability equal to editing `ci.yml` itself, so
+it is outside this gate's threat model (a compromised workflow definition is a
+different, higher-privilege problem). The real gate step always runs first and
+atomically overwrites the evidence path with the true (pass-or-fail) state, so a
+pre-planted file cannot survive a genuine run (independently verified). Signing
+the evidence with a CI secret (HMAC) is recorded as future defense-in-depth; it
+is deliberately not added here to avoid introducing a new managed secret.
+
 ### Original wave (pre-closure) status, superseded
 
 The initial pass reached PARTIAL PASS (21/24) with w5-19/w5-20/w5-21 residual;
