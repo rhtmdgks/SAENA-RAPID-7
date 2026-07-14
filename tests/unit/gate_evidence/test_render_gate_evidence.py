@@ -47,6 +47,19 @@ main = render_gate_evidence.main
 SCHEMA_VERSION = render_gate_evidence.SCHEMA_VERSION
 
 
+@pytest.fixture(autouse=True)
+def _no_ci_run_binding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear GITHUB_SHA / GITHUB_RUN_ID by default so a test asserting a
+    specific fail-closed reason is NOT preempted by the stale-binding check when
+    this suite runs INSIDE CI (GitHub Actions always sets those vars, so without
+    this the renderer would return `stale/reused evidence` before reaching the
+    reason under test — the failure this fixture fixes). The few tests that
+    exercise the binding check set these vars explicitly and thereby override
+    this fixture."""
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+    monkeypatch.delenv("GITHUB_RUN_ID", raising=False)
+
+
 # --------------------------------------------------------------------------- #
 # Fixture builders — mirror tests/integration/_gate_evidence.py's shape.
 # --------------------------------------------------------------------------- #
