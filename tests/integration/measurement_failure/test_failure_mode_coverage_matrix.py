@@ -180,6 +180,7 @@ tests, matching CLAUDE.md principle 6 (독점 수정 경로).
 from __future__ import annotations
 
 import ast
+import os
 import re
 import subprocess
 import sys
@@ -387,7 +388,6 @@ def _docker_available() -> bool:
     this codebase's own established discipline for cross-module probes —
     see `conftest.py`'s module docstring), so this test's Docker-available
     branch and the actual suite run under the SAME condition."""
-    import os
     import socket
 
     docker_host = os.environ.get("DOCKER_HOST", "")
@@ -437,6 +437,18 @@ def test_real_postgres_matrix_rows_actually_ran_when_docker_is_available() -> No
         f"{relative_path}::{function_name}"
         for relative_path, function_name in _THIS_DIR_INTEGRATION_ROWS
     ]
+    # This child run deliberately selects a NODE-ID SUBSET of the matrix rows
+    # (an internal ran-vs-skipped diagnostic, not an invocation of the
+    # required failure-mode gate) — it must NOT inherit
+    # `SAENA_MEASUREMENT_FAILURE_REQUIRED` from the parent process's
+    # environment. If it did, the required-scenario COMPLETENESS guard
+    # (`_failure_completeness.py`, MUST-FIX B) would correctly hard-fail this
+    # intentional subset as if it were a partial-selection bypass of the real
+    # gate, breaking this unrelated diagnostic. Strip it (and the sibling E2E
+    # required var, for the same reason) from the child env explicitly.
+    child_env = dict(os.environ)
+    child_env.pop("SAENA_MEASUREMENT_FAILURE_REQUIRED", None)
+    child_env.pop("SAENA_MEASUREMENT_E2E_REQUIRED", None)
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-rs", "-q", *node_ids],
         cwd=_REPO_ROOT,
@@ -444,6 +456,7 @@ def test_real_postgres_matrix_rows_actually_ran_when_docker_is_available() -> No
         text=True,
         timeout=180,
         check=False,
+        env=child_env,
     )
     output = result.stdout
 

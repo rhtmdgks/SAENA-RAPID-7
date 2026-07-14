@@ -148,26 +148,47 @@ measurement-privacy:
 # REAL composed measurement E2E (real Postgres 16 + ClickHouse 24.8 + Temporal
 # time-skipping). SAENA_MEASUREMENT_E2E_REQUIRED=1 arms the required-lane guard:
 # an infra-absent/all-skipped run is a HARD FAILURE (exit 6), never a silent pass.
+# MUST-FIX C (defense-in-depth, belt-and-suspenders with the conftest
+# completeness guard above): `PYTEST_ADDOPTS=''` on EVERY pytest line in this
+# required recipe ONLY neutralizes a caller's environment (e.g.
+# PYTEST_ADDOPTS="-k <test>") from shrinking this recipe's hardcoded selection
+# — the env override applies to that one command each time, not the whole
+# recipe/justfile, so other (non-required) recipes still honor a caller's
+# PYTEST_ADDOPTS. SAENA_MEASUREMENT_E2E_REQUIRED=1 stays armed internally
+# (SSOT); no `| tee` / `|| true` — the pytest exit code is the recipe line's
+# exit code, untouched.
 measurement-e2e:
-    uv run pytest tests/unit/svc_experiment_attribution_boundary tests/unit/svc_experiment_attribution_pipeline -q
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/svc_experiment_attribution_boundary tests/unit/svc_experiment_attribution_pipeline -q
     # The REAL composed E2E (w5-19/c5-01): real Postgres 16 + ClickHouse 24.8 +
     # Temporal time-skipping. SAENA_MEASUREMENT_E2E_REQUIRED=1 arms the
-    # conftest's zero-collected hard-fail guard (a naming typo / import error
-    # that collects 0 from this required lane exits non-0, never a silent pass).
-    SAENA_MEASUREMENT_E2E_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_e2e tests/integration/measurement_workflow -p no:cacheprovider
+    # conftest's zero-collected AND all-skipped hard-fail guards (a naming
+    # typo / import error / partial selection in this required lane exits 6,
+    # never a silent pass); PYTEST_ADDOPTS='' strips any caller-injected
+    # -k/-m/addopts so the full hardcoded path set below always runs.
+    PYTEST_ADDOPTS='' SAENA_MEASUREMENT_E2E_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_e2e tests/integration/measurement_workflow -p no:cacheprovider
 
 # w5-06/w5-13/w5-18: measurement fail-closed / fraud / UNDETERMINED-never-PASS
 # discriminators (named explicitly — non-test_* helper files).
+# MUST-FIX C (defense-in-depth, belt-and-suspenders with the conftest
+# completeness guard above): `PYTEST_ADDOPTS=''` on EVERY pytest line in this
+# required recipe ONLY neutralizes a caller's environment (e.g.
+# PYTEST_ADDOPTS="-k <test>") from shrinking this recipe's hardcoded selection
+# — the env override applies to that one command each time, not the whole
+# recipe/justfile, so other (non-required) recipes still honor a caller's
+# PYTEST_ADDOPTS. SAENA_MEASUREMENT_FAILURE_REQUIRED=1 stays armed internally
+# (SSOT); no `| tee` / `|| true` — the pytest exit code is the recipe line's
+# exit code, untouched.
 measurement-failure-modes:
-    uv run pytest tests/security/measurement_fraud.py tests/security/measurement_adversarial.py -q
-    uv run pytest tests/unit/svc_experiment_attribution_pipeline -q
+    PYTEST_ADDOPTS='' uv run pytest tests/security/measurement_fraud.py tests/security/measurement_adversarial.py -q
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/svc_experiment_attribution_pipeline -q
     # The completed failure-mode matrix (w5-20/c5-02): real Postgres crash/
     # replay/rollback/conflict + F-9 fraud repoint through the integrated engine.
     # SAENA_MEASUREMENT_FAILURE_REQUIRED=1 arms the conftest's required-lane
     # guard: any skipped required integration test (Docker/Postgres absent) or
     # zero passed is a HARD FAILURE (exit 6) — this required gate can never pass
-    # as a green "0 passed, N skipped".
-    SAENA_MEASUREMENT_FAILURE_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
+    # as a green "0 passed, N skipped". PYTEST_ADDOPTS='' strips any
+    # caller-injected -k/-m/addopts so the full hardcoded path set always runs.
+    PYTEST_ADDOPTS='' SAENA_MEASUREMENT_FAILURE_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
 
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.

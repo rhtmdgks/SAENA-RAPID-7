@@ -48,11 +48,28 @@ Fix: cleanly separate the two lanes.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
 _THIS_DIR = Path(__file__).resolve().parent
+
+# Import the E2E required-scenario completeness manifest/guard (test-support,
+# same directory). Loaded here — at the tests/integration ANCESTOR — so the
+# completeness guard fires for the composed-E2E lane no matter which subset of
+# {measurement_e2e, measurement_workflow} paths a caller selects (a caller who
+# drops one whole directory still triggers the ancestor conftest, so
+# path-omission cannot dodge the guard).
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
+import _measurement_e2e_completeness as _e2e_complete  # noqa: E402
+
+# Node-id -> outcome recorder for the E2E completeness guard. Populated by
+# pytest_runtest_logreport below across the WHOLE session (both directories).
+_E2E_PASSED: set[str] = set()
+_E2E_SKIPPED: set[str] = set()
+_E2E_FAILED: set[str] = set()
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -80,3 +97,41 @@ def pytest_configure(config: pytest.Config) -> None:
         "excluded from the blocking `just verify` unit lane (w2-20), run "
         "separately via `just test-integration`.",
     )
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    # Record E2E node outcomes for the required-scenario completeness guard.
+    # A fixture skip (Docker/ClickHouse/Temporal absent) surfaces at
+    # when=="setup"; a pass/fail at when=="call". Only manifest nodes matter,
+    # but record broadly and let the guard intersect with the manifest.
+    if report.when == "setup" and report.outcome == "skipped":
+        _E2E_SKIPPED.add(report.nodeid)
+    elif report.when == "call":
+        if report.outcome == "passed":
+            _E2E_PASSED.add(report.nodeid)
+        elif report.outcome == "failed":
+            _E2E_FAILED.add(report.nodeid)
+        elif report.outcome == "skipped":
+            _E2E_SKIPPED.add(report.nodeid)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    # E2E REQUIRED-SCENARIO COMPLETENESS guard (Wave 5 Closure). Only acts when
+    # the E2E required env is armed; otherwise silent (the umbrella
+    # `just test-integration` lane and the unit lane never arm it). Compares the
+    # authoritative manifest against what actually executed-and-PASSED, so a
+    # partial `-k`/`-m`/`--deselect`/single-node/PYTEST_ADDOPTS selection —
+    # which the pre-existing selected-set guards cannot see past — hard-fails
+    # (exit 6) instead of going green on a fraction of the required scenarios.
+    if not _e2e_complete.required_armed():
+        return
+    report = _e2e_complete.evaluate(_E2E_PASSED, _E2E_SKIPPED, _E2E_FAILED)
+    if report.ok:
+        return
+    # Set the hard-fail exit code FIRST — must hold even if the terminal
+    # reporter is unavailable (e.g. `-p no:terminalreporter`).
+    session.exitstatus = _e2e_complete.HARD_FAIL_EXIT
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is None:
+        return
+    reporter.write_line(_e2e_complete.format_failure(report), red=True)

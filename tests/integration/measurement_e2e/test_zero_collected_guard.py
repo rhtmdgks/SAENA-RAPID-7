@@ -189,8 +189,39 @@ _EXPECTED_INFRA_HARD_FAIL_EXIT = 6
 # tests so a child run can never recurse. Callers AND it with their own filter.
 _NO_RECURSE = (
     "not test_a_ and not test_b_ and not test_c_ and not test_d_ "
-    "and not test_e_ and not test_f_ and not test_g_ and not test_inert_"
+    "and not test_e_ and not test_f_ and not test_g_ and not test_h_ "
+    "and not test_i_ and not test_j_ and not test_inert_"
 )
+
+# Repo root + the two composed-E2E directories (the required lane spans both).
+_REPO_ROOT = _THIS_DIR.parents[2]
+_E2E_DIR = "tests/integration/measurement_e2e"
+_WORKFLOW_DIR = "tests/integration/measurement_workflow"
+
+
+def _run_both_dirs(*, required_flag: bool, k_expr: str | None, addopts: str | None = None):
+    """Run pytest over BOTH composed-E2E directories from the repo root — the
+    shape the real `just measurement-e2e` gate uses — with the E2E required env
+    armed/disarmed, optionally narrowing with `-k` or a poisoned PYTEST_ADDOPTS.
+    Used to prove the required-scenario COMPLETENESS guard (in
+    tests/integration/conftest.py) rejects partial selections."""
+    env = dict(os.environ)
+    if required_flag:
+        env[_REQUIRED_ENV_VAR] = "1"
+    else:
+        env.pop(_REQUIRED_ENV_VAR, None)
+    if addopts is not None:
+        env["PYTEST_ADDOPTS"] = addopts
+    args = ["-m", "integration", _E2E_DIR, _WORKFLOW_DIR]
+    if k_expr is not None:
+        args += ["-k", k_expr]
+    return subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "pytest", *args, "-p", "no:cacheprovider", "-q"],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
 
 
 def _run_child(
@@ -310,3 +341,118 @@ def test_g_required_arms_on_non_canonical_truthy_value() -> None:
         assert "HARD FAILURE" in combined, (
             f"expected the required-mode guard message for value {value!r}:\n{combined}"
         )
+
+
+# --------------------------------------------------------------------------- #
+# REQUIRED-SCENARIO COMPLETENESS guard (Wave 5 Closure — tests/integration/
+# conftest.py, manifest tests/integration/_measurement_e2e_completeness.py).
+# These prove the PARTIAL-SELECTION / DESELECTION fail-open is closed. They are
+# Docker-INDEPENDENT: the selection keeps only a container-free test that PASSES
+# on any host, so the missing REAL scenarios are caught purely by the manifest
+# completeness comparison (not the Docker-absent skip guard). The real-container
+# partial-selection proofs (a real scenario passes while others are deselected)
+# are run against real Docker in the Lead adversarial battery + the required CI
+# gate — see the exit-report; a Docker-absent self-test alone must not claim the
+# partial-selection defense.
+# --------------------------------------------------------------------------- #
+def test_h_completeness_container_free_only_selection_hard_fails() -> None:
+    # Armed, both dirs, `-k` keeps only the container-free inert leaf (passes on
+    # any host). All 28 required real scenarios are deselected -> the manifest
+    # completeness guard hard-fails (exit 6), even though the selected test
+    # passed and nothing was "skipped".
+    result = _run_both_dirs(
+        required_flag=True, k_expr="test_inert_leaf_for_nonempty_selection_proof"
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "armed + a partial selection keeping only a container-free passing test "
+        "must HARD FAIL (exit 6) via the required-scenario completeness guard — "
+        f"a partial selection can never go green; got {result.returncode}:\n{combined}"
+    )
+    assert "completeness" in combined, f"expected the completeness guard's message:\n{combined}"
+    assert "did not execute-and-PASS" in combined, (
+        f"expected the missing-scenario reason:\n{combined}"
+    )
+
+
+def test_h_completeness_via_poisoned_pytest_addopts_hard_fails() -> None:
+    # Same, but the narrowing is injected via PYTEST_ADDOPTS (the CI-poisoning
+    # vector) rather than an explicit CLI `-k`. Direct pytest with the env armed
+    # must still hard-fail (exit 6) — the guard does not depend on the recipe
+    # stripping ADDOPTS.
+    result = _run_both_dirs(
+        required_flag=True,
+        k_expr=None,
+        addopts="-k test_inert_leaf_for_nonempty_selection_proof",
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "armed + PYTEST_ADDOPTS narrowing must HARD FAIL (exit 6) via the "
+        f"completeness guard; got {result.returncode}:\n{combined}"
+    )
+    assert "completeness" in combined, f"expected the completeness message:\n{combined}"
+
+
+def test_i_completeness_manifest_matches_collectible_set_no_drift() -> None:
+    # DRIFT meta-test: the manifest's expected node set must equal the ACTUAL
+    # collectible required node set (both directions) — a renamed/removed real
+    # scenario, or a new real scenario absent from the manifest, fails loudly so
+    # the manifest can never silently under- or over-declare the suite.
+    import _measurement_e2e_completeness as manifest  # noqa: PLC0415
+
+    # Strip the armed env AND any inherited PYTEST_ADDOPTS from the collect-only
+    # child: `--collect-only` still runs pytest_sessionfinish (so an armed child
+    # would spuriously hard-fail a run that executes nothing), and an inherited
+    # PYTEST_ADDOPTS `-k` would narrow the collected set and break the drift
+    # equality. This is a pure collection introspection — neither belongs here.
+    env = dict(os.environ)
+    env.pop(_REQUIRED_ENV_VAR, None)
+    env.pop("PYTEST_ADDOPTS", None)
+    collect = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "integration",
+            _E2E_DIR,
+            _WORKFLOW_DIR,
+            "--collect-only",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
+    combined = collect.stdout + collect.stderr
+    # Collectible real-scenario node ids = every collected node id under the two
+    # composed-E2E test modules (exclude this guard self-test file + the failure
+    # guard, which are container-free mechanism proofs, not required scenarios).
+    collected = {
+        line.strip()
+        for line in collect.stdout.splitlines()
+        if "::" in line and "test_zero_collected_guard.py" not in line
+    }
+    collected_real = {
+        n
+        for n in collected
+        if n.startswith("tests/integration/measurement_e2e/test_real_composed_measurement_e2e.py::")
+        or n.startswith("tests/integration/measurement_workflow/test_measurement_workflow.py::")
+    }
+    assert collected_real, (
+        f"collect-only produced no real E2E node ids (collection error?):\n{combined}"
+    )
+    expected = set(manifest.EXPECTED_NODE_IDS)
+    missing_from_manifest = collected_real - expected
+    stale_in_manifest = expected - collected_real
+    assert not missing_from_manifest, (
+        "real E2E scenarios exist that the manifest does NOT declare (add them to "
+        f"_measurement_e2e_completeness.REQUIRED_SCENARIOS): {sorted(missing_from_manifest)}"
+    )
+    assert not stale_in_manifest, (
+        "manifest declares scenarios that are no longer collectible (renamed/"
+        f"removed — update the manifest): {sorted(stale_in_manifest)}"
+    )

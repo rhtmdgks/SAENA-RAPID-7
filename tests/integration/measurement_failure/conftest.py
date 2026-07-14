@@ -49,6 +49,13 @@ for _p in (_THIS_DIR, _SERVICE_SRC, _PIPELINE_FACTORIES_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+# Import the failure-mode required-scenario completeness manifest/guard
+# (test-support, same directory; MUST-FIX B). Closes the partial-selection
+# fail-open the pre-existing selected-set-only guard below cannot see past: a
+# caller who narrows the run via `-k` / `--deselect` / a single-node path /
+# `PYTEST_ADDOPTS` leaves the SELECTED set fully passing, so the lane went
+# green having run only a fraction of the required failure-mode scenarios.
+import _failure_completeness as _failure_complete  # noqa: E402
 from saena_experiment_attribution.persistence import adapter  # noqa: E402
 
 
@@ -182,6 +189,33 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if reasons:
         session.exitstatus = _FAILURE_HARD_FAIL_EXIT
         _report_hard_fail(session, reasons)
+        return
+
+    # REQUIRED-SCENARIO COMPLETENESS guard (MUST-FIX B). The checks above only
+    # ever inspect the SELECTED set (session.items) — a caller who narrows the
+    # run via `-k` / `--deselect` / a single-node path / `PYTEST_ADDOPTS` can
+    # leave that selected set fully passing while running only a fraction of
+    # the 31-scenario required manifest. Compare the authoritative manifest
+    # (independent of what pytest happened to select) against what actually
+    # executed-and-PASSED; reuses the SAME `_FAILURE_OUTCOMES` recorder
+    # `pytest_runtest_logreport` already populates above.
+    report = _failure_complete.evaluate(
+        _FAILURE_OUTCOMES["passed"],
+        _FAILURE_OUTCOMES["skipped"],
+        _FAILURE_OUTCOMES["failed"],
+    )
+    if not report.ok:
+        session.exitstatus = _FAILURE_HARD_FAIL_EXIT
+        _report_completeness_hard_fail(session, report)
+
+
+def _report_completeness_hard_fail(
+    session: pytest.Session, report: _failure_complete.CompletenessReport
+) -> None:
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is None:
+        return
+    reporter.write_line(_failure_complete.format_failure(report), red=True)
 
 
 def _report_hard_fail(session: pytest.Session, reasons: list[str]) -> None:

@@ -477,7 +477,10 @@ jobs:
     # ClickHouse 24.8 + Temporal time-skipping — plus w5-12/w5-13 boundary +
     # fail-closed pipeline. The `just measurement-e2e` recipe arms
     # SAENA_MEASUREMENT_E2E_REQUIRED=1, so an infra-absent/all-skipped run is a
-    # HARD FAILURE (exit 6), never a green "0 passed, N skipped".
+    # HARD FAILURE (exit 6), never a green "0 passed, N skipped". MUST-FIX C:
+    # every pytest line inside the recipe also strips a caller's PYTEST_ADDOPTS
+    # (`PYTEST_ADDOPTS=''`) so the hardcoded path set can never be shrunk by
+    # this job's (or a reusable-workflow caller's) environment.
     needs: [unit]
     runs-on: ubuntu-latest
     steps:
@@ -491,10 +494,26 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv sync --locked
       - run: uv run just measurement-e2e
+      - name: Job summary (MUST-FIX C — completeness/required-mode evidence)
+        if: always()
+        run: |
+          {
+            echo "### measurement-e2e gate"
+            echo ""
+            echo "- SHA: \`${{ github.sha }}\`"
+            echo "- recipe: \`just measurement-e2e\`"
+            echo "- required-mode armed: \`true\` (SAENA_MEASUREMENT_E2E_REQUIRED=1, internal SSOT)"
+            echo "- PYTEST_ADDOPTS injection: neutralized for every pytest invocation in the recipe (\`PYTEST_ADDOPTS=''\` override); full hardcoded path set ran"
+            echo ""
+            echo "Ran the full hardcoded path set (\`tests/integration/measurement_e2e tests/integration/measurement_workflow\`) with the required env armed on the SHA above."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   measurement-failure-modes:
     # w5-06/w5-13/w5-18: fail-closed / fraud / UNDETERMINED-never-PASS
-    # discriminators (non-test_* helper files named explicitly).
+    # discriminators (non-test_* helper files named explicitly). MUST-FIX C:
+    # every pytest line inside the recipe also strips a caller's PYTEST_ADDOPTS
+    # (`PYTEST_ADDOPTS=''`) so the hardcoded path set can never be shrunk by
+    # this job's (or a reusable-workflow caller's) environment.
     needs: [unit]
     runs-on: ubuntu-latest
     steps:
@@ -508,6 +527,19 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv sync --locked
       - run: uv run just measurement-failure-modes
+      - name: Job summary (MUST-FIX C — completeness/required-mode evidence)
+        if: always()
+        run: |
+          {
+            echo "### measurement-failure-modes gate"
+            echo ""
+            echo "- SHA: \`${{ github.sha }}\`"
+            echo "- recipe: \`just measurement-failure-modes\`"
+            echo "- required-mode armed: \`true\` (SAENA_MEASUREMENT_FAILURE_REQUIRED=1, internal SSOT)"
+            echo "- PYTEST_ADDOPTS injection: neutralized for every pytest invocation in the recipe (\`PYTEST_ADDOPTS=''\` override); full hardcoded path set ran"
+            echo ""
+            echo "Ran the full hardcoded path set (\`tests/integration/measurement_failure\`) with the required env armed on the SHA above."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   helm-smoke:
     # W3 offline chart packaging gate (w2-23/w3-07 chart). No cluster contact:
