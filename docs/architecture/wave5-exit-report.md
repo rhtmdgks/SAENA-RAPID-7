@@ -364,10 +364,10 @@ ci↔justfile parity green.
 
 | Gate | Docker present | Docker absent (required env armed) | Optional (flag unset) |
 |---|---|---|---|
-| `just measurement-e2e` | e2e 39 pass (28 real PG16 + CH24.8 + Temporal time-skipping rows + 11 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (never green "0 passed, N skipped" **or a partial `-k`/`--deselect`/single-node/PYTEST_ADDOPTS selection**) | honest skip, exit 0 |
-| `just measurement-failure-modes` | failure matrix 41 pass (31 real-PG rows + 10 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (incl. any partial selection) | honest skip, exit 0 |
+| `just measurement-e2e` | e2e 42 pass (28 real PG16 + CH24.8 + Temporal time-skipping rows + 14 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (never green "0 passed, N skipped" **or a partial `-k`/`--deselect`/single-node/PYTEST_ADDOPTS selection**) | honest skip, exit 0 |
+| `just measurement-failure-modes` | failure matrix 44 pass (31 real-PG rows + 13 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (incl. any partial selection) | honest skip, exit 0 |
 
-Real-container lanes green 2× each; guard self-tests: E2E 11 passed, failure 10
+Real-container lanes green 2× each; guard self-tests: E2E 14 passed, failure 13
 passed (incl. the container-free-only bypass, fail-safe-arming, and the
 required-scenario **completeness** regressions — partial `-k`/`--deselect`/
 single-node/`PYTEST_ADDOPTS` selection each hard-fail, plus the manifest drift

@@ -53,7 +53,7 @@ this doc does not hardcode it (a commit cannot reference its own future SHA).
 Both required integration gates hard-fail (exit 6) — never a green "0 passed,
 N skipped" — when Docker/ClickHouse/Temporal is absent, any required test is
 skipped, or zero collected, with the required env var armed by the recipe (SSOT).
-Docker-present: `measurement-e2e` 39 pass / `measurement-failure-modes` 41 pass,
+Docker-present: `measurement-e2e` 42 pass / `measurement-failure-modes` 44 pass,
 real containers, skipped=0. Optional/local (flag unset): honest skip. Arming is
 fail-safe (any truthy value arms; a typo never downgrades to the optional lane).
 
@@ -126,9 +126,9 @@ the Closure round CLOSED all three (see `wave5-exit-report.md` c5-01…c5-04):
 - **w5-19 E2E** — CLOSED (c5-01). Real composed E2E integrated: real Postgres 16
   + ClickHouse 24.8 + Temporal time-skipping, driving the actual
   `run_measurement` composition; run by the required `measurement-e2e` gate
-  (39 pass, skipped=0, Docker-present; exit 6 Docker-absent).
+  (42 pass, skipped=0, Docker-present; exit 6 Docker-absent).
 - **w5-20 failure-modes** — CLOSED (c5-02). Full failure-mode matrix integrated
-  (`measurement-failure-modes` gate: 41 pass, skipped=0). The conflicting-
+  (`measurement-failure-modes` gate: 44 pass, skipped=0). The conflicting-
   confirmation seam is CLOSED (c5-03): `run_measurement` now catches the
   persistence `IdempotencyConflictError` and emits `UNDETERMINED
   (CONFLICTING_CONFIRMATION)` — never PASS — instead of propagating the raw
