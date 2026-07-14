@@ -48,16 +48,24 @@ Base main: `156568c`. Per-unit integration commits are in
 branch tip is the PR #7 head shown on GitHub — the authoritative moving value;
 this doc does not hardcode it (a commit cannot reference its own future SHA).
 
-## Required-gate fail-closed contract (Wave 5 Closure Final Remediation)
+## Required-gate fail-closed contract (Wave 5 Closure)
 
 Both required integration gates hard-fail (exit 6) — never a green "0 passed,
 N skipped" — when Docker/ClickHouse/Temporal is absent, any required test is
 skipped, or zero collected, with the required env var armed by the recipe (SSOT).
-Docker-present: `measurement-e2e` 36 pass / `measurement-failure-modes` 35 pass,
+Docker-present: `measurement-e2e` 39 pass / `measurement-failure-modes` 41 pass,
 real containers, skipped=0. Optional/local (flag unset): honest skip. Arming is
-fail-safe (any truthy value arms; a typo never downgrades to the optional lane),
-and a required run that selects ZERO real-container scenarios also hard-fails
-(exit 6) — a `-k` keeping only container-free guard tests cannot bypass the lane.
+fail-safe (any truthy value arms; a typo never downgrades to the optional lane).
+
+**Required-scenario completeness** (final closure): the guards no longer trust
+only the SELECTED set. An authoritative manifest SSOT (28 E2E scenarios across
+postgres/clickhouse/temporal/composed legs; 31 failure nodes, 16 primary /
+15 recovery) is compared against what actually execute-and-PASSED, so a partial
+`-k`/`-m`/`--deselect`/single-node/`PYTEST_ADDOPTS` selection — or dropping a
+whole backend leg — hard-fails (exit 6) instead of going green on a fraction of
+the required scenarios. The recipes additionally clear `PYTEST_ADDOPTS` per
+command so external selection injection cannot shrink the set. Drift meta-tests
+keep each manifest in lock-step with the real suite (both directions).
 
 ## Evidence
 

@@ -104,6 +104,49 @@ downgrade the required lane to the optional/honest-skip lane. Guard self-tests
 updated to this contract (E2E 8, failure 4). Stale "w5-19/w5-20 residual"
 comments in `justfile`/`ci.yml` were also corrected.
 
+### Wave 5 Closure — Required-Scenario Completeness Remediation
+
+The `pytest_sessionfinish` guards above (and the collected/skipped guards)
+inspected only `session.items` — the tests pytest actually **selected** after
+`-k` / `-m` / `--deselect` / single-node-path / `PYTEST_ADDOPTS` filtering. So a
+caller who selected a **subset** left that selected set fully passing and the
+gate went GREEN having run only a *fraction* of the required scenarios — a
+partial-selection / deselection fail-open. Reproduced (Docker present, armed) at
+the prior head: `-k <one test>` → exit 0 "1 passed, N deselected"; `--deselect`
+of one required node → exit 0; a single node path → exit 0; dropping the whole
+Temporal directory → exit 0 (composed passed, Temporal never ran);
+`PYTEST_ADDOPTS=-k` → exit 0.
+
+Closed with an authoritative **manifest SSOT + expected-vs-executed completeness
+guard** (never a bare count — node-id SETS are compared, so a renamed test can't
+substitute):
+
+- **E2E** (`tests/integration/_measurement_e2e_completeness.py`): 28 required
+  scenarios, each with a stable semantic id, its pytest node id, and its backend
+  leg (postgres / clickhouse / temporal / composed). Wired into the **ancestor**
+  `tests/integration/conftest.py` `pytest_sessionfinish`, so it fires for BOTH
+  `measurement_e2e` + `measurement_workflow` and closes path-omission of either
+  directory. Armed + any expected node not execute-and-PASS (deselected /
+  uncollected / skipped / failed), or ZERO tests for any backend leg, or empty
+  manifest → HARD FAILURE exit 6.
+- **failure** (`tests/integration/measurement_failure/_failure_completeness.py`):
+  31 required nodes (16 primary / 15 recovery), wired into the existing
+  `measurement_failure/conftest.py` `pytest_sessionfinish`. Missing node, zero
+  primary, or zero recovery → exit 6.
+- **Invocation hardening**: both required `just` recipes prefix `PYTEST_ADDOPTS=''`
+  on every pytest line (targeted per-command override — other recipes still honor
+  a caller's `PYTEST_ADDOPTS`), so external `-k`/`-m`/`--deselect` injection
+  cannot shrink the required set even before the guard runs. CI keeps calling
+  `uv run just <recipe>` (SSOT) and adds an `if: always()` job-summary step
+  (SHA + armed + recipe + injection-neutralized).
+- **Drift meta-tests** (both lanes): assert the manifest node set equals the
+  actual collectible set in BOTH directions — a renamed/removed real test, or a
+  manifest-only entry, fails loudly, so the SSOT can never silently drift.
+
+Manifest modules are TEST-SUPPORT only (under `tests/`, never imported by any
+runtime/production package). Fail-safe arming + the terminalreporter None-guard
+are preserved; `session.exitstatus = 6` is set before any reporter access.
+
 ### Original wave (pre-closure) status, superseded
 
 The initial pass reached PARTIAL PASS (21/24) with w5-19/w5-20/w5-21 residual;
@@ -291,14 +334,16 @@ ci↔justfile parity green.
 
 | Gate | Docker present | Docker absent (required env armed) | Optional (flag unset) |
 |---|---|---|---|
-| `just measurement-e2e` | e2e 36 pass (28 real PG16 + CH24.8 + Temporal time-skipping rows + 8 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (never green "0 passed, N skipped") | honest skip, exit 0 |
-| `just measurement-failure-modes` | failure matrix 35 pass (31 real-PG rows + 4 guard proofs), skipped=0 | **exit 6 HARD FAILURE** | honest skip, exit 0 |
+| `just measurement-e2e` | e2e 39 pass (28 real PG16 + CH24.8 + Temporal time-skipping rows + 11 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (never green "0 passed, N skipped" **or a partial `-k`/`--deselect`/single-node/PYTEST_ADDOPTS selection**) | honest skip, exit 0 |
+| `just measurement-failure-modes` | failure matrix 41 pass (31 real-PG rows + 10 guard proofs), skipped=0 | **exit 6 HARD FAILURE** (incl. any partial selection) | honest skip, exit 0 |
 
-Real-container lanes green 2× each; guard self-tests: E2E 8 passed, failure 4
-passed (incl. the container-free-only bypass and fail-safe-arming regressions).
-No wall-clock sleep stabilizes Temporal (time-skipping only).
+Real-container lanes green 2× each; guard self-tests: E2E 11 passed, failure 10
+passed (incl. the container-free-only bypass, fail-safe-arming, and the
+required-scenario **completeness** regressions — partial `-k`/`--deselect`/
+single-node/`PYTEST_ADDOPTS` selection each hard-fail, plus the manifest drift
+meta-test). No wall-clock sleep stabilizes Temporal (time-skipping only).
 Failure-mode matrix: every declared node exists + is collectible + ran; primary
-and recovery both run; skipped=0 in required mode.
+and recovery both run; skipped=0 and missing=0 in required mode.
 
 ## DO NOT AUTO-MERGE
 
