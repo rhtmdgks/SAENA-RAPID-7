@@ -44,8 +44,9 @@ _SERVICE_SRC = (
     _REPO_ROOT / "services" / "experimentation" / "experiment-attribution-service" / "src"
 )
 _PIPELINE_FACTORIES_DIR = _REPO_ROOT / "tests" / "unit" / "svc_experiment_attribution_pipeline"
+_INTEGRATION_DIR = _THIS_DIR.parent
 
-for _p in (_THIS_DIR, _SERVICE_SRC, _PIPELINE_FACTORIES_DIR):
+for _p in (_THIS_DIR, _INTEGRATION_DIR, _SERVICE_SRC, _PIPELINE_FACTORIES_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -56,6 +57,7 @@ for _p in (_THIS_DIR, _SERVICE_SRC, _PIPELINE_FACTORIES_DIR):
 # `PYTEST_ADDOPTS` leaves the SELECTED set fully passing, so the lane went
 # green having run only a fraction of the required failure-mode scenarios.
 import _failure_completeness as _failure_complete  # noqa: E402
+import _gate_evidence  # noqa: E402
 from saena_experiment_attribution.persistence import adapter  # noqa: E402
 
 
@@ -130,6 +132,8 @@ def pytest_configure(config: pytest.Config) -> None:
 _FAILURE_REQUIRED_ENV_VAR = "SAENA_MEASUREMENT_FAILURE_REQUIRED"
 _FAILURE_HARD_FAIL_EXIT = 6
 _FAILURE_OUTCOMES: dict[str, set[str]] = {"passed": set(), "skipped": set(), "failed": set()}
+_FAILURE_XFAILED: set[str] = set()
+_FAILURE_XPASSED: set[str] = set()
 
 
 def _failure_required_armed() -> bool:
@@ -157,12 +161,43 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
     if report.when == "setup" and report.outcome == "skipped":
         _FAILURE_OUTCOMES["skipped"].add(report.nodeid)
     elif report.when == "call":
-        _FAILURE_OUTCOMES.setdefault(report.outcome, set()).add(report.nodeid)
+        # xfailed (skipped + wasxfail) and xpassed (passed + wasxfail) are NOT
+        # clean passes — record them separately so an xfailed required node
+        # counts as missing, never as coverage.
+        wasxfail = getattr(report, "wasxfail", None) is not None
+        if report.outcome == "passed" and wasxfail:
+            _FAILURE_XPASSED.add(report.nodeid)
+        elif report.outcome == "skipped" and wasxfail:
+            _FAILURE_XFAILED.add(report.nodeid)
+        else:
+            _FAILURE_OUTCOMES.setdefault(report.outcome, set()).add(report.nodeid)
+
+
+def _selected_failure_node_ids(session: pytest.Session) -> set[str]:
+    return {item.nodeid for item in session.items}
+
+
+def _emit_failure_evidence(session: pytest.Session) -> None:
+    # Machine-readable runtime EVIDENCE (Wave 5 evidence-integrity closure) —
+    # written on EVERY armed path (pass, partial, infra-skip, zero-collected) so
+    # the CI renderer sees the true state instead of a static claim.
+    payload = _failure_complete.build_evidence_payload(
+        _FAILURE_OUTCOMES["passed"],
+        _FAILURE_OUTCOMES["skipped"],
+        _FAILURE_OUTCOMES["failed"],
+        selected_ids=_selected_failure_node_ids(session),
+        xfailed=len(_FAILURE_XFAILED),
+        xpassed=len(_FAILURE_XPASSED),
+        witnesses=_gate_evidence.witnesses(),
+        intended_exit_code=_FAILURE_HARD_FAIL_EXIT,
+    )
+    _gate_evidence.write_evidence(payload)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if not _failure_required_armed():
         return
+    _emit_failure_evidence(session)
     nodes = _this_dir_integration_nodes(session)
     if not nodes:
         session.exitstatus = _FAILURE_HARD_FAIL_EXIT
@@ -245,6 +280,16 @@ def postgres_container() -> Iterator[PostgresContainer]:
     if not _DOCKER_AVAILABLE:
         pytest.skip("Docker daemon not reachable — honest skip (ADR-0017)")
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as container:
+        # Positive runtime WITNESS that a REAL Postgres 16 container started —
+        # the CI evidence renderer proves the 'postgres' leg from this, never
+        # from an env var (Wave 5 evidence-integrity closure).
+        _inner = getattr(container, "_container", None)
+        _cid = getattr(_inner, "id", None)
+        _gate_evidence.record_container_witness(
+            "postgres",
+            image="postgres:16-alpine",
+            container_id=str(_cid)[:12] if _cid else None,
+        )
         yield container
 
 

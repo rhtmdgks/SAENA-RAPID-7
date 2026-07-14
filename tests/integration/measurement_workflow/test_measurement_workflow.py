@@ -57,6 +57,7 @@ import asyncio
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta, timezone
 
+import _gate_evidence
 import pytest
 from attribution_factories import (
     OTHER_REGISTRATION_HASH,
@@ -121,6 +122,14 @@ def temporal_env(
             f"(startup failed within {_STARTUP_TIMEOUT_SECONDS}s): "
             f"{type(_probe_result).__name__}: {_probe_result}"
         )
+    # Positive runtime WITNESS that the REAL Temporal time-skipping test server
+    # started — the CI evidence renderer proves the 'temporal' leg from this,
+    # never from an env var (Wave 5 evidence-integrity closure).
+    _gate_evidence.record_container_witness(
+        "temporal",
+        image="temporalio-time-skipping-test-server",
+        detail="WorkflowEnvironment.start_time_skipping",
+    )
     return _probe_result
 
 

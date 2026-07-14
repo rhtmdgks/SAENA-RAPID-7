@@ -51,10 +51,20 @@ _SKILL_BANK_SRC = (
     _REPO_ROOT / "services" / "experimentation" / "strategy-skill-bank-service" / "src"
 )
 
-for _p in (_THIS_DIR, _MEASUREMENT_PG_DIR, _E2E_HARNESS_DIR, _ATTRIBUTION_SRC, _SKILL_BANK_SRC):
+_INTEGRATION_DIR = _THIS_DIR.parent
+
+for _p in (
+    _THIS_DIR,
+    _INTEGRATION_DIR,
+    _MEASUREMENT_PG_DIR,
+    _E2E_HARNESS_DIR,
+    _ATTRIBUTION_SRC,
+    _SKILL_BANK_SRC,
+):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+import _gate_evidence  # noqa: E402
 from saena_experiment_attribution.persistence import adapter  # noqa: E402
 
 # --------------------------------------------------------------------------- #
@@ -331,11 +341,23 @@ def run_async(coro):  # noqa: ANN001, ANN201
     return asyncio.run(coro)
 
 
+def _container_id(container: object) -> str | None:
+    inner = getattr(container, "_container", None)
+    cid = getattr(inner, "id", None)
+    return str(cid)[:12] if cid else None
+
+
 @pytest.fixture(scope="session")
 def postgres_container() -> Iterator[PostgresContainer]:
     if not _DOCKER_AVAILABLE:
         pytest.skip("Docker daemon not reachable — honest skip (ADR-0017)")
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as container:
+        # Positive runtime WITNESS that a REAL Postgres 16 container started —
+        # the CI evidence renderer proves the 'postgres' leg from this, never
+        # from an env var (Wave 5 evidence-integrity closure).
+        _gate_evidence.record_container_witness(
+            "postgres", image="postgres:16-alpine", container_id=_container_id(container)
+        )
         yield container
 
 
@@ -437,6 +459,11 @@ def clickhouse_container() -> Iterator[object]:
     from testcontainers.clickhouse import ClickHouseContainer
 
     with ClickHouseContainer("clickhouse/clickhouse-server:24.8-alpine") as container:
+        _gate_evidence.record_container_witness(
+            "clickhouse",
+            image="clickhouse/clickhouse-server:24.8-alpine",
+            container_id=_container_id(container),
+        )
         yield container
 
 

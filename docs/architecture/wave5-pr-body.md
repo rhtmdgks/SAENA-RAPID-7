@@ -67,6 +67,30 @@ the required scenarios. The recipes additionally clear `PYTEST_ADDOPTS` per
 command so external selection injection cannot shrink the set. Drift meta-tests
 keep each manifest in lock-step with the real suite (both directions).
 
+## Wave 5 Closure — CI Evidence Integrity
+
+**In progress; CI verification pending — not yet claimed green.** The prior
+`if: always()` job-summary step echoed a static success line; it never proved
+anything about the run that produced it. Remediation replaces the echo with a
+fail-closed evidence chain: each required gate (`measurement-e2e`,
+`measurement-failure-modes`) now writes a machine-generated evidence JSON
+(schema `saena.gate-evidence/v1`) via the completeness guard, recording
+`required_mode_armed`, expected/selected/executed/passed/failed/skipped/
+xfailed/xpassed/deselected counts, missing/unexpected/duplicate node ids,
+per-leg executed/passed/witness, `real_containers_proven`, and real-container
+**witnesses** — Postgres/ClickHouse/Temporal image + container id, recorded by
+the fixtures only when a real container actually starts. A fail-closed
+renderer (`tools/validation/render_gate_evidence.py`) verifies the evidence
+file exists, matches the schema, and is bound to **this** `commit_sha` +
+`github_run_id` (stale evidence from a prior run is rejected), then reports
+`completeness_passed` + `real_containers_proven` + `skipped=0` + `missing=0` —
+otherwise the CI step exits non-zero (NOT PROVEN / FAILED). The job summary
+renders FROM this evidence; it is never a static echo again. Evidence files
+are uploaded as CI artifacts (`if: always()`). This proves real-container
+execution from runtime witnesses recorded during the run, not from env vars
+asserting intent. Mechanism only — this has not yet run green on CI; that
+verification is pending.
+
 ## Evidence
 
 - Unit lane 5297 tests; per-unit 100% (or ≥99%) module coverage; global
@@ -102,9 +126,9 @@ the Closure round CLOSED all three (see `wave5-exit-report.md` c5-01…c5-04):
 - **w5-19 E2E** — CLOSED (c5-01). Real composed E2E integrated: real Postgres 16
   + ClickHouse 24.8 + Temporal time-skipping, driving the actual
   `run_measurement` composition; run by the required `measurement-e2e` gate
-  (36 pass, skipped=0, Docker-present; exit 6 Docker-absent).
+  (39 pass, skipped=0, Docker-present; exit 6 Docker-absent).
 - **w5-20 failure-modes** — CLOSED (c5-02). Full failure-mode matrix integrated
-  (`measurement-failure-modes` gate: 35 pass, skipped=0). The conflicting-
+  (`measurement-failure-modes` gate: 41 pass, skipped=0). The conflicting-
   confirmation seam is CLOSED (c5-03): `run_measurement` now catches the
   persistence `IdempotencyConflictError` and emits `UNDETERMINED
   (CONFLICTING_CONFIRMATION)` — never PASS — instead of propagating the raw

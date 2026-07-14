@@ -147,6 +147,36 @@ Manifest modules are TEST-SUPPORT only (under `tests/`, never imported by any
 runtime/production package). Fail-safe arming + the terminalreporter None-guard
 are preserved; `session.exitstatus = 6` is set before any reporter access.
 
+### Wave 5 Closure — CI Evidence Integrity
+
+**Remediation in progress; CI verification pending.** The CI job summaries no
+longer emit a static success claim. Each required gate (`measurement-e2e`,
+`measurement-failure-modes`) now writes a machine-generated evidence JSON
+(schema `saena.gate-evidence/v1`) via the completeness guard, containing:
+`required_mode_armed`; expected/selected/executed/passed/failed/skipped/
+xfailed/xpassed/deselected counts; missing/unexpected/duplicate node ids;
+per-leg (postgres/clickhouse/temporal/composed) executed/passed/witness;
+`real_containers_proven`; and real-container **WITNESSES** — the Postgres,
+ClickHouse, and Temporal image + container id, recorded by the fixtures
+themselves only at the moment a real container actually starts (not asserted
+by env var).
+
+A fail-closed renderer (`tools/validation/render_gate_evidence.py`) verifies:
+the evidence file exists; it matches the `saena.gate-evidence/v1` schema; it
+is bound to **this** commit — `commit_sha` + `github_run_id` match the current
+run, so stale evidence carried over from a prior run is rejected; and it
+reports `completeness_passed` + `real_containers_proven` + `skipped=0` +
+`missing=0`. If any of that fails, the CI step exits non-zero and the summary
+reads NOT PROVEN / FAILED — never green by default. The summary is rendered
+FROM this evidence; it is no longer a static echo. Evidence JSON files are
+uploaded as CI artifacts (`if: always()`), so the raw witnesses survive the
+run for independent audit.
+
+This proves real-container execution from runtime witnesses captured by the
+fixtures during execution — not from env-var declarations of intent. This is
+a mechanism description only: the remediation has not yet been exercised on a
+green CI run, and that verification is explicitly pending, not claimed here.
+
 ### Original wave (pre-closure) status, superseded
 
 The initial pass reached PARTIAL PASS (21/24) with w5-19/w5-20/w5-21 residual;
@@ -273,13 +303,13 @@ gate), not silently.
 
 ## Residual / OPEN / production-only
 
-- **w5-19 (E2E)** — CLOSED (c5-01). 18 real-container composed E2E scenarios +
+- **w5-19 (E2E)** — CLOSED (c5-01). 28 required E2E scenarios +
   guard-mechanism tests in `tests/integration/measurement_e2e/` — real Postgres
   16 + ClickHouse 24.8 + Temporal time-skipping, no mock-only, no wall-clock
   sleep. A `SAENA_MEASUREMENT_E2E_REQUIRED=1` env-var contract arms a
   zero-collected hard-fail guard (a naming/import error collecting 0 exits
   non-0, never a silent pass) wired into the `measurement-e2e` named gate.
-- **w5-20 (failure modes)** — CLOSED (c5-02). Full 18-node failure-mode matrix,
+- **w5-20 (failure modes)** — CLOSED (c5-02). Full 31-node failure-mode matrix (16 primary / 15 recovery),
   every node existing + collectible + run-verified (6-check gate with teeth);
   F-9 repointed to the integrated `b_gate.decide_b_verdict` (thin shim, all
   importers green). 31 integration tests vs real Postgres. **Seam finding

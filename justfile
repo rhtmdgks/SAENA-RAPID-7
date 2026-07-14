@@ -165,7 +165,12 @@ measurement-e2e:
     # typo / import error / partial selection in this required lane exits 6,
     # never a silent pass); PYTEST_ADDOPTS='' strips any caller-injected
     # -k/-m/addopts so the full hardcoded path set below always runs.
-    PYTEST_ADDOPTS='' SAENA_MEASUREMENT_E2E_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_e2e tests/integration/measurement_workflow -p no:cacheprovider
+    # Runtime EVIDENCE (Wave 5 evidence-integrity closure): the guard writes a
+    # machine-readable saena.gate-evidence/v1 JSON here (even on failure). CI
+    # sets SAENA_GATE_EVIDENCE_PATH/SAENA_GATE_INVOCATION_ID at job level so its
+    # separate renderer step reads the SAME file; locally they default. The
+    # CI summary is rendered FROM this file (never a static echo).
+    SAENA_GATE_EVIDENCE_PATH="${SAENA_GATE_EVIDENCE_PATH:-$PWD/.evidence/gate-e2e.json}" SAENA_GATE_INVOCATION_ID="${SAENA_GATE_INVOCATION_ID:-$(uuidgen 2>/dev/null || echo local-$$)}" PYTEST_ADDOPTS='' SAENA_MEASUREMENT_E2E_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_e2e tests/integration/measurement_workflow -p no:cacheprovider
 
 # w5-06/w5-13/w5-18: measurement fail-closed / fraud / UNDETERMINED-never-PASS
 # discriminators (named explicitly — non-test_* helper files).
@@ -188,7 +193,8 @@ measurement-failure-modes:
     # zero passed is a HARD FAILURE (exit 6) — this required gate can never pass
     # as a green "0 passed, N skipped". PYTEST_ADDOPTS='' strips any
     # caller-injected -k/-m/addopts so the full hardcoded path set always runs.
-    PYTEST_ADDOPTS='' SAENA_MEASUREMENT_FAILURE_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
+    # Runtime EVIDENCE (Wave 5 evidence-integrity closure) — see measurement-e2e.
+    SAENA_GATE_EVIDENCE_PATH="${SAENA_GATE_EVIDENCE_PATH:-$PWD/.evidence/gate-failure-modes.json}" SAENA_GATE_INVOCATION_ID="${SAENA_GATE_INVOCATION_ID:-$(uuidgen 2>/dev/null || echo local-$$)}" PYTEST_ADDOPTS='' SAENA_MEASUREMENT_FAILURE_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
 
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.

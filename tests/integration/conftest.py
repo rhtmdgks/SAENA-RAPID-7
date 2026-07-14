@@ -63,6 +63,7 @@ _THIS_DIR = Path(__file__).resolve().parent
 # path-omission cannot dodge the guard).
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
+import _gate_evidence  # noqa: E402
 import _measurement_e2e_completeness as _e2e_complete  # noqa: E402
 
 # Node-id -> outcome recorder for the E2E completeness guard. Populated by
@@ -70,6 +71,8 @@ import _measurement_e2e_completeness as _e2e_complete  # noqa: E402
 _E2E_PASSED: set[str] = set()
 _E2E_SKIPPED: set[str] = set()
 _E2E_FAILED: set[str] = set()
+_E2E_XFAILED: set[str] = set()
+_E2E_XPASSED: set[str] = set()
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -108,11 +111,21 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
         _E2E_SKIPPED.add(report.nodeid)
     elif report.when == "call":
         if report.outcome == "passed":
-            _E2E_PASSED.add(report.nodeid)
+            if getattr(report, "wasxfail", None) is not None:
+                _E2E_XPASSED.add(report.nodeid)  # xpassed — ran but not a clean pass
+            else:
+                _E2E_PASSED.add(report.nodeid)
         elif report.outcome == "failed":
             _E2E_FAILED.add(report.nodeid)
         elif report.outcome == "skipped":
-            _E2E_SKIPPED.add(report.nodeid)
+            if getattr(report, "wasxfail", None) is not None:
+                _E2E_XFAILED.add(report.nodeid)  # xfailed — NOT a real pass
+            else:
+                _E2E_SKIPPED.add(report.nodeid)
+
+
+def _selected_e2e_node_ids(session: pytest.Session) -> set[str]:
+    return {item.nodeid for item in session.items}
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
@@ -126,6 +139,23 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if not _e2e_complete.required_armed():
         return
     report = _e2e_complete.evaluate(_E2E_PASSED, _E2E_SKIPPED, _E2E_FAILED)
+
+    # Emit machine-readable runtime EVIDENCE (Wave 5 evidence-integrity closure)
+    # — ALWAYS, on pass OR fail, so the CI renderer sees the true state instead
+    # of a static claim. xfailed/xpassed are counted separately and are NOT
+    # treated as clean passes (an xfailed required node counts as missing).
+    payload = _e2e_complete.build_evidence_payload(
+        _E2E_PASSED,
+        _E2E_SKIPPED,
+        _E2E_FAILED,
+        selected_ids=_selected_e2e_node_ids(session),
+        xfailed=len(_E2E_XFAILED),
+        xpassed=len(_E2E_XPASSED),
+        witnesses=_gate_evidence.witnesses(),
+        intended_exit_code=_e2e_complete.HARD_FAIL_EXIT,
+    )
+    _gate_evidence.write_evidence(payload)
+
     if report.ok:
         return
     # Set the hard-fail exit code FIRST — must hold even if the terminal

@@ -256,6 +256,77 @@ def evaluate(passed: set[str], skipped: set[str], failed: set[str]) -> Completen
     )
 
 
+#: Legs that correspond to a real container/test-server whose START must be
+#: witnessed at runtime (the 'composed' leg is a logical whole-pipeline tag, not
+#: a separate container — it is proven when postgres AND clickhouse are).
+REAL_CONTAINER_LEGS: tuple[str, ...] = (LEG_POSTGRES, LEG_CLICKHOUSE, LEG_TEMPORAL)
+
+
+def build_evidence_payload(
+    passed: set[str],
+    skipped: set[str],
+    failed: set[str],
+    *,
+    selected_ids: set[str],
+    xfailed: int,
+    xpassed: int,
+    witnesses: dict[str, dict],
+    intended_exit_code: int,
+) -> dict:
+    """Assemble the machine-readable evidence payload for the E2E gate from the
+    recorded outcome sets + the fixture-recorded real-container witnesses. Built
+    even on a FAILED/partial run so the renderer sees the true state. Never
+    includes a secret — only node ids, counts, leg names and image refs."""
+    report = evaluate(passed, skipped, failed)
+    passed_n = {_norm(n) for n in passed}
+    skipped_n = {_norm(n) for n in skipped}
+    failed_n = {_norm(n) for n in failed}
+    selected_n = {_norm(n) for n in selected_ids}
+    expected = EXPECTED_NODE_IDS
+    executed_expected = expected & (passed_n | skipped_n | failed_n)
+    unexpected = sorted((passed_n | failed_n) - expected)
+    _all_node_ids = [s.node_id for s in REQUIRED_SCENARIOS]
+    duplicate_ids = sorted({n for n in _all_node_ids if _all_node_ids.count(n) > 1})
+    witness_legs = {leg for leg, w in witnesses.items() if w.get("started")}
+    # 'composed' is proven iff both real DB legs are witnessed.
+    composed_witnessed = LEG_POSTGRES in witness_legs and LEG_CLICKHOUSE in witness_legs
+
+    executed_all = passed_n | skipped_n | failed_n
+    legs: dict[str, dict] = {}
+    for leg in sorted(ALL_LEGS):
+        leg_scenarios = [s for s in REQUIRED_SCENARIOS if leg in s.legs]
+        executed = sum(1 for s in leg_scenarios if s.node_id in executed_all)
+        passed_ct = sum(1 for s in leg_scenarios if s.node_id in passed_n)
+        has_witness = composed_witnessed if leg == LEG_COMPOSED else leg in witness_legs
+        legs[leg] = {"executed": executed, "passed": passed_ct, "witness": has_witness}
+
+    real_containers_proven = all(leg in witness_legs for leg in REAL_CONTAINER_LEGS)
+
+    return {
+        "gate_name": "e2e",
+        "required_mode_armed": required_armed(),
+        "command_started": True,
+        "collection_completed": True,
+        "expected_count": len(expected),
+        "selected_count": len(expected & selected_n),
+        "executed_count": len(executed_expected),
+        "passed_count": len(report.passed),
+        "failed_count": len(report.failed),
+        "skipped_count": len(report.skipped),
+        "xfailed_count": xfailed,
+        "xpassed_count": xpassed,
+        "deselected_count": len(expected - selected_n),
+        "missing_node_ids": sorted(report.missing),
+        "unexpected_node_ids": unexpected,
+        "duplicate_ids": duplicate_ids,
+        "completeness_passed": report.ok,
+        "real_containers_proven": real_containers_proven,
+        "exit_code": 0 if report.ok else intended_exit_code,
+        "legs": legs,
+        "witnesses": witnesses,
+    }
+
+
 def format_failure(report: CompletenessReport) -> str:
     sep = "\n  - "
     legs = ", ".join(f"{k}={report.legs_executed[k]}" for k in sorted(ALL_LEGS))

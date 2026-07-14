@@ -392,6 +392,88 @@ def evaluate(passed: set[str], skipped: set[str], failed: set[str]) -> Completen
     )
 
 
+#: The single real-container leg this lane witnesses (real Postgres 16). The CI
+#: renderer proves it from the fixture-recorded witness, never an env var.
+REAL_CONTAINER_LEGS: tuple[str, ...] = ("postgres",)
+
+PRIMARY_EXPECTED = sum(1 for s in REQUIRED_SCENARIOS if s.category == CATEGORY_PRIMARY)
+RECOVERY_EXPECTED = sum(1 for s in REQUIRED_SCENARIOS if s.category == CATEGORY_RECOVERY)
+
+
+def build_evidence_payload(
+    passed: set[str],
+    skipped: set[str],
+    failed: set[str],
+    *,
+    selected_ids: set[str],
+    xfailed: int,
+    xpassed: int,
+    witnesses: dict[str, dict],
+    intended_exit_code: int,
+) -> dict:
+    """Assemble the machine-readable evidence payload for the failure-mode gate
+    (mirror of the E2E lane's builder). Built even on a FAILED/partial run so the
+    renderer sees the true state. Never includes a secret."""
+    report = evaluate(passed, skipped, failed)
+    passed_n = {_norm(n) for n in passed}
+    skipped_n = {_norm(n) for n in skipped}
+    failed_n = {_norm(n) for n in failed}
+    selected_n = {_norm(n) for n in selected_ids}
+    expected = EXPECTED_NODE_IDS
+    executed_expected = expected & (passed_n | skipped_n | failed_n)
+    unexpected = sorted((passed_n | failed_n) - expected)
+    _all_ids = [s.node_id for s in REQUIRED_SCENARIOS]
+    duplicate_ids = sorted({n for n in _all_ids if _all_ids.count(n) > 1})
+
+    witness_legs = {leg for leg, w in witnesses.items() if w.get("started")}
+    postgres_scenarios = len(REQUIRED_SCENARIOS)  # every real node hits real PG
+    legs = {
+        "postgres": {
+            "executed": len(executed_expected),
+            "passed": len(report.passed),
+            "witness": "postgres" in witness_legs,
+        }
+    }
+    real_containers_proven = all(leg in witness_legs for leg in REAL_CONTAINER_LEGS)
+    primary_passed = sum(
+        1 for s in REQUIRED_SCENARIOS if s.category == CATEGORY_PRIMARY and s.node_id in passed_n
+    )
+    recovery_passed = sum(
+        1 for s in REQUIRED_SCENARIOS if s.category == CATEGORY_RECOVERY and s.node_id in passed_n
+    )
+
+    return {
+        "gate_name": "failure-modes",
+        "required_mode_armed": failure_required_armed(),
+        "command_started": True,
+        "collection_completed": True,
+        "expected_count": len(expected),
+        "selected_count": len(expected & selected_n),
+        "executed_count": len(executed_expected),
+        "passed_count": len(report.passed),
+        "failed_count": len(report.failed),
+        "skipped_count": len(report.skipped),
+        "xfailed_count": xfailed,
+        "xpassed_count": xpassed,
+        "deselected_count": len(expected - selected_n),
+        "missing_node_ids": sorted(report.missing),
+        "unexpected_node_ids": unexpected,
+        "duplicate_ids": duplicate_ids,
+        "completeness_passed": report.ok,
+        "real_containers_proven": real_containers_proven,
+        "exit_code": 0 if report.ok else intended_exit_code,
+        "legs": legs,
+        "witnesses": witnesses,
+        "primary_expected": PRIMARY_EXPECTED,
+        "primary_executed": report.executed_primary,
+        "primary_passed": primary_passed,
+        "recovery_expected": RECOVERY_EXPECTED,
+        "recovery_executed": report.executed_recovery,
+        "recovery_passed": recovery_passed,
+        "postgres_scenarios": postgres_scenarios,
+    }
+
+
 def format_failure(report: CompletenessReport) -> str:
     sep = "\n  - "
     return (

@@ -19,8 +19,9 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SVC_SRC = _REPO_ROOT / "services" / "experimentation" / "experiment-attribution-service" / "src"
 _UNIT_FACTORIES_DIR = _REPO_ROOT / "tests" / "unit" / "svc_experiment_attribution_workflow"
+_INTEGRATION_DIR = _REPO_ROOT / "tests" / "integration"
 
-for _path in (_SVC_SRC, _UNIT_FACTORIES_DIR):
+for _path in (_INTEGRATION_DIR, _SVC_SRC, _UNIT_FACTORIES_DIR):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 

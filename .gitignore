@@ -75,3 +75,6 @@ tools/contract-lint/node_modules/
 # Coverage artifacts (regenerated every test run)
 .coverage
 coverage.xml
+
+# Wave 5 gate evidence (runtime-generated, never committed)
+.evidence/

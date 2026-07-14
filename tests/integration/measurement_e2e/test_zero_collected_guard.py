@@ -36,10 +36,16 @@ These tests PROVE the required behaviours by running pytest AS A SUBPROCESS
 A dedicated inert `test_*` leaf (`test_inert_leaf_for_nonempty_selection_
 proof`) is the single-item selection target for (b), so nesting stays exactly
 one level deep with no self-matching `-k` recursion.
+
+Investigator-C MUST-FIX #1 proofs (xpass-on-required-node closes as a HARD
+FAILURE, never a clean pass) and the two evidence-integrity self-tests
+(`test_j_...`) live at the bottom of this module, after the `_NO_RECURSE`
+clause + `_run_both_dirs`/`_run_child` helpers they reuse.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -190,7 +196,8 @@ _EXPECTED_INFRA_HARD_FAIL_EXIT = 6
 _NO_RECURSE = (
     "not test_a_ and not test_b_ and not test_c_ and not test_d_ "
     "and not test_e_ and not test_f_ and not test_g_ and not test_h_ "
-    "and not test_i_ and not test_j_ and not test_inert_"
+    "and not test_i_ and not test_j_ and not test_k_ and not test_l_ "
+    "and not test_m_ and not test_inert_"
 )
 
 # Repo root + the two composed-E2E directories (the required lane spans both).
@@ -455,4 +462,230 @@ def test_i_completeness_manifest_matches_collectible_set_no_drift() -> None:
     assert not stale_in_manifest, (
         "manifest declares scenarios that are no longer collectible (renamed/"
         f"removed — update the manifest): {sorted(stale_in_manifest)}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Investigator-C MUST-FIX #1 proofs + evidence-integrity self-tests (Wave 5
+# Closure follow-up). New test-name prefixes (`test_j_`, `test_k_`) are already
+# added to `_NO_RECURSE` above so no child subprocess spawned by ANY test in
+# this module can re-select these and recurse.
+# --------------------------------------------------------------------------- #
+
+
+def _docker_available() -> bool:
+    """Verbatim-duplicated probe (never imported across directories — matches
+    every sibling conftest/guard module's own convention) — used ONLY to
+    honestly SKIP the one test below that needs a real node to actually run
+    and PASS before being marked xpass; every other test in this module needs
+    no Docker."""
+    import socket
+
+    docker_host = os.environ.get("DOCKER_HOST", "")
+    if docker_host.startswith("tcp://"):
+        host_port = docker_host.removeprefix("tcp://")
+        host, _, port_str = host_port.partition(":")
+        port = int(port_str) if port_str else 2375
+        try:
+            with socket.create_connection((host, port), timeout=2.0):
+                return True
+        except OSError:
+            return False
+    for candidate in (
+        "/var/run/docker.sock",
+        os.path.expanduser("~/.docker/run/docker.sock"),
+        os.path.expanduser("~/.colima/default/docker.sock"),
+    ):
+        if os.path.exists(candidate):
+            try:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(2.0)
+                    sock.connect(candidate)
+                return True
+            except OSError:
+                continue
+    return False
+
+
+#: Repo-relative node-id prefix of the composed-E2E module the xpass target
+#: lives in (mirrors `_measurement_e2e_completeness._COMPOSED_MODULE`).
+_COMPOSED_MODULE_RELPATH = "tests/integration/measurement_e2e/test_real_composed_measurement_e2e.py"
+
+#: The one required real node the xpass-injection plugin targets. Needs both
+#: Postgres + ClickHouse (composed leg) — genuinely passes on a Docker-present
+#: host, so marking it `xfail(strict=False)` produces a true XPASS (outcome
+#: "passed", `wasxfail` set), never a fabricated result.
+_XPASS_TARGET_FUNC = "test_full_pass_flow_b_verified_skill_intake_accepted"
+_XPASS_TARGET_NODE = f"{_COMPOSED_MODULE_RELPATH}::{_XPASS_TARGET_FUNC}"
+
+_XPASS_PLUGIN_SOURCE = f'''\
+import pytest
+
+
+def pytest_collection_modifyitems(config, items):
+    for it in items:
+        if it.name == "{_XPASS_TARGET_FUNC}":
+            it.add_marker(
+                pytest.mark.xfail(strict=False, reason="probe: Investigator-C MUST-FIX #1")
+            )
+'''
+
+
+def test_j_xpass_on_required_node_hard_fails(tmp_path) -> None:  # noqa: ANN001
+    """Investigator-C MUST-FIX #1: arm the FULL E2E gate (both composed-E2E
+    directories, the real `just measurement-e2e` shape) and inject an
+    `xfail(strict=False)` marker onto ONE required real node via a tiny
+    throwaway pytest plugin (`-p <modname>`). That node still genuinely PASSES
+    (Docker present, real Postgres+ClickHouse) -> pytest reports it XPASS
+    (outcome="passed", `wasxfail` set) rather than a clean PASS. The
+    completeness guard's `pytest_runtest_logreport` recorder (tests/
+    integration/conftest.py) must route an XPASSED node to `_E2E_XPASSED`, NOT
+    `_E2E_PASSED` — so it counts as `missing` from the manifest's `passed`
+    comparison — and the gate must HARD FAIL (exit 6), never a clean pass,
+    proving a required scenario cannot be laundered through xfail/xpass into a
+    silent skip-equivalent."""
+    if not _docker_available():
+        import pytest as _pytest  # noqa: PLC0415
+
+        _pytest.skip(
+            "Docker daemon not reachable — honest skip; this proof needs the "
+            "target node to actually run and PASS before being marked xpass"
+        )
+
+    plugin_file = tmp_path / "_saena_xpass_probe_plugin.py"
+    plugin_file.write_text(_XPASS_PLUGIN_SOURCE)
+
+    env = dict(os.environ)
+    env[_REQUIRED_ENV_VAR] = "1"
+    env["PYTEST_ADDOPTS"] = ""
+    # Prepend tmp_path onto PYTHONPATH so `-p _saena_xpass_probe_plugin` (a
+    # bare importable module name, pytest's own `-p` contract) resolves.
+    existing_pp = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(tmp_path) + (os.pathsep + existing_pp if existing_pp else "")
+
+    result = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
+            "-m",
+            "integration",
+            _E2E_DIR,
+            _WORKFLOW_DIR,
+            # CRITICAL: ignore THIS guard self-test file in the child so the
+            # child never re-collects (and re-runs) this xpass test — that would
+            # fork-bomb (each child spawning another full-gate child). The real
+            # composed + workflow nodes (which the xpass proof needs) are in
+            # OTHER files and still run.
+            "--ignore",
+            str(_GUARD_FILE),
+            "-p",
+            "no:cacheprovider",
+            "-p",
+            "_saena_xpass_probe_plugin",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "an XPASSED required node must HARD FAIL the gate (exit "
+        f"{_EXPECTED_INFRA_HARD_FAIL_EXIT}) — an xpass is NOT a clean pass and must be "
+        f"treated as a missing required scenario; got {result.returncode}:\n{combined}"
+    )
+    assert "completeness" in combined, f"expected the completeness guard's message:\n{combined}"
+    assert _XPASS_TARGET_FUNC in combined, (
+        f"expected the xpassed target node ({_XPASS_TARGET_NODE}) named in the "
+        f"missing-scenario reason:\n{combined}"
+    )
+    assert "xpassed" in combined, (
+        f"expected pytest's own terminal summary to surface the xpassed outcome for "
+        f"{_XPASS_TARGET_NODE}:\n{combined}"
+    )
+
+
+def test_j_manifest_node_ids_unique_and_1to1() -> None:
+    """Container-free. The manifest must have no node-id collapses (every
+    `RequiredScenario.node_id` distinct — a collision would silently shrink
+    the effective required set below `len(REQUIRED_SCENARIOS)`) AND no
+    scenario-id collisions (the human-facing semantic id set must also be
+    1:1 with the scenario count)."""
+    import _measurement_e2e_completeness as manifest  # noqa: PLC0415
+
+    assert len(manifest.EXPECTED_NODE_IDS) == len(manifest.REQUIRED_SCENARIOS), (
+        "node_id collision(s) detected — the frozenset of EXPECTED_NODE_IDS is smaller "
+        f"than REQUIRED_SCENARIOS ({len(manifest.EXPECTED_NODE_IDS)} vs "
+        f"{len(manifest.REQUIRED_SCENARIOS)}); a duplicate node_id silently shrinks the "
+        "required set below its declared scenario count"
+    )
+    scenario_ids = {s.scenario_id for s in manifest.REQUIRED_SCENARIOS}
+    assert len(scenario_ids) == len(manifest.REQUIRED_SCENARIOS), (
+        "scenario_id collision(s) detected — "
+        f"{len(scenario_ids)} unique vs {len(manifest.REQUIRED_SCENARIOS)} declared scenarios"
+    )
+
+
+def test_j_partial_selection_emits_failclosed_evidence(tmp_path) -> None:  # noqa: ANN001
+    """Container-free (Docker not required — the missing real nodes make this
+    fail-closed regardless of infra availability). Armed + a `-k` selection
+    that keeps ONLY the container-free inert leaf + SAENA_GATE_EVIDENCE_PATH
+    pointed at a tmp file: run the E2E gate subprocess, then load the emitted
+    evidence JSON and assert it honestly reports the fail-closed state —
+    completeness_passed False, real_containers_proven False (no witness was
+    ever recorded), missing_node_ids non-empty (all 28 required scenarios were
+    deselected)."""
+    evidence_path = tmp_path / "gate-e2e-evidence.json"
+    env = dict(os.environ)
+    env[_REQUIRED_ENV_VAR] = "1"
+    env["SAENA_GATE_EVIDENCE_PATH"] = str(evidence_path)
+    env.pop("SAENA_GATE_INVOCATION_ID", None)
+    # Force Docker-absent in the child so this stays truly container-free and
+    # deterministic (a Docker-present host would start real Postgres via the
+    # session-autouse migration fixture even for this container-free selection).
+    env["DOCKER_HOST"] = "tcp://127.0.0.1:1"
+
+    # `_run_both_dirs` doesn't accept extra env vars, so invoke directly (same
+    # shape) with the evidence path wired into the child env.
+    result = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "integration",
+            _E2E_DIR,
+            _WORKFLOW_DIR,
+            "-k",
+            "test_inert_leaf_for_nonempty_selection_proof",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        f"expected the completeness hard-fail exit {_EXPECTED_INFRA_HARD_FAIL_EXIT}; "
+        f"got {result.returncode}:\n{combined}"
+    )
+    assert evidence_path.exists(), (
+        f"the gate must write runtime evidence to SAENA_GATE_EVIDENCE_PATH even on a "
+        f"fail-closed partial-selection run:\n{combined}"
+    )
+    payload = json.loads(evidence_path.read_text())
+    assert payload["completeness_passed"] is False, (
+        f"partial-selection evidence must report completeness_passed=False: {payload}"
+    )
+    assert payload["real_containers_proven"] is False, (
+        "no real-container witness was ever recorded (the selection deselected every "
+        f"real scenario) — real_containers_proven must be False: {payload}"
+    )
+    assert payload["missing_node_ids"], (
+        f"missing_node_ids must be non-empty (all 28 required scenarios deselected): {payload}"
     )
