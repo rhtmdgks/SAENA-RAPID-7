@@ -69,31 +69,45 @@ keep each manifest in lock-step with the real suite (both directions).
 
 ## Wave 5 Closure — CI Evidence Integrity
 
-**In progress; CI verification pending — not yet claimed green.** The prior
-`if: always()` job-summary step echoed a static success line; it never proved
-anything about the run that produced it. Remediation replaces the echo with a
+The prior `if: always()` job-summary step echoed a static success line; it
+never proved anything about the run that produced it. It is replaced by a
 fail-closed evidence chain: each required gate (`measurement-e2e`,
-`measurement-failure-modes`) now writes a machine-generated evidence JSON
-(schema `saena.gate-evidence/v1`) via the completeness guard, recording
+`measurement-failure-modes`) writes a machine-generated evidence JSON (schema
+`saena.gate-evidence/v1`) via the completeness guard, recording
 `required_mode_armed`, expected/selected/executed/passed/failed/skipped/
 xfailed/xpassed/deselected counts, missing/unexpected/duplicate node ids,
 per-leg executed/passed/witness, `real_containers_proven`, and real-container
 **witnesses** — Postgres/ClickHouse/Temporal image + container id, recorded by
-the fixtures only when a real container actually starts. A fail-closed
-renderer (`tools/validation/render_gate_evidence.py`) verifies the evidence
-file exists, matches the schema, and is bound to **this** `commit_sha` +
-`github_run_id` (stale evidence from a prior run is rejected), then reports
-`completeness_passed` + `real_containers_proven` + `skipped=0` + `missing=0` —
-otherwise the CI step exits non-zero (NOT PROVEN / FAILED). The job summary
-renders FROM this evidence; it is never a static echo again. Evidence files
-are uploaded as CI artifacts (`if: always()`). This proves real-container
-execution from runtime witnesses recorded during the run, not from env vars
-asserting intent. Mechanism only — this has not yet run green on CI; that
-verification is pending.
+the fixtures only when a real container actually starts.
+
+A **strict** validator (`tools/validation/render_gate_evidence.py`, spec
+`tools/validation/gate_evidence_spec.py`) INDEPENDENTLY re-derives acceptance —
+it never trusts the producer's `completeness_passed`. It enforces the execution
+lifecycle (`command_started`/`collection_completed`/`required_mode_armed`/
+`completeness_passed`/`real_containers_proven` are the boolean `True`,
+`exit_code==0`), exact count consistency (selected==executed==passed==expected
+= the authoritative 28/31; failed/skipped/xfailed/xpassed/deselected==0;
+missing/duplicate==[]), per-leg and primary/recovery consistency (16/15),
+strict witness shape (started `is True`, leg==key, approved image family,
+nonempty container id for Postgres/ClickHouse), and exact binding to **this**
+commit_sha + github_run_id + github_run_attempt + **invocation_id** (a
+same-run file from another gate invocation, or any stale/forged field, is
+rejected). Booleans use strict `is True` (a JSON `true` where an int is required
+— and vice-versa — fails). Unexpected nodes must belong to an authorized
+guard/meta-test file and can never substitute for a required manifest node. Any
+contradiction → CI step exits non-zero (NOT PROVEN). The summary renders FROM
+this evidence; it is never a static echo again. Evidence uploaded as CI
+artifacts (`if: always()`).
+
+The mechanism ran **green on CI at `67f0136`** (run 29301126277; artifacts
+downloaded + inspected: e2e 28/28 + Postgres/ClickHouse/Temporal witnesses,
+failure 31/31 primary 16/recovery 15 + Postgres witness, `real_containers_proven`,
+skipped=0, missing=0, bound to the run). The strict-validator hardening in this
+change is re-verified by the PR's own current-HEAD CI checks (authoritative).
 
 ## Evidence
 
-- Unit lane 5297 tests; per-unit 100% (or ≥99%) module coverage; global
+- Unit lane 5358 tests; per-unit 100% (or ≥99%) module coverage; global
   coverage ratchet held at 99%.
 - **Real containers**: Postgres `16-alpine` (39 tests RAN), ClickHouse
   `24.8-alpine` (14 RAN), Temporal time-skipping (9 RAN, 3× identical, zero

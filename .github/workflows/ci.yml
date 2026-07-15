@@ -490,7 +490,10 @@ jobs:
     # Set at job level so the gate step AND the render step see the same path.
     env:
       SAENA_GATE_EVIDENCE_PATH: ${{ github.workspace }}/.evidence/gate-e2e.json
-      SAENA_GATE_INVOCATION_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      # Gate-UNIQUE invocation id (not just run+attempt) so a same-run evidence
+      # file from the OTHER gate invocation cannot be reused here — the strict
+      # validator requires evidence.invocation_id == this env value.
+      SAENA_GATE_INVOCATION_ID: e2e-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -533,7 +536,8 @@ jobs:
     # Runtime EVIDENCE (Wave 5 evidence-integrity closure) — see measurement-e2e.
     env:
       SAENA_GATE_EVIDENCE_PATH: ${{ github.workspace }}/.evidence/gate-failure-modes.json
-      SAENA_GATE_INVOCATION_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      # Gate-UNIQUE invocation id — see measurement-e2e.
+      SAENA_GATE_INVOCATION_ID: failure-modes-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:

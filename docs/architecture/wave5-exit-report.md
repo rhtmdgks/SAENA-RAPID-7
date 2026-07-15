@@ -149,33 +149,45 @@ are preserved; `session.exitstatus = 6` is set before any reporter access.
 
 ### Wave 5 Closure — CI Evidence Integrity
 
-**Remediation in progress; CI verification pending.** The CI job summaries no
-longer emit a static success claim. Each required gate (`measurement-e2e`,
-`measurement-failure-modes`) now writes a machine-generated evidence JSON
-(schema `saena.gate-evidence/v1`) via the completeness guard, containing:
-`required_mode_armed`; expected/selected/executed/passed/failed/skipped/
-xfailed/xpassed/deselected counts; missing/unexpected/duplicate node ids;
-per-leg (postgres/clickhouse/temporal/composed) executed/passed/witness;
+The CI job summaries no longer emit a static success claim. Each required gate
+(`measurement-e2e`, `measurement-failure-modes`) writes a machine-generated
+evidence JSON (schema `saena.gate-evidence/v1`) via the completeness guard,
+containing: `required_mode_armed`; expected/selected/executed/passed/failed/
+skipped/xfailed/xpassed/deselected counts; missing/unexpected/duplicate node
+ids; per-leg (postgres/clickhouse/temporal/composed) executed/passed/witness;
 `real_containers_proven`; and real-container **WITNESSES** — the Postgres,
 ClickHouse, and Temporal image + container id, recorded by the fixtures
 themselves only at the moment a real container actually starts (not asserted
 by env var).
 
-A fail-closed renderer (`tools/validation/render_gate_evidence.py`) verifies:
-the evidence file exists; it matches the `saena.gate-evidence/v1` schema; it
-is bound to **this** commit — `commit_sha` + `github_run_id` match the current
-run, so stale evidence carried over from a prior run is rejected; and it
-reports `completeness_passed` + `real_containers_proven` + `skipped=0` +
-`missing=0`. If any of that fails, the CI step exits non-zero and the summary
-reads NOT PROVEN / FAILED — never green by default. The summary is rendered
-FROM this evidence; it is no longer a static echo. Evidence JSON files are
-uploaded as CI artifacts (`if: always()`), so the raw witnesses survive the
-run for independent audit.
+A **STRICT** validator (`tools/validation/render_gate_evidence.py`, backed by
+the authoritative SSOT `tools/validation/gate_evidence_spec.py` with a
+manifest-drift test) independently RE-DERIVES acceptance — it never trusts the
+producer's `completeness_passed`. It enforces, and fails closed on any
+violation of: (a) execution lifecycle — `command_started`, `collection_completed`,
+`required_mode_armed`, `completeness_passed`, `real_containers_proven` are the
+boolean `True` (strict `is True`, never truthiness) and `exit_code == 0`;
+(b) count consistency — selected==executed==passed==expected = the authoritative
+28 (e2e) / 31 (failure); failed/skipped/xfailed/xpassed/deselected==0;
+missing/duplicate==[]; unexpected nodes only from an authorized guard/meta file
+(never substituting a required node); (c) per-leg and primary/recovery (16/15)
+counts equal the manifest-derived expectations; (d) witness shape — `started
+is True`, `leg == key`, approved image family, nonempty container-id-shaped
+string for Postgres/ClickHouse; (e) exact binding to **this** invocation —
+`commit_sha` + `github_run_id` + `github_run_attempt` + **`invocation_id`** all
+match the run, so a stale artifact OR a same-run file from a different gate
+invocation is rejected. JSON `true` where an int is required (and vice-versa)
+fails. The summary renders FROM this evidence — never a static echo. Evidence
+JSON files are uploaded as CI artifacts (`if: always()`) for independent audit.
 
-This proves real-container execution from runtime witnesses captured by the
-fixtures during execution — not from env-var declarations of intent. This is
-a mechanism description only: the remediation has not yet been exercised on a
-green CI run, and that verification is explicitly pending, not claimed here.
+This proves real-container execution from runtime witnesses captured during
+execution, not from env-var declarations of intent. The mechanism ran **green
+on CI at `67f0136`** (run 29301126277; both evidence artifacts downloaded +
+inspected: e2e expected=passed=28 + Postgres/ClickHouse/Temporal witnesses,
+failure 31 with primary 16 / recovery 15 + Postgres witness,
+`real_containers_proven`, skipped=0, missing=0, bound to the run). The
+strict-validator hardening is re-verified by the PR's own current-HEAD CI
+checks (authoritative), not by any hardcoded SHA in this document.
 
 **Trust boundary (known limitation, future hardening).** The evidence is not
 cryptographically signed: a hand-forged JSON carrying the *matching* commit_sha
@@ -368,7 +380,7 @@ altered — measurement services consume events only when wired.
 ## Verification (Wave 5 Closure Final Remediation)
 
 `uv run just verify` green 3× (deterministic): lint, typecheck, unit lane
-(5297 passed), coverage ratchet held (99%), boundaries (11 import contracts
+(5358 passed), coverage ratchet held (99%), boundaries (11 import contracts
 kept), contracts + registry validate. All 8 W5 named gates individually green;
 ci↔justfile parity green.
 
