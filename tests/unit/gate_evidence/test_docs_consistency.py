@@ -8,7 +8,7 @@ Canonical numbers (single source of truth for the prose):
   - failure required-scenario manifest: 31 (16 primary / 15 recovery)
   - measurement-e2e gate pass total: 42   (28 scenarios + 14 guard/meta tests)
   - measurement-failure-modes gate pass total: 44 (31 + 13 guard/meta tests)
-  - unit lane total: 5358
+  - unit lane total: 5365
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ _DOCS = (
 
 #: Substrings that must NOT appear — stale totals or superseded "pending" claims.
 _FORBIDDEN = (
-    "5297",  # stale unit total (now 5358)
+    "5297",  # stale unit total (now 5365)
     "39 pass",  # stale e2e gate total (now 42)
     "41 pass",  # stale failure gate total (now 44)
     "36 pass",  # older stale e2e total
@@ -38,7 +38,7 @@ _FORBIDDEN = (
 
 #: Canonical tokens that must be present in at least one doc.
 _REQUIRED = (
-    "5358",
+    "5365",
     "42 pass",
     "44 pass",
     "28 E2E scenarios",

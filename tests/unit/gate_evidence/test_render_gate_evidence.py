@@ -1061,9 +1061,7 @@ def test_56_main_writes_summary_file_on_failure_too(tmp_path: Path) -> None:
 # key injected alongside all valid required data must fail closed — the legs /
 # witnesses blocks must be EXACTLY the authoritative set, never a superset.
 # =========================================================================== #
-def test_unknown_extra_leg_fails_closed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_unknown_extra_leg_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data = complete_e2e_evidence()
     data["legs"]["fake_extra_leg"] = {"executed": 1, "passed": 1, "witness": True}
     _set_matching_binding_env(monkeypatch, data["run_binding"])

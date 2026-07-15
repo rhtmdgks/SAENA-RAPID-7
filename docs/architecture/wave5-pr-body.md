@@ -107,7 +107,7 @@ change is re-verified by the PR's own current-HEAD CI checks (authoritative).
 
 ## Evidence
 
-- Unit lane 5358 tests; per-unit 100% (or ≥99%) module coverage; global
+- Unit lane 5365 tests; per-unit 100% (or ≥99%) module coverage; global
   coverage ratchet held at 99%.
 - **Real containers**: Postgres `16-alpine` (39 tests RAN), ClickHouse
   `24.8-alpine` (14 RAN), Temporal time-skipping (9 RAN, 3× identical, zero

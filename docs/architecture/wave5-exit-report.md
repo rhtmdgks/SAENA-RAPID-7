@@ -380,7 +380,7 @@ altered — measurement services consume events only when wired.
 ## Verification (Wave 5 Closure Final Remediation)
 
 `uv run just verify` green 3× (deterministic): lint, typecheck, unit lane
-(5358 passed), coverage ratchet held (99%), boundaries (11 import contracts
+(5365 passed), coverage ratchet held (99%), boundaries (11 import contracts
 kept), contracts + registry validate. All 8 W5 named gates individually green;
 ci↔justfile parity green.
 
