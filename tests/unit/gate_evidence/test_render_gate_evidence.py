@@ -1054,3 +1054,49 @@ def test_56_main_writes_summary_file_on_failure_too(tmp_path: Path) -> None:
     assert code != 0
     written = summary_path.read_text()
     assert "does not exist" in written
+
+
+# =========================================================================== #
+# Unknown-key rejection (critic-A/C MUST-FIX): a fabricated EXTRA leg or witness
+# key injected alongside all valid required data must fail closed — the legs /
+# witnesses blocks must be EXACTLY the authoritative set, never a superset.
+# =========================================================================== #
+def test_unknown_extra_leg_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = complete_e2e_evidence()
+    data["legs"]["fake_extra_leg"] = {"executed": 1, "passed": 1, "witness": True}
+    _set_matching_binding_env(monkeypatch, data["run_binding"])
+    path = _write(tmp_path, data)
+    code, markdown = render("e2e", path)
+    assert code != 0
+    assert "fabricated leg" in markdown or "unexpected/fabricated leg" in markdown
+
+
+def test_unknown_extra_witness_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = complete_e2e_evidence()
+    data["witnesses"]["redis"] = {
+        "leg": "redis",
+        "image": "redis:7",
+        "container_id": "abcdef123456",
+        "detail": None,
+        "started": True,
+    }
+    _set_matching_binding_env(monkeypatch, data["run_binding"])
+    path = _write(tmp_path, data)
+    code, markdown = render("e2e", path)
+    assert code != 0
+    assert "fabricated witness" in markdown or "unexpected/fabricated witness" in markdown
+
+
+def test_unknown_extra_leg_fails_closed_failure_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = complete_failure_modes_evidence()
+    data["legs"]["fake_extra_leg"] = {"executed": 1, "passed": 1, "witness": True}
+    _set_matching_binding_env(monkeypatch, data["run_binding"])
+    path = _write(tmp_path, data)
+    code, _markdown = render("failure-modes", path)
+    assert code != 0

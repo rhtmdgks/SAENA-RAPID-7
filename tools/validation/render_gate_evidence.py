@@ -184,6 +184,12 @@ def _validate_legs(data: dict[str, Any], spec: GateSpec, problems: list[str]) ->
     if not isinstance(legs, dict):
         problems.append("legs block is not an object")
         return
+    # Reject UNKNOWN leg keys — a fabricated extra leg (e.g. "fake_extra_leg")
+    # must never be silently ignored (critic-A MUST-FIX). The legs block must be
+    # EXACTLY the authoritative set.
+    unknown = sorted(set(legs) - set(spec.all_legs))
+    if unknown:
+        problems.append(f"legs block has unexpected/fabricated leg(s): {unknown}")
     for leg in spec.all_legs:
         info = legs.get(leg)
         if not isinstance(info, dict):
@@ -209,6 +215,12 @@ def _validate_witnesses(data: dict[str, Any], spec: GateSpec, problems: list[str
     if not isinstance(witnesses, dict):
         problems.append("witnesses block is not an object")
         return
+    # Reject UNKNOWN witness keys — an injected extra witness (a fabrication)
+    # must fail closed (critic-A MUST-FIX, same class as the fake-leg gap). Only
+    # the required real-container legs may carry a witness.
+    unknown = sorted(set(witnesses) - set(spec.required_witness_legs))
+    if unknown:
+        problems.append(f"witnesses block has unexpected/fabricated witness(es): {unknown}")
     for leg in spec.required_witness_legs:
         w = witnesses.get(leg)
         if not isinstance(w, dict):
