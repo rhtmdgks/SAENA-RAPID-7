@@ -1,0 +1,691 @@
+"""Self-verifying proof for the zero-collected HARD FAILURE guard (c5-01).
+
+The guard (in this directory's `conftest.py::pytest_collection_finish`) hard-
+fails the required real-container measurement E2E lane (`pytest.UsageError` ->
+exit 4, non-zero/non-5) — instead of pytest's silently-tolerated exit-5 "no
+tests collected" — when the EXPLICIT env-var contract
+`SAENA_MEASUREMENT_E2E_REQUIRED=1` is set AND zero items were collected FROM
+THIS DIRECTORY. That flag is set only by the c5-05 required named-gate recipe
+(`just measurement-e2e`); umbrella / dev / broad `tests/integration` runs never
+set it, so 0-here is silent in those (no false-fire on an ancestor/umbrella
+invocation).
+
+These tests PROVE the required behaviours by running pytest AS A SUBPROCESS
+(the guard aborts the whole session, so it cannot be exercised in-process) with
+`SAENA_MEASUREMENT_E2E_REQUIRED` set/unset in the subprocess env:
+
+  (a) flag set + `-k` deselecting everything  -> exit 4 (UsageError) + message
+      (the ZERO-COLLECTED guard in `pytest_collection_finish`)
+  (b) flag set + a selection keeping ONLY container-free items (the inert guard
+      leaf) -> HARD FAILURE exit 6 (critic-F probe 5a: a required run that
+      executes ZERO real-container scenarios is a BYPASS — collection_finish
+      stays silent because dir items DO exist, so `pytest_sessionfinish` must
+      catch the empty real-container set). Was previously (wrongly) asserted as
+      an exit-0 pass; the corrected fail-closed contract forbids that.
+  (c) flag NOT set + zero-collected-here       -> guard silent (MF-2 dead: no
+      false-fire on an umbrella/ancestor invocation collecting nothing here)
+  (d) flag set + Docker absent (infra-absent → real-container scenarios all
+      SKIP) -> HARD FAILURE exit 6 (the required-mode no-skip guard in
+      `pytest_sessionfinish`; MUST-FIX A — a required lane must never pass as
+      "0 passed, N skipped"). Docker absence subsumes ClickHouse/Temporal
+      absence + any missing runtime dependency (all surface as skips).
+  (e) flag NOT set + Docker absent             -> documented honest skip, exit 0
+  (f) flag set + a single required container test still skips -> HARD FAILURE
+      exit 6 (ONE un-run scenario is enough; not only the all-skipped case)
+
+A dedicated inert `test_*` leaf (`test_inert_leaf_for_nonempty_selection_
+proof`) is the single-item selection target for (b), so nesting stays exactly
+one level deep with no self-matching `-k` recursion.
+
+Investigator-C MUST-FIX #1 proofs (xpass-on-required-node closes as a HARD
+FAILURE, never a clean pass) and the two evidence-integrity self-tests
+(`test_j_...`) live at the bottom of this module, after the `_NO_RECURSE`
+clause + `_run_both_dirs`/`_run_child` helpers they reuse.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+_THIS_DIR = Path(__file__).resolve().parent
+_GUARD_FILE = _THIS_DIR / "test_zero_collected_guard.py"
+
+_REQUIRED_ENV_VAR = "SAENA_MEASUREMENT_E2E_REQUIRED"
+
+#: A `-k` expression guaranteed to match none of this directory's tests — used
+#: to force an empty selection, the exact condition the guard must hard-fail on
+#: WHEN the env-var contract is armed.
+_NO_MATCH_K_EXPR = "this_k_expression_matches_no_test_whatsoever_c5e2e"
+
+#: pytest's exit code for a `pytest.UsageError` (what the guard raises).
+_EXPECTED_USAGE_ERROR_EXIT = 4
+#: pytest's exit code for "no tests collected" — the tolerated default the
+#: guard exists to REPLACE with a hard failure.
+_TOLERATED_NO_TESTS_EXIT = 5
+
+
+def _run_pytest_subprocess(
+    args: list[str], *, required_flag: bool
+) -> subprocess.CompletedProcess[str]:
+    """Run pytest as a subprocess with `SAENA_MEASUREMENT_E2E_REQUIRED`
+    explicitly set to "1" (armed) or removed (disarmed) in the child env — the
+    parent's own value never leaks in, so each scenario controls the contract
+    deterministically."""
+    env = dict(os.environ)
+    if required_flag:
+        env[_REQUIRED_ENV_VAR] = "1"
+    else:
+        env.pop(_REQUIRED_ENV_VAR, None)
+    return subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "pytest", *args, "-p", "no:cacheprovider", "-q"],
+        capture_output=True,
+        text=True,
+        cwd=str(_THIS_DIR),
+        env=env,
+    )
+
+
+def test_inert_leaf_for_nonempty_selection_proof() -> None:
+    """An intentionally trivial, side-effect-free leaf used ONLY as the
+    single-item selection target of scenario (b) below — it spawns no further
+    subprocess, so selecting it keeps the nesting depth bounded (one level)."""
+    assert True
+
+
+# --------------------------------------------------------------------------- #
+# (a) flag SET + a `-k` that deselects everything -> exit 4 + guard message.
+# --------------------------------------------------------------------------- #
+def test_a_flag_set_zero_collected_hard_fails_non5() -> None:
+    result = _run_pytest_subprocess([str(_THIS_DIR), "-k", _NO_MATCH_K_EXPR], required_flag=True)
+    combined = result.stdout + result.stderr
+
+    assert result.returncode == _EXPECTED_USAGE_ERROR_EXIT, (
+        "zero-collected guard did not hard-fail as a UsageError "
+        f"(expected exit {_EXPECTED_USAGE_ERROR_EXIT}, got {result.returncode}). "
+        f"Output:\n{combined}"
+    )
+    assert result.returncode not in (0, _TOLERATED_NO_TESTS_EXIT), (
+        "zero-collected guard degraded to a silent pass (0) or pytest's "
+        f"tolerated exit-5; got {result.returncode}:\n{combined}"
+    )
+    assert "collected ZERO test items" in combined, (
+        f"guard message absent from subprocess output:\n{combined}"
+    )
+    assert f"{_REQUIRED_ENV_VAR}=1" in combined, (
+        f"guard message should name the env-var contract that armed it; output:\n{combined}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# (b) flag SET + a selection keeping ONLY container-free items (the inert guard
+#     leaf) -> HARD FAILURE exit 6. Critic-F probe 5a regression: dir items DO
+#     exist (so `pytest_collection_finish`'s zero-DIR-collected UsageError stays
+#     silent — no false-fire), but ZERO real-container scenarios were selected,
+#     which `pytest_sessionfinish` must reject as a required-lane BYPASS. A
+#     required run that executes no Postgres/ClickHouse/Temporal scenario at all
+#     must never pass green.
+# --------------------------------------------------------------------------- #
+def test_b_flag_set_container_free_only_selection_hard_fails_bypass_closed() -> None:
+    target_node = f"{_GUARD_FILE}::test_inert_leaf_for_nonempty_selection_proof"
+    result = _run_pytest_subprocess([target_node], required_flag=True)
+    combined = result.stdout + result.stderr
+
+    assert "collected ZERO test items" not in combined, (
+        "the zero-DIR-collected guard must stay silent here (dir items DO "
+        f"exist) — the BYPASS is caught by pytest_sessionfinish instead:\n{combined}"
+    )
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "arming the required flag then selecting ONLY container-free tests must "
+        "HARD FAIL (exit 6) — a required run that executes zero real-container "
+        f"scenarios is a bypass, never a green pass; got exit {result.returncode}:\n{combined}"
+    )
+    assert result.returncode not in (0, _TOLERATED_NO_TESTS_EXIT), (
+        "the container-free-only bypass degraded to a silent pass (0) or "
+        f"tolerated exit-5; got {result.returncode}:\n{combined}"
+    )
+    assert "HARD FAILURE" in combined, (
+        f"expected the required-mode guard's reason message:\n{combined}"
+    )
+    assert "ZERO real-container" in combined, (
+        f"expected the bypass-specific reason (zero real-container selected):\n{combined}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# (c) flag NOT set + zero-collected-here -> guard silent (MF-2 pinned dead:
+#     an umbrella/ancestor invocation that collects nothing HERE must NOT
+#     hard-fail the whole suite).
+# --------------------------------------------------------------------------- #
+def test_c_flag_unset_zero_collected_here_does_not_false_fire() -> None:
+    # Force a zero-from-this-dir selection (the `-k` no-match) WITHOUT the flag
+    # — exactly the shape an umbrella run past this lane, or a
+    # `pytest tests/integration -k <sibling-test>` ancestor run, produces for
+    # this directory. The guard must stay silent: pytest's own bare exit-5
+    # ("no tests collected") is the correct, non-hard-failing outcome here.
+    result = _run_pytest_subprocess([str(_THIS_DIR), "-k", _NO_MATCH_K_EXPR], required_flag=False)
+    combined = result.stdout + result.stderr
+
+    assert "collected ZERO test items" not in combined, (
+        "guard FALSE-FIRED without the env-var contract set — an umbrella / "
+        f"ancestor invocation must never hard-fail this lane:\n{combined}"
+    )
+    assert result.returncode != _EXPECTED_USAGE_ERROR_EXIT, (
+        "guard raised UsageError (exit 4) without the env-var contract set — "
+        f"this is the MF-2 false-fire that must stay dead:\n{combined}"
+    )
+    # pytest's own tolerated "no tests collected" exit-5 is the expected,
+    # non-hard-failing outcome for a disarmed empty selection.
+    assert result.returncode == _TOLERATED_NO_TESTS_EXIT, (
+        "a disarmed zero-collected selection should fall through to pytest's "
+        f"own exit-5, not a hard failure; got {result.returncode}:\n{combined}"
+    )
+
+
+# The required-mode all-skipped / infra-absent HARD-FAILURE exit code
+# (session.exitstatus set in conftest.pytest_sessionfinish). Distinct from
+# UsageError(4) and no-tests(5).
+_EXPECTED_INFRA_HARD_FAIL_EXIT = 6
+
+
+# A `-k` clause that ALWAYS excludes this guard file's own subprocess-spawning
+# tests so a child run can never recurse. Callers AND it with their own filter.
+_NO_RECURSE = (
+    "not test_a_ and not test_b_ and not test_c_ and not test_d_ "
+    "and not test_e_ and not test_f_ and not test_g_ and not test_h_ "
+    "and not test_i_ and not test_j_ and not test_k_ and not test_l_ "
+    "and not test_m_ and not test_inert_"
+)
+
+# Repo root + the two composed-E2E directories (the required lane spans both).
+_REPO_ROOT = _THIS_DIR.parents[2]
+_E2E_DIR = "tests/integration/measurement_e2e"
+_WORKFLOW_DIR = "tests/integration/measurement_workflow"
+
+
+def _run_both_dirs(*, required_flag: bool, k_expr: str | None, addopts: str | None = None):
+    """Run pytest over BOTH composed-E2E directories from the repo root — the
+    shape the real `just measurement-e2e` gate uses — with the E2E required env
+    armed/disarmed, optionally narrowing with `-k` or a poisoned PYTEST_ADDOPTS.
+    Used to prove the required-scenario COMPLETENESS guard (in
+    tests/integration/conftest.py) rejects partial selections."""
+    env = dict(os.environ)
+    if required_flag:
+        env[_REQUIRED_ENV_VAR] = "1"
+    else:
+        env.pop(_REQUIRED_ENV_VAR, None)
+    if addopts is not None:
+        env["PYTEST_ADDOPTS"] = addopts
+    args = ["-m", "integration", _E2E_DIR, _WORKFLOW_DIR]
+    if k_expr is not None:
+        args += ["-k", k_expr]
+    return subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "pytest", *args, "-p", "no:cacheprovider", "-q"],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
+
+
+def _run_child(
+    *,
+    required_flag: bool,
+    docker_absent: bool,
+    k_extra: str | None = None,
+    required_value: str = "1",
+):
+    env = dict(os.environ)
+    if required_flag:
+        env[_REQUIRED_ENV_VAR] = required_value
+    else:
+        env.pop(_REQUIRED_ENV_VAR, None)
+    if docker_absent:
+        env["DOCKER_HOST"] = "tcp://127.0.0.1:1"
+    k_expr = _NO_RECURSE if k_extra is None else f"({k_extra}) and ({_NO_RECURSE})"
+    return subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            str(_THIS_DIR),
+            "-m",
+            "integration",
+            "-k",
+            k_expr,
+            "-p",
+            "no:cacheprovider",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(_THIS_DIR),
+        env=env,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# (d) REQUIRED + Docker absent -> HARD FAILURE (MUST-FIX A). The real-container
+#     scenarios are collected then individually skipped; a required lane must
+#     NEVER pass as "0 passed, N skipped". Docker absence subsumes ClickHouse/
+#     Temporal absence and any missing-runtime-dependency path — they ALL
+#     surface as skips, which this same guard turns into a non-zero exit.
+# --------------------------------------------------------------------------- #
+def test_d_required_docker_absent_hard_fails_non_zero() -> None:
+    result = _run_child(required_flag=True, docker_absent=True)
+    combined = result.stdout + result.stderr
+    assert result.returncode not in (0, _TOLERATED_NO_TESTS_EXIT), (
+        "REQUIRED lane with Docker absent must HARD FAIL (non-zero, non-5) — a "
+        "required real-container lane must never pass as '0 passed, N skipped'; "
+        f"got exit {result.returncode}:\n{combined}"
+    )
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        f"expected the infra-absent hard-fail exit {_EXPECTED_INFRA_HARD_FAIL_EXIT}; "
+        f"got {result.returncode}:\n{combined}"
+    )
+    assert "HARD FAILURE" in combined, f"expected the guard's reason message:\n{combined}"
+
+
+# --------------------------------------------------------------------------- #
+# (e) OPTIONAL (flag unset) + Docker absent -> documented honest skip, exit 0.
+# --------------------------------------------------------------------------- #
+def test_e_optional_docker_absent_is_an_honest_skip() -> None:
+    result = _run_child(required_flag=False, docker_absent=True)
+    combined = result.stdout + result.stderr
+    assert result.returncode == 0, (
+        "OPTIONAL lane (no SAENA_MEASUREMENT_E2E_REQUIRED) with Docker absent must "
+        f"be a documented honest skip, exit 0; got {result.returncode}:\n{combined}"
+    )
+    assert "skipped" in combined, f"expected honest skips in optional mode:\n{combined}"
+    assert "HARD FAILURE" not in combined, (
+        f"the required-mode guard must NOT fire when the flag is unset:\n{combined}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# (f) REQUIRED + exactly ONE required container test forced to skip (the rest
+#     could run) -> HARD FAILURE. Proves the guard fails on a PARTIAL skip, not
+#     only the all-skipped case. Injected via a `-k` that also excludes one
+#     real-container test AND a `--runxfail`-style deselection is NOT used
+#     (deselection != skip); instead we point DOCKER_HOST at an unreachable
+#     address so the container tests skip, which is the realistic partial-skip
+#     shape a required lane must reject — combined with a selection narrowed to
+#     a single container test proves ONE skip is enough to hard-fail.
+# --------------------------------------------------------------------------- #
+def test_f_required_single_container_test_skipped_hard_fails() -> None:
+    result = _run_child(
+        required_flag=True,
+        docker_absent=True,
+        k_extra="test_full_pass_flow_b_verified_skill_intake_accepted",
+    )
+    combined = result.stdout + result.stderr
+    # With Docker absent, even a single selected container test skips -> the
+    # guard hard-fails; a required lane never tolerates a single un-run scenario.
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "a single skipped required container test must hard-fail the lane; got "
+        f"exit {result.returncode}:\n{combined}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# (g) REQUIRED armed with a NON-canonical truthy value (`true` / `yes` / `" 1 "`
+#     with whitespace) -> still ARMS (critic-F SHOULD-FIX: fail-safe arming, not
+#     exact `== "1"` equality). Docker absent + `true` => still HARD FAIL exit 6.
+#     A typo must never silently downgrade the required lane to optional/skip.
+# --------------------------------------------------------------------------- #
+def test_g_required_arms_on_non_canonical_truthy_value() -> None:
+    for value in ("true", "yes", " 1 "):
+        result = _run_child(required_flag=True, docker_absent=True, required_value=value)
+        combined = result.stdout + result.stderr
+        assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+            f"{_REQUIRED_ENV_VAR}={value!r} must still ARM the required lane "
+            f"(fail-safe), hard-failing exit {_EXPECTED_INFRA_HARD_FAIL_EXIT} when "
+            f"Docker absent; got {result.returncode}:\n{combined}"
+        )
+        assert "HARD FAILURE" in combined, (
+            f"expected the required-mode guard message for value {value!r}:\n{combined}"
+        )
+
+
+# --------------------------------------------------------------------------- #
+# REQUIRED-SCENARIO COMPLETENESS guard (Wave 5 Closure — tests/integration/
+# conftest.py, manifest tests/integration/_measurement_e2e_completeness.py).
+# These prove the PARTIAL-SELECTION / DESELECTION fail-open is closed. They are
+# Docker-INDEPENDENT: the selection keeps only a container-free test that PASSES
+# on any host, so the missing REAL scenarios are caught purely by the manifest
+# completeness comparison (not the Docker-absent skip guard). The real-container
+# partial-selection proofs (a real scenario passes while others are deselected)
+# are run against real Docker in the Lead adversarial battery + the required CI
+# gate — see the exit-report; a Docker-absent self-test alone must not claim the
+# partial-selection defense.
+# --------------------------------------------------------------------------- #
+def test_h_completeness_container_free_only_selection_hard_fails() -> None:
+    # Armed, both dirs, `-k` keeps only the container-free inert leaf (passes on
+    # any host). All 28 required real scenarios are deselected -> the manifest
+    # completeness guard hard-fails (exit 6), even though the selected test
+    # passed and nothing was "skipped".
+    result = _run_both_dirs(
+        required_flag=True, k_expr="test_inert_leaf_for_nonempty_selection_proof"
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "armed + a partial selection keeping only a container-free passing test "
+        "must HARD FAIL (exit 6) via the required-scenario completeness guard — "
+        f"a partial selection can never go green; got {result.returncode}:\n{combined}"
+    )
+    assert "completeness" in combined, f"expected the completeness guard's message:\n{combined}"
+    assert "did not execute-and-PASS" in combined, (
+        f"expected the missing-scenario reason:\n{combined}"
+    )
+
+
+def test_h_completeness_via_poisoned_pytest_addopts_hard_fails() -> None:
+    # Same, but the narrowing is injected via PYTEST_ADDOPTS (the CI-poisoning
+    # vector) rather than an explicit CLI `-k`. Direct pytest with the env armed
+    # must still hard-fail (exit 6) — the guard does not depend on the recipe
+    # stripping ADDOPTS.
+    result = _run_both_dirs(
+        required_flag=True,
+        k_expr=None,
+        addopts="-k test_inert_leaf_for_nonempty_selection_proof",
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "armed + PYTEST_ADDOPTS narrowing must HARD FAIL (exit 6) via the "
+        f"completeness guard; got {result.returncode}:\n{combined}"
+    )
+    assert "completeness" in combined, f"expected the completeness message:\n{combined}"
+
+
+def test_i_completeness_manifest_matches_collectible_set_no_drift() -> None:
+    # DRIFT meta-test: the manifest's expected node set must equal the ACTUAL
+    # collectible required node set (both directions) — a renamed/removed real
+    # scenario, or a new real scenario absent from the manifest, fails loudly so
+    # the manifest can never silently under- or over-declare the suite.
+    import _measurement_e2e_completeness as manifest  # noqa: PLC0415
+
+    # Strip the armed env AND any inherited PYTEST_ADDOPTS from the collect-only
+    # child: `--collect-only` still runs pytest_sessionfinish (so an armed child
+    # would spuriously hard-fail a run that executes nothing), and an inherited
+    # PYTEST_ADDOPTS `-k` would narrow the collected set and break the drift
+    # equality. This is a pure collection introspection — neither belongs here.
+    env = dict(os.environ)
+    env.pop(_REQUIRED_ENV_VAR, None)
+    env.pop("PYTEST_ADDOPTS", None)
+    collect = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "integration",
+            _E2E_DIR,
+            _WORKFLOW_DIR,
+            "--collect-only",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
+    combined = collect.stdout + collect.stderr
+    # Collectible real-scenario node ids = every collected node id under the two
+    # composed-E2E test modules (exclude this guard self-test file + the failure
+    # guard, which are container-free mechanism proofs, not required scenarios).
+    collected = {
+        line.strip()
+        for line in collect.stdout.splitlines()
+        if "::" in line and "test_zero_collected_guard.py" not in line
+    }
+    collected_real = {
+        n
+        for n in collected
+        if n.startswith("tests/integration/measurement_e2e/test_real_composed_measurement_e2e.py::")
+        or n.startswith("tests/integration/measurement_workflow/test_measurement_workflow.py::")
+    }
+    assert collected_real, (
+        f"collect-only produced no real E2E node ids (collection error?):\n{combined}"
+    )
+    expected = set(manifest.EXPECTED_NODE_IDS)
+    missing_from_manifest = collected_real - expected
+    stale_in_manifest = expected - collected_real
+    assert not missing_from_manifest, (
+        "real E2E scenarios exist that the manifest does NOT declare (add them to "
+        f"_measurement_e2e_completeness.REQUIRED_SCENARIOS): {sorted(missing_from_manifest)}"
+    )
+    assert not stale_in_manifest, (
+        "manifest declares scenarios that are no longer collectible (renamed/"
+        f"removed — update the manifest): {sorted(stale_in_manifest)}"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Investigator-C MUST-FIX #1 proofs + evidence-integrity self-tests (Wave 5
+# Closure follow-up). New test-name prefixes (`test_j_`, `test_k_`) are already
+# added to `_NO_RECURSE` above so no child subprocess spawned by ANY test in
+# this module can re-select these and recurse.
+# --------------------------------------------------------------------------- #
+
+
+def _docker_available() -> bool:
+    """Verbatim-duplicated probe (never imported across directories — matches
+    every sibling conftest/guard module's own convention) — used ONLY to
+    honestly SKIP the one test below that needs a real node to actually run
+    and PASS before being marked xpass; every other test in this module needs
+    no Docker."""
+    import socket
+
+    docker_host = os.environ.get("DOCKER_HOST", "")
+    if docker_host.startswith("tcp://"):
+        host_port = docker_host.removeprefix("tcp://")
+        host, _, port_str = host_port.partition(":")
+        port = int(port_str) if port_str else 2375
+        try:
+            with socket.create_connection((host, port), timeout=2.0):
+                return True
+        except OSError:
+            return False
+    for candidate in (
+        "/var/run/docker.sock",
+        os.path.expanduser("~/.docker/run/docker.sock"),
+        os.path.expanduser("~/.colima/default/docker.sock"),
+    ):
+        if os.path.exists(candidate):
+            try:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(2.0)
+                    sock.connect(candidate)
+                return True
+            except OSError:
+                continue
+    return False
+
+
+#: Repo-relative node-id prefix of the composed-E2E module the xpass target
+#: lives in (mirrors `_measurement_e2e_completeness._COMPOSED_MODULE`).
+_COMPOSED_MODULE_RELPATH = "tests/integration/measurement_e2e/test_real_composed_measurement_e2e.py"
+
+#: The one required real node the xpass-injection plugin targets. Needs both
+#: Postgres + ClickHouse (composed leg) — genuinely passes on a Docker-present
+#: host, so marking it `xfail(strict=False)` produces a true XPASS (outcome
+#: "passed", `wasxfail` set), never a fabricated result.
+_XPASS_TARGET_FUNC = "test_full_pass_flow_b_verified_skill_intake_accepted"
+_XPASS_TARGET_NODE = f"{_COMPOSED_MODULE_RELPATH}::{_XPASS_TARGET_FUNC}"
+
+_XPASS_PLUGIN_SOURCE = f'''\
+import pytest
+
+
+def pytest_collection_modifyitems(config, items):
+    for it in items:
+        if it.name == "{_XPASS_TARGET_FUNC}":
+            it.add_marker(
+                pytest.mark.xfail(strict=False, reason="probe: Investigator-C MUST-FIX #1")
+            )
+'''
+
+
+def test_j_xpass_on_required_node_hard_fails(tmp_path) -> None:  # noqa: ANN001
+    """Investigator-C MUST-FIX #1: arm the FULL E2E gate (both composed-E2E
+    directories, the real `just measurement-e2e` shape) and inject an
+    `xfail(strict=False)` marker onto ONE required real node via a tiny
+    throwaway pytest plugin (`-p <modname>`). That node still genuinely PASSES
+    (Docker present, real Postgres+ClickHouse) -> pytest reports it XPASS
+    (outcome="passed", `wasxfail` set) rather than a clean PASS. The
+    completeness guard's `pytest_runtest_logreport` recorder (tests/
+    integration/conftest.py) must route an XPASSED node to `_E2E_XPASSED`, NOT
+    `_E2E_PASSED` — so it counts as `missing` from the manifest's `passed`
+    comparison — and the gate must HARD FAIL (exit 6), never a clean pass,
+    proving a required scenario cannot be laundered through xfail/xpass into a
+    silent skip-equivalent."""
+    if not _docker_available():
+        import pytest as _pytest  # noqa: PLC0415
+
+        _pytest.skip(
+            "Docker daemon not reachable — honest skip; this proof needs the "
+            "target node to actually run and PASS before being marked xpass"
+        )
+
+    plugin_file = tmp_path / "_saena_xpass_probe_plugin.py"
+    plugin_file.write_text(_XPASS_PLUGIN_SOURCE)
+
+    env = dict(os.environ)
+    env[_REQUIRED_ENV_VAR] = "1"
+    env["PYTEST_ADDOPTS"] = ""
+    # Prepend tmp_path onto PYTHONPATH so `-p _saena_xpass_probe_plugin` (a
+    # bare importable module name, pytest's own `-p` contract) resolves.
+    existing_pp = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(tmp_path) + (os.pathsep + existing_pp if existing_pp else "")
+
+    result = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
+            "-m",
+            "integration",
+            _E2E_DIR,
+            _WORKFLOW_DIR,
+            # CRITICAL: ignore THIS guard self-test file in the child so the
+            # child never re-collects (and re-runs) this xpass test — that would
+            # fork-bomb (each child spawning another full-gate child). The real
+            # composed + workflow nodes (which the xpass proof needs) are in
+            # OTHER files and still run.
+            "--ignore",
+            str(_GUARD_FILE),
+            "-p",
+            "no:cacheprovider",
+            "-p",
+            "_saena_xpass_probe_plugin",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        "an XPASSED required node must HARD FAIL the gate (exit "
+        f"{_EXPECTED_INFRA_HARD_FAIL_EXIT}) — an xpass is NOT a clean pass and must be "
+        f"treated as a missing required scenario; got {result.returncode}:\n{combined}"
+    )
+    assert "completeness" in combined, f"expected the completeness guard's message:\n{combined}"
+    assert _XPASS_TARGET_FUNC in combined, (
+        f"expected the xpassed target node ({_XPASS_TARGET_NODE}) named in the "
+        f"missing-scenario reason:\n{combined}"
+    )
+    assert "xpassed" in combined, (
+        f"expected pytest's own terminal summary to surface the xpassed outcome for "
+        f"{_XPASS_TARGET_NODE}:\n{combined}"
+    )
+
+
+def test_j_manifest_node_ids_unique_and_1to1() -> None:
+    """Container-free. The manifest must have no node-id collapses (every
+    `RequiredScenario.node_id` distinct — a collision would silently shrink
+    the effective required set below `len(REQUIRED_SCENARIOS)`) AND no
+    scenario-id collisions (the human-facing semantic id set must also be
+    1:1 with the scenario count)."""
+    import _measurement_e2e_completeness as manifest  # noqa: PLC0415
+
+    assert len(manifest.EXPECTED_NODE_IDS) == len(manifest.REQUIRED_SCENARIOS), (
+        "node_id collision(s) detected — the frozenset of EXPECTED_NODE_IDS is smaller "
+        f"than REQUIRED_SCENARIOS ({len(manifest.EXPECTED_NODE_IDS)} vs "
+        f"{len(manifest.REQUIRED_SCENARIOS)}); a duplicate node_id silently shrinks the "
+        "required set below its declared scenario count"
+    )
+    scenario_ids = {s.scenario_id for s in manifest.REQUIRED_SCENARIOS}
+    assert len(scenario_ids) == len(manifest.REQUIRED_SCENARIOS), (
+        "scenario_id collision(s) detected — "
+        f"{len(scenario_ids)} unique vs {len(manifest.REQUIRED_SCENARIOS)} declared scenarios"
+    )
+
+
+def test_j_partial_selection_emits_failclosed_evidence(tmp_path) -> None:  # noqa: ANN001
+    """Container-free (Docker not required — the missing real nodes make this
+    fail-closed regardless of infra availability). Armed + a `-k` selection
+    that keeps ONLY the container-free inert leaf + SAENA_GATE_EVIDENCE_PATH
+    pointed at a tmp file: run the E2E gate subprocess, then load the emitted
+    evidence JSON and assert it honestly reports the fail-closed state —
+    completeness_passed False, real_containers_proven False (no witness was
+    ever recorded), missing_node_ids non-empty (all 28 required scenarios were
+    deselected)."""
+    evidence_path = tmp_path / "gate-e2e-evidence.json"
+    env = dict(os.environ)
+    env[_REQUIRED_ENV_VAR] = "1"
+    env["SAENA_GATE_EVIDENCE_PATH"] = str(evidence_path)
+    env.pop("SAENA_GATE_INVOCATION_ID", None)
+    # Force Docker-absent in the child so this stays truly container-free and
+    # deterministic (a Docker-present host would start real Postgres via the
+    # session-autouse migration fixture even for this container-free selection).
+    env["DOCKER_HOST"] = "tcp://127.0.0.1:1"
+
+    # `_run_both_dirs` doesn't accept extra env vars, so invoke directly (same
+    # shape) with the evidence path wired into the child env.
+    result = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "integration",
+            _E2E_DIR,
+            _WORKFLOW_DIR,
+            "-k",
+            "test_inert_leaf_for_nonempty_selection_proof",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=env,
+    )
+    combined = result.stdout + result.stderr
+    assert result.returncode == _EXPECTED_INFRA_HARD_FAIL_EXIT, (
+        f"expected the completeness hard-fail exit {_EXPECTED_INFRA_HARD_FAIL_EXIT}; "
+        f"got {result.returncode}:\n{combined}"
+    )
+    assert evidence_path.exists(), (
+        f"the gate must write runtime evidence to SAENA_GATE_EVIDENCE_PATH even on a "
+        f"fail-closed partial-selection run:\n{combined}"
+    )
+    payload = json.loads(evidence_path.read_text())
+    assert payload["completeness_passed"] is False, (
+        f"partial-selection evidence must report completeness_passed=False: {payload}"
+    )
+    assert payload["real_containers_proven"] is False, (
+        "no real-container witness was ever recorded (the selection deselected every "
+        f"real scenario) — real_containers_proven must be False: {payload}"
+    )
+    assert payload["missing_node_ids"], (
+        f"missing_node_ids must be non-empty (all 28 required scenarios deselected): {payload}"
+    )

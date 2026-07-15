@@ -1,0 +1,17 @@
+{
+  "deployment_id": "dep-0001",
+  "registration_ref": {
+    "experiment_id": "exp-0001",
+    "registration_canonical_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "deployment_target": {
+    "kind": "site",
+    "identifier": "primary-site"
+  },
+  "confirmer": {
+    "identity": "customer-ci-bot",
+    "method": "ci_pipeline"
+  },
+  "confirmed_at": "2026-07-14T00:00:00Z",
+  "_expected_violation": "neither deployed_commit_sha nor artifact_hash is present — violates the root allOf/anyOf 'at least one deployment identity' constraint. The JSON Schema validator rejects this; the generated pydantic model does NOT (datamodel-code-generator leaves both fields Optional and does not translate the anyOf-of-required into a validator) — tracked as a known_conditional_gap in _model_registry.py."
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/deployment-confirmed/v1/deployment-confirmed.schema.json",
+  "title": "deployment.confirmed.v1 payload",
+  "description": "Payload of the deployment.confirmed.v1 event (AsyncAPI channel #17, Wave 5) — notification that a customer/B-department deployment of the treatment under an experiment registration has been confirmed. This event is the SOLE authority that starts the 7-day external-performance clock (docs/architecture/wave5-plan.md deliverable 2, ALG §7.3:483). It is NOT an engine observation, so the channel is NOT x-saena-engine-id-required (deployment.confirmed is a customer/CI-CD signal, not a ChatGPT-Search observation). CLOCK-TRUST NOTE: confirmed_at is a customer-supplied RFC3339 UTC (Z) CLAIM only — the trust anchor for the 7-day clock is the server receive time recorded by the ingress gateway, never this payload field; a backdated/forward-dated confirmed_at must not be able to move the clock (validated in w5-03/w5-14).",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024 — additive-minor evolution, no additionalProperties:false; undeclared-key rejection is a policy-gate obligation, not schema-enforced). Authority: docs/architecture/wave5-plan.md §'Dependency DAG' (w5-02 Contracts Steward deliverable 1 — deployment.confirmed.v1 = NEW channel #17), deliverable 2 '7-day clock' (ALG §7.3:483 'sole clock-start authority'), Human decision H5 (confirmer trust model: signed external identity -> policy-gate-first -> direct signal; server receive-time anchor). Producer forge-console-api-service — the external customer/B CI-CD signal is ingested and republished by the forge-console-api ingress gateway (it is the ingress that emits this bus event; the operations block names it as producer, consistent with the AsyncAPI file's existing '<producer>-service produces <address>.' convention). engine_id is intentionally ABSENT/NOT required — deployment confirmation is not a per-engine observation (contrast observation.captured / experiment.outcome.observed which ARE engine-id-required). tenant_id/run_id/idempotency_key are carried by the envelope (ADR-0013/ADR-0024(e)) and NOT re-projected into this payload. registration_ref.registration_canonical_hash reuses the common/identifiers sha256_ref shape (same ledger-anchor convention as event/experiment-registered.canonical_hash); deployed_commit_sha reuses common/identifiers git_sha; artifact_hash reuses sha256_ref. At-least-one-of {deployed_commit_sha, artifact_hash} is enforced by the root allOf/anyOf — a deployment is identified by EITHER a source commit OR a content-addressed build artifact, sometimes both. The anyOf is nested under allOf (not a bare root anyOf) deliberately so datamodel-codegen emits a single root model instead of splitting one class per anyOf branch.",
+  "type": "object",
+  "required": [
+    "deployment_id",
+    "registration_ref",
+    "deployment_target",
+    "confirmer",
+    "confirmed_at"
+  ],
+  "allOf": [
+    {
+      "anyOf": [
+        {
+          "required": [
+            "deployed_commit_sha"
+          ]
+        },
+        {
+          "required": [
+            "artifact_hash"
+          ]
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "deployment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque identifier for the confirmed deployment, mirrors common/identifiers/v1 opaque-id shape but not promoted there (not a CONFIRMED core business identifier)."
+    },
+    "registration_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "registration_canonical_hash"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "$comment": "Correlation key back to domain/experiment-registration.experiment_id and event/experiment-registered.experiment_id."
+        },
+        "registration_canonical_hash": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+          "$comment": "The immutable preregistration canonical hash (event/experiment-registered.canonical_hash / domain/experiment-registration.canonical_hash) this deployment confirms against — binds the deployment to the exact registered design."
+        }
+      },
+      "$comment": "Closed sub-object: the deployment MUST reference a specific immutable registration by experiment_id + canonical hash so the confirmation cannot be re-pointed at a different design after the fact."
+    },
+    "deployed_commit_sha": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/git_sha",
+      "$comment": "Source commit SHA of the deployed treatment (one of the two allowed deployment identities — see the root allOf/anyOf)."
+    },
+    "artifact_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "Content-addressed hash of the deployed build artifact (one of the two allowed deployment identities — see the root allOf/anyOf)."
+    },
+    "deployment_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identifier"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "Opaque target-kind label (e.g. site/route/environment class) — open string, no enum pinned in v1 (customer-topology dependent)."
+        },
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "Opaque target identifier within that kind; NEVER raw customer secrets/URLs-with-tokens (query/fragment-bearing URIs are excluded by convention, mirroring common/identifiers uri_ref rationale)."
+        }
+      }
+    },
+    "confirmer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "method"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "Opaque confirmer identity (service/actor id of the external customer/B CI-CD signer). PII minimization — opaque id only, never raw personal data."
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "How the deployment was confirmed (e.g. ci_pipeline/manual/webhook signer) — opaque label, open in v1."
+        },
+        "signature_ref": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+          "$comment": "OPTIONAL content-addressed/URI reference to the external signature artifact proving the confirmer identity (H5 signed-external-identity trust model). Ref ONLY — the signature material itself is never inlined."
+        }
+      }
+    },
+    "confirmed_at": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+      "$comment": "Customer-CLAIMED RFC3339 UTC (Z-canonical) deployment-confirmation time. CLAIM ONLY — the 7-day clock's trust anchor is the server receive time recorded at the ingress (see schema description CLOCK-TRUST NOTE); this field must never be the sole clock-start authority (w5-03/w5-14)."
+    }
+  }
+}

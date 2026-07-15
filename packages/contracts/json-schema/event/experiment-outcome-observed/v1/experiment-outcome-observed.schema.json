@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/experiment-outcome-observed/v1/experiment-outcome-observed.schema.json",
+  "title": "experiment.outcome.observed.v1 payload",
+  "description": "Payload of the experiment.outcome.observed.v1 event — notification that experiment-attribution-service computed a Difference-in-Differences (DiD) outcome for a registered experiment over its 7-day window and reached a B-layer verdict. Mirrors domain/experiment-outcome/v1 (the internal decision record). Skill-bank consumes ONLY B-verified (b_verdict=pass) outcomes (docs/architecture/api-event-contracts.md:68; wave5-plan.md E7).",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024 — additive-minor; no additionalProperties:false; undeclared-key rejection is a policy-gate obligation, not schema-enforced — see wave5-plan.md 'outcome-field-gap' W4-carried obligation, closed via policy-gate/guard by w5-06/w5-12, not silently). Authority: docs/architecture/wave5-plan.md deliverables 1-4 (DiD activation, B-gate, evidence bundle), E3/E4/E5, Human decisions H3 (independent-layer definition) and H4 (outcome_layer enum spelling [discovery,citation,absorption,prominence,referral]; conversion EXCLUDED — ALG §4:212 non-scope). engine_id REQUIRED and closed to ['chatgpt-search'] — this channel is already x-saena-engine-id-required (ADR-0013 'experiment 계열' family), composed via allOf $ref to common/engine-id/v1's engine_required_payload activation fragment (NOT redeclared inline). window.clock_anchor is const 'deployment_confirmed' — the ONLY clock-start authority is deployment.confirmed.v1 (deliverable 2). B-GATE POLICY OBLIGATION (NOT schema-checkable): b_verdict=pass requires improvement in >=2 independent signal layers (ALG §3.7-5:198); an open-class payload cannot enforce '>=2 distinct outcome_layer with distinct evidence_basis_id' — that is the w5-06 b_gate guard's obligation, honestly deferred here, NOT faked in-schema. tenant_id/run_id/idempotency carried by envelope (ADR-0024(e)), not re-projected. All refs/hashes are content-addressed anchors; NO raw customer content inline (wave5-plan.md non-scope 'Raw customer query/content/secret in events'). Both raw_view and control_adjusted_view are present (ALG §11.3:674-676 reproducibility: raw+weighted both).",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../../../common/engine-id/v1/engine-id.schema.json#/$defs/engine_required_payload"
+    }
+  ],
+  "required": [
+    "experiment_id",
+    "registration_canonical_hash",
+    "window",
+    "deployment_confirmation_ref",
+    "per_signal_results",
+    "b_verdict",
+    "raw_view",
+    "control_adjusted_view",
+    "confidence",
+    "evidence_bundle_ref",
+    "grs_policy"
+  ],
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Correlation key to domain/experiment-registration.experiment_id."
+    },
+    "registration_canonical_hash": {
+      "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+      "$comment": "The immutable preregistration canonical hash this outcome is measured against (event/experiment-registered.canonical_hash) — binds the outcome to the exact registered design (no post-hoc re-registration)."
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "ended_at",
+        "clock_anchor"
+      ],
+      "properties": {
+        "started_at": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc",
+          "$comment": "Window start (server-anchored, derived from deployment.confirmed.v1 receive time — deliverable 2)."
+        },
+        "ended_at": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/timestamp_utc"
+        },
+        "clock_anchor": {
+          "const": "deployment_confirmed",
+          "$comment": "The ONLY clock-start authority is deployment.confirmed.v1 (ALG §7.3:483). Const-pinned so no other anchor can be claimed."
+        }
+      }
+    },
+    "deployment_confirmation_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque reference to the deployment.confirmed.v1 signal (deployment_id) that started this window's clock."
+    },
+    "per_signal_results": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome_layer",
+          "metric_id",
+          "evidence_basis_id",
+          "treatment_raw_delta",
+          "control_raw_delta",
+          "net_of_control_lift",
+          "sample_counts",
+          "insufficient"
+        ],
+        "properties": {
+          "outcome_layer": {
+            "type": "string",
+            "enum": [
+              "discovery",
+              "citation",
+              "absorption",
+              "prominence",
+              "referral"
+            ],
+            "$comment": "H4 enum spelling (ALG §3.5:159). 'absorption' here is a data-model outcome-layer value ONLY, NOT P1 absorption-model activation (wave5-plan.md non-scope note). Conversion is intentionally excluded."
+          },
+          "metric_id": {
+            "type": "string",
+            "minLength": 1,
+            "$comment": "Metric identifier within the outcome layer (domain/experiment-registration.metric_defs[].metric_id)."
+          },
+          "evidence_basis_id": {
+            "type": "string",
+            "minLength": 1,
+            "$comment": "Distinct evidence-basis identifier — H3 independent-layer definition: a layer counts toward the B-gate's >=2-independent-layer requirement only with a DISTINCT evidence_basis_id (duplicate basis counted once). Enforced by the w5-06 b_gate guard, not this schema."
+          },
+          "treatment_raw_delta": {
+            "type": "number",
+            "$comment": "Raw pre/post delta on the treatment arm for this metric."
+          },
+          "control_raw_delta": {
+            "type": "number",
+            "$comment": "Raw pre/post delta on the control arm (common-trend subtraction basis)."
+          },
+          "net_of_control_lift": {
+            "type": "number",
+            "$comment": "DiD estimate: treatment delta net of control delta (deterministic DiD, w5-05)."
+          },
+          "sample_counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "treatment",
+              "control"
+            ],
+            "properties": {
+              "treatment": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "control": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "insufficient": {
+            "type": "boolean",
+            "$comment": "True when sample counts / data quality are below the threshold to trust this layer's estimate — contributes to an UNDETERMINED verdict rather than pass/fail (E4)."
+          }
+        }
+      },
+      "$comment": "Per-signal-layer DiD results. B-gate PASS policy (>=2 independent layers) is applied over this array by the w5-06 guard, not by this schema."
+    },
+    "b_verdict": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "undetermined"
+      ],
+      "$comment": "B-layer decision. pass = >=2 independent layers improved (policy-gate obligation, not schema-checkable); undetermined = insufficient/contaminated/late (E4)."
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "$comment": "OPTIONAL open string array of typed reason codes (H7 code-level enum v1; snake_case), esp. for fail/undetermined verdicts. Open vocabulary at schema level (pattern-constrained); the canonical code set is a w5-06 reason_codes obligation."
+    },
+    "raw_view": {
+      "type": "object",
+      "$comment": "Raw (un-control-adjusted) view of the outcome — MUST be present alongside control_adjusted_view (ALG §11.3:674-676 raw+weighted reproducibility). Interior open by design (per-metric raw figures); no additionalProperties:false so it can carry layer-specific raw fields."
+    },
+    "control_adjusted_view": {
+      "type": "object",
+      "$comment": "Control-adjusted (net-of-control) view — MUST be present alongside raw_view. Interior open by design."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "$comment": "Overall confidence in the verdict, 0..1."
+    },
+    "evidence_bundle_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_hash",
+        "artifact_ref"
+      ],
+      "properties": {
+        "manifest_hash": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+          "$comment": "Hash of the domain/evidence-bundle-manifest/v1 this outcome is backed by (E5 tamper-evidence anchor)."
+        },
+        "artifact_ref": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/uri_ref",
+          "$comment": "Content-addressed reference to the stored evidence bundle artifact — ref ONLY, no raw customer content inline."
+        }
+      }
+    },
+    "grs_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "hash",
+        "provenance"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "$comment": "GRS (guaranteed-result-standard) policy bundle version applied (mechanism only; production policy values BLOCKED(human) — wave5-plan.md H1)."
+        },
+        "hash": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+          "$comment": "Hash of the signed GRS policy bundle used (fail-closed: unsigned/missing policy => UNDETERMINED, w5-07)."
+        },
+        "provenance": {
+          "type": "string",
+          "enum": [
+            "production",
+            "test_fixture"
+          ],
+          "$comment": "Distinguishes a real production GRS policy from a TEST-ONLY fixture (E6) — a test_fixture provenance must never be mistaken for a production determination."
+        }
+      }
+    }
+  }
+}

@@ -16,7 +16,19 @@ from saena_analytics_clickhouse.schema import (
 
 
 def test_table_names_match_mission_scope() -> None:
-    assert TABLE_NAMES == ("observations", "citations", "experiment_registrations")
+    # w5-11 (Wave 5) additively registers `measurement_outcome` alongside the
+    # three w4-06 tables — same EXPAND-only convention `schema.py`'s own
+    # "Expand/contract policy" docstring already documents (a new table is a
+    # new, separate `CREATE TABLE IF NOT EXISTS`, never a same-commit edit of
+    # an existing one). This assertion is updated here (not in w5-11's own
+    # exclusive test path) only because it hard-codes the exact tuple and
+    # would otherwise spuriously fail — no other line in this file changes.
+    assert TABLE_NAMES == (
+        "observations",
+        "citations",
+        "experiment_registrations",
+        "measurement_outcome",
+    )
 
 
 @pytest.mark.parametrize("table", TABLE_NAMES)
@@ -32,8 +44,15 @@ def test_require_known_table_rejects_unknown_table() -> None:
 @pytest.mark.parametrize("table", TABLE_NAMES)
 def test_every_table_ddl_is_time_partitioned_and_tenant_prefixed(table: str) -> None:
     """ADR-0007 rev.2 §5: time partition + `ORDER BY (tenant_id, ...)`
-    prefix — no per-tenant partition."""
-    up_statements = MIGRATIONS[0].up_sql
+    prefix — no per-tenant partition.
+
+    Searches every migration's `up_sql` (not just `MIGRATIONS[0]`) — w5-11
+    (Wave 5) additively registers `measurement_outcome` in `MIGRATIONS[1]`
+    (a NEW migration entry, never a same-commit edit of `MIGRATIONS[0]`, per
+    `schema.py`'s own "Expand/contract policy"), so a table-name-agnostic
+    lookup across all migrations is what "every table this package owns" now
+    actually requires."""
+    up_statements = [s for migration in MIGRATIONS for s in migration.up_sql]
     matching = [s for s in up_statements if f"CREATE TABLE IF NOT EXISTS {table}" in s]
     assert len(matching) == 1
     ddl = matching[0]
@@ -47,9 +66,12 @@ def test_every_table_ddl_is_time_partitioned_and_tenant_prefixed(table: str) -> 
 
 
 def test_no_table_emits_a_ttl_clause() -> None:
-    """TTL/retention is OPEN (README.md) — no CREATE TABLE may emit TTL."""
-    for statement in MIGRATIONS[0].up_sql:
-        assert "TTL" not in statement.upper() or "TTL" not in statement
+    """TTL/retention is OPEN (README.md) — no CREATE TABLE may emit TTL.
+
+    Checks every migration's `up_sql` (see the DDL-shape test above for why)."""
+    for migration in MIGRATIONS:
+        for statement in migration.up_sql:
+            assert "TTL" not in statement.upper() or "TTL" not in statement
 
 
 def test_observations_ddl_has_no_query_text_column() -> None:

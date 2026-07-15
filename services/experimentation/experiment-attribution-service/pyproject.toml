@@ -1,0 +1,45 @@
+[project]
+name = "saena-experiment-attribution"
+version = "0.1.0"
+description = "SAENA experiment-attribution-service — measurement persistence (Postgres, w5-10), event boundary (w5-12), pipeline (w5-13) and durable 7-day Temporal workflow (w5-14)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "saena-domain",
+    "saena-schemas",
+    "sqlalchemy>=2.0.36,<3",
+    "asyncpg>=0.30,<1",
+    "temporalio>=1.9,<2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saena_experiment_attribution"]
+
+[tool.uv.sources]
+saena-domain = { workspace = true }
+saena-schemas = { workspace = true }
+
+# NOTE (w5-10): this package is NOT YET a member of the root workspace
+# (root pyproject.toml `[tool.uv.workspace].members` / dev dependency-group)
+# — per this repo's established Wave-3/4/5 parallel-unit convention (see
+# services/intelligence/claim-evidence-service/pyproject.toml's identical
+# NOTE, and packages/hooks-runtime/pyproject.toml before it), each new
+# package patch unit's own exclusive paths never include root
+# pyproject.toml: registering a new workspace member is the Integrator's
+# job at merge time (CLAUDE.md "독점 수정 경로" / "단일 owner" — root
+# pyproject.toml is shared infrastructure every parallel Wave-5 unit would
+# otherwise collide on). Until that registration happens, this package is
+# NOT `uv sync`-installed/importable as a real distribution — this unit's
+# own tests (`tests/unit/svc_experiment_attribution_persistence/conftest.py`
+# and `tests/integration/measurement_pg/conftest.py`) import it by inserting
+# `src/` directly onto `sys.path` instead, exactly like that same conftest
+# pattern already does for `saena_claim_evidence`.
+#
+# sqlalchemy/asyncpg are additionally listed here as EXPLICIT dependencies
+# (not left transitive-through-saena-domain) because the persistence adapter
+# in this service imports them directly at module top level — declaring them
+# here documents that direct dependency for the Integrator's workspace
+# registration, mirroring `packages/vector-store/pyproject.toml`.

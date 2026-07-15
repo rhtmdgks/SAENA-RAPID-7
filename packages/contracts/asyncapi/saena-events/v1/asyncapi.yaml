@@ -12,7 +12,13 @@ info:
     their payload $ref here for the first time (no channel-count change);
     entity.graph.versioned.v1/claim.evidence.versioned.v1/
     experiment.registered.v1/experiment.anchored.v1 are the 4 brand-new
-    channels — 16 channels total as of Wave 4). Delivery semantics: at-least-once
+    channels — 16 channels total as of Wave 4). **+ 1 Wave 5 NEW channel**
+    (w5-02 Contracts Steward — deployment.confirmed.v1, channel #17, the sole
+    7-day-clock start authority; wave5-plan.md deliverable 2) AND the two
+    previously envelope-only P1-deferred channels experiment.outcome.observed.v1
+    and strategy.card.eligible.v1 gained their payload $ref for the first time
+    in Wave 5 (no channel-count change from those two) — 17 channels total as of
+    Wave 5. Delivery semantics: at-least-once
     with idempotent consumers (docs/specs/SAENA_k3s_Package_and_Operations_Spec_v1.md
     §4.1; docs/architecture/api-event-contracts.md "Events: versioned topics;
     at-least-once; idempotent consumers"). No dead-letter-queue channel is
@@ -21,11 +27,11 @@ info:
     channel's message payload is an allOf overlay over
     envelope/event-envelope/v1 (R8, approved plan §1.1 ruling R8 — AsyncAPI
     allOf-overlay pattern) that pins event_type/context_type via const and
-    substitutes payload with the event's own payload schema (or leaves the
-    envelope's open payload default for the 2 remaining envelope-only
-    deferred channels, experiment.outcome.observed.v1 and
-    strategy.card.eligible.v1 — both explicitly out of Wave 4 scope per
-    wave4-plan.md "Forbidden in W4": outcome analysis / strategy-card-eligible).
+    substitutes payload with the event's own payload schema. As of Wave 5
+    (w5-02) every channel — including experiment.outcome.observed.v1 and
+    strategy.card.eligible.v1, which were the last two envelope-only
+    deferred channels in Wave 4 — now pins a concrete payload $ref; no
+    envelope-only-default channels remain.
     Every message's payload is a Multi Format Schema Object
     (AsyncAPI 3.0.0 spec §Message Object payload field references the Multi
     Format Schema Object, NOT a bare schemaFormat sibling key on the Message
@@ -380,8 +386,10 @@ channels:
   experiment.outcome.observed.v1:
     address: experiment.outcome.observed.v1
     description: >-
-      payload contract P1 — envelope-only until experiment outcome payload
-      contract lands.
+      DiD experiment outcome observed over the 7-day window + B-layer verdict
+      (w5-02: payload contract landed, Wave 5). skill-bank consumes B-verified
+      (b_verdict=pass) outcomes ONLY (api-event-contracts.md:68; wave5-plan.md
+      E7). engine-id-required (experiment 계열, ADR-0013).
     x-saena-engine-id-required: true
     messages:
       experimentOutcomeObserved:
@@ -399,13 +407,17 @@ channels:
                     const: experiment.outcome.observed.v1
                   context_type:
                     const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/experiment-outcome-observed/v1/experiment-outcome-observed.schema.json"
 
   strategy.card.eligible.v1:
     address: strategy.card.eligible.v1
     description: >-
-      payload contract P1 — envelope-only until strategy card payload
-      contract lands. AggregateContext (cross-tenant, k-anonymity fields —
-      ADR-0006 rev.2 / ADR-0013).
+      Strategy-card candidate eligible for the (aggregate) skill bank, backed
+      by a B-verified outcome (w5-02: payload contract landed, Wave 5).
+      AggregateContext (cross-tenant, k-anonymity fields on the envelope —
+      ADR-0006 rev.2 / ADR-0013). Fail-closed intake boundary ONLY
+      (wave5-plan.md non-scope: no auto-approval / global sharing).
     messages:
       strategyCardEligible:
         name: StrategyCardEligible
@@ -422,6 +434,41 @@ channels:
                     const: strategy.card.eligible.v1
                   context_type:
                     const: aggregate
+                  payload:
+                    $ref: "../../../json-schema/event/strategy-card-eligible/v1/strategy-card-eligible.schema.json"
+
+  deployment.confirmed.v1:
+    address: deployment.confirmed.v1
+    description: >-
+      Customer/B-department deployment of an experiment's treatment confirmed
+      (Wave 5 NEW channel #17, w5-02 Contracts Steward — wave5-plan.md
+      deliverable 2). SOLE authority that starts the 7-day external-performance
+      clock (ALG §7.3:483). NOT an engine observation — deployment confirmation
+      is a customer/CI-CD signal, not a ChatGPT-Search observation, so this
+      channel is intentionally NOT x-saena-engine-id-required. The payload's
+      confirmed_at is a customer CLAIM only; the clock's trust anchor is the
+      server receive time at the ingress, never the payload timestamp
+      (H5 confirmer trust model). Producer forge-console-api-service — the
+      external signal is ingested and republished by the forge-console-api
+      ingress gateway.
+    messages:
+      deploymentConfirmed:
+        name: DeploymentConfirmed
+        title: deployment.confirmed.v1
+        summary: Deployment confirmed (forge-console-api-service).
+        contentType: application/json
+        payload:
+          schemaFormat: "application/schema+json;version=draft-2020-12"
+          schema:
+            allOf:
+              - $ref: "../../../json-schema/envelope/event-envelope/v1/event-envelope.schema.json"
+              - properties:
+                  event_type:
+                    const: deployment.confirmed.v1
+                  context_type:
+                    const: tenant
+                  payload:
+                    $ref: "../../../json-schema/event/deployment-confirmed/v1/deployment-confirmed.schema.json"
 
 operations:
   sendRepoIntaken:
@@ -551,3 +598,11 @@ operations:
     summary: strategy-skill-bank-service produces strategy.card.eligible.v1.
     messages:
       - $ref: "#/channels/strategy.card.eligible.v1/messages/strategyCardEligible"
+
+  sendDeploymentConfirmed:
+    action: send
+    channel:
+      $ref: "#/channels/deployment.confirmed.v1"
+    summary: forge-console-api-service produces deployment.confirmed.v1.
+    messages:
+      - $ref: "#/channels/deployment.confirmed.v1/messages/deploymentConfirmed"

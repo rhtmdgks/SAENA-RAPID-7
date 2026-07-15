@@ -100,7 +100,19 @@ from saena_analytics_clickhouse.errors import MigrationError, UnknownTableError
 # Every table this package owns — the query builder (`query.py`) and the
 # guard in `store.py` both reject any table name outside this set, so a
 # typo'd or forged table name can never reach an executor.
-TABLE_NAMES: tuple[str, ...] = ("observations", "citations", "experiment_registrations")
+#
+# `measurement_outcome` (w5-11, Wave 5 Stage 2): append-only projection of
+# experiment B-gate outcome decisions — see `_measurement_outcome_ddl` below
+# for the full column-by-column spec basis. Added the SAME way `MIGRATIONS`'s
+# own "Expand/contract policy" note already permits (EXPAND: a brand-new
+# table is always additive, never a same-commit CONTRACT of an existing one)
+# — a NEW `Migration` entry (`0002`), never a same-commit edit of `0001`.
+TABLE_NAMES: tuple[str, ...] = (
+    "observations",
+    "citations",
+    "experiment_registrations",
+    "measurement_outcome",
+)
 
 
 def require_known_table(table: str) -> None:
@@ -234,10 +246,119 @@ ORDER BY (tenant_id, occurred_at, id)
 """.strip()
 
 
+def _measurement_outcome_ddl(settings: str) -> str:
+    """`measurement_outcome` (w5-11) — append-only projection of an
+    experiment's B-gate outcome decision.
+
+    Spec basis (wave5-plan.md w5-11/E9, ALG §3.7-3/§3.7-5/§11.3, k3s Gate C):
+    - `tenant_id`/`experiment_id` — the decision's tenant + experiment scope.
+    - `registration_canonical_hash` — cross-reference to the immutable
+      registration hash (`saena_domain.experiment.ledger`'s H-3 anchor, same
+      "store the hash, never the payload" discipline `experiment_registrations.
+      registration_hash` above already uses).
+    - `window_started_at`/`window_ended_at` — the measurement window this
+      decision covers (the 7-day clock, ALG §7.3:483).
+    - `b_verdict` — `LowCardinality(String)`: `pass`/`fail`/`undetermined`
+      (wave5-plan E4: insufficient/contaminated/late data ⇒ UNDETERMINED, never
+      silently PASS/FAIL). `LowCardinality` is the standard ClickHouse idiom
+      for a small fixed-vocabulary string column (storage + scan efficiency);
+      enum MEMBERSHIP is enforced by `rows.py`'s `MeasurementOutcomeRow`, not
+      by a DB-level `ENUM` type, matching this table's siblings (`status`
+      above is also a plain validated string, not a ClickHouse `Enum8`).
+    - `reason_codes` — `Array(LowCardinality(String))`: the typed reason-code
+      vocabulary (wave5-plan H7) explaining an UNDETERMINED/FAIL verdict —
+      never free-text (no raw-content channel here, same discipline as
+      `citation_refs`/`observation_cell` elsewhere in this file).
+    - `outcome_layer` — the ALG §3.5 layer this signal belongs to
+      (`discovery`/`citation`/`absorption`/`prominence`/`referral`, wave5-plan
+      H4) — METADATA (a classification label), never raw content.
+    - `evidence_basis_id` — a `sha256:` content ref into the evidence bundle
+      for the signal this row's aggregates were computed from (H-3-style
+      hash-only cross-reference, mirrors `registration_canonical_hash`'s own
+      "hash, never payload" shape) — `Nullable` because a signal row MAY
+      predate/omit a specific evidence-basis pointer (e.g. an early
+      insufficient-data row) without blocking the rest of the projection.
+    - `sample_count_treatment`/`sample_count_control` — METADATA-SAFE
+      aggregate counts (never raw per-observation content) supporting the
+      B-gate's "at least two independent layers" arithmetic and dashboard
+      sample-size displays.
+    - `insufficient_data` — `Bool`: this signal's own honest "not enough
+      samples to decide" flag (wave5-plan E4 "insufficient ... ⇒ UNDETERMINED
+      + reason code" — this column is the per-signal witness a dashboard/
+      auditor can cross-check against the row's own `reason_codes`).
+    - `net_of_control_lift` — `Nullable(Float64)`: the DECISION recorded in
+      this task's own prompt — store the numeric per-signal
+      control-adjusted (DiD) lift (needed for the raw+control-adjusted
+      dashboard views, k3s §9.2:485) but NEVER a raw effect magnitude beyond
+      this single control-adjusted number (no raw per-observation values, no
+      raw treatment/control series — those remain evidence-bundle-referenced
+      via `evidence_basis_id`, never inlined here). `Nullable` because an
+      UNDETERMINED/insufficient-data row may have no computable lift at all.
+    - `raw_lift` — `Nullable(Float64)`: the UNADJUSTED (pre-DiD-control)
+      companion figure the same dashboard obligation requires ("raw+weighted
+      evidence both retained", ALG §11.3:674-676) — paired with
+      `net_of_control_lift` so `to_raw_vs_adjusted_view_sql` (`query.py`) can
+      project both views from ONE row without a second table. This is a
+      SUMMARY STATISTIC (one float), not raw per-observation content — the
+      same "aggregate number, not raw series" boundary `net_of_control_lift`
+      itself already draws.
+    - `evidence_bundle_manifest_hash` — `sha256:` ref to the entry's evidence
+      bundle (`saena_domain.measurement.evidence.EvidenceBundleManifest.
+      manifest_hash`) — hash-only, never the bundle content itself.
+    - `grs_policy_version`/`grs_policy_hash`/`grs_policy_provenance` — the
+      GRS policy identity this decision was evaluated under (wave5-plan
+      deliverable 5 / H1: "signed policy bundle" — this table stores the
+      policy's OWN identity/provenance metadata as a cross-reference,
+      mirroring `registration_hash`'s hash-only discipline, never the policy
+      bundle's full content).
+    - `dedup_witness` — adapter-internal r4-02 bookkeeping column, same
+      shape/purpose as every sibling table's own (see module docstring above
+      `_DEDUP_WINDOW_SETTINGS`) — never selected by any `get_*` query.
+
+    `PARTITION BY toYYYYMM(occurred_at)` + `ORDER BY (tenant_id, occurred_at,
+    id)` — identical convention to every other table in this file (ADR-0007
+    rev.2 §5; per-tenant partition FORBIDDEN). No `TTL` clause (retention is
+    OPEN, same "leave TTL unset" policy as the module docstring already
+    records for the sibling tables — this is not a new decision).
+    """
+    return f"""
+CREATE TABLE IF NOT EXISTS measurement_outcome
+(
+    tenant_id String,
+    id String,
+    idempotency_key String,
+    occurred_at DateTime64(3, 'UTC'),
+    ingested_at DateTime64(3, 'UTC') DEFAULT now64(3, 'UTC'),
+    experiment_id String,
+    registration_canonical_hash String,
+    window_started_at DateTime64(3, 'UTC'),
+    window_ended_at DateTime64(3, 'UTC'),
+    b_verdict LowCardinality(String),
+    reason_codes Array(LowCardinality(String)),
+    outcome_layer LowCardinality(String),
+    evidence_basis_id Nullable(String),
+    sample_count_treatment UInt64,
+    sample_count_control UInt64,
+    insufficient_data Bool,
+    net_of_control_lift Nullable(Float64),
+    raw_lift Nullable(Float64),
+    evidence_bundle_manifest_hash String,
+    grs_policy_version String,
+    grs_policy_hash String,
+    grs_policy_provenance String,
+    dedup_witness String DEFAULT ''
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(occurred_at)
+ORDER BY (tenant_id, occurred_at, id)
+{settings}
+""".strip()
+
+
 def create_table_statements(
     *, deduplication_window: int = DEFAULT_DEDUP_WINDOW
-) -> tuple[str, str, str]:
-    """The three `CREATE TABLE IF NOT EXISTS` statements, with a configurable
+) -> tuple[str, str, str, str]:
+    """The four `CREATE TABLE IF NOT EXISTS` statements, with a configurable
     physical-dedup window. Production uses `DEFAULT_DEDUP_WINDOW`; a test that
     needs to force a physical duplicate PAST the window (to prove query-time
     logical dedup still collapses it) passes a small value (e.g. 1)."""
@@ -246,16 +367,21 @@ def create_table_statements(
         _observations_ddl(settings),
         _citations_ddl(settings),
         _experiment_registrations_ddl(settings),
+        _measurement_outcome_ddl(settings),
     )
 
 
-_CREATE_OBSERVATIONS, _CREATE_CITATIONS, _CREATE_EXPERIMENT_REGISTRATIONS = create_table_statements(
-    deduplication_window=DEFAULT_DEDUP_WINDOW
-)
+(
+    _CREATE_OBSERVATIONS,
+    _CREATE_CITATIONS,
+    _CREATE_EXPERIMENT_REGISTRATIONS,
+    _CREATE_MEASUREMENT_OUTCOME,
+) = create_table_statements(deduplication_window=DEFAULT_DEDUP_WINDOW)
 
 _DROP_OBSERVATIONS = "DROP TABLE IF EXISTS observations"
 _DROP_CITATIONS = "DROP TABLE IF EXISTS citations"
 _DROP_EXPERIMENT_REGISTRATIONS = "DROP TABLE IF EXISTS experiment_registrations"
+_DROP_MEASUREMENT_OUTCOME = "DROP TABLE IF EXISTS measurement_outcome"
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,6 +415,16 @@ MIGRATIONS: tuple[Migration, ...] = (
             _DROP_CITATIONS,
             _DROP_OBSERVATIONS,
         ),
+    ),
+    Migration(
+        version="0002",
+        description=(
+            "create measurement_outcome (w5-11, Wave 5: append-only B-gate "
+            "outcome projection — ADR-0007 rev.2 time-partitioned, "
+            "tenant-prefixed ORDER BY, same convention as 0001)"
+        ),
+        up_sql=(_CREATE_MEASUREMENT_OUTCOME,),
+        down_sql=(_DROP_MEASUREMENT_OUTCOME,),
     ),
 )
 

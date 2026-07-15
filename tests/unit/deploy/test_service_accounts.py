@@ -115,6 +115,13 @@ class TestFiveJobAndBrowserPoolServiceAccountsRendered:
             "saena-forge-intelligence-worker-sa",
             "saena-forge-chatgpt-observer-sa",
         }
+        # w5-21 adds 2 more Deployment-backed service SAs (measurement plane);
+        # excluded by name here so this assertion keeps isolating the ORIGINAL
+        # 8 control-plane SAs, exactly as it already excludes the w4-14 pair.
+        w5_21_new_service_sa_names = {
+            "saena-forge-experiment-attribution-sa",
+            "saena-forge-strategy-skill-bank-sa",
+        }
         docs = _rendered_docs(chart_dir)
         service_sas = [
             d
@@ -122,6 +129,7 @@ class TestFiveJobAndBrowserPoolServiceAccountsRendered:
             if d["kind"] == "ServiceAccount"
             and d["metadata"]["name"] not in JOB_AND_BROWSER_POOL_SA_NAMES
             and d["metadata"]["name"] not in w4_14_new_service_sa_names
+            and d["metadata"]["name"] not in w5_21_new_service_sa_names
         ]
         assert len(service_sas) == 8
         for sa in service_sas:

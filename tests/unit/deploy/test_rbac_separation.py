@@ -241,7 +241,7 @@ class TestDefaultServiceAccountNeverReferenced:
     ) -> None:
         docs = _rendered_docs(chart_dir)
         deployments = [d for d in docs if d["kind"] == "Deployment"]
-        assert len(deployments) == 10  # 8 pre-Wave-4 + 2 w4-14
+        assert len(deployments) == 12  # 8 pre-Wave-4 + 2 w4-14 + 2 w5-21
         for dep in deployments:
             pod_spec = dep["spec"]["template"]["spec"]
             sa_name = pod_spec.get("serviceAccountName", "")

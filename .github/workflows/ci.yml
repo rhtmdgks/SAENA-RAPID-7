@@ -373,6 +373,197 @@ jobs:
       - run: uv sync --locked
       - run: uv run just intelligence-privacy
 
+  # ---- Wave 5 (Measurement·B-Layer) named required checks (ADR-0018) ----
+  measurement-clock:
+    # w5-03/w5-14: deployment-confirmed validation + trusted 7-day clock +
+    # durable Temporal timer (real time-skipping server on ubuntu-latest).
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just measurement-clock
+
+  experiment-registration:
+    # w5-04: measurement-time experiment binding — immutability + contamination.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just experiment-registration
+
+  did-attribution:
+    # w5-05: deterministic per-signal DiD engine.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just did-attribution
+
+  b-layer-gate:
+    # w5-06/w5-07: ≥2-independent-layer B-gate + GRS fail-closed policy.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just b-layer-gate
+
+  evidence-bundle:
+    # w5-08/w5-09: tamper-evident evidence-bundle manifest + persistence ports.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just evidence-bundle
+
+  measurement-privacy:
+    # w5-18/w5-10/w5-11: cross-module privacy/tenant isolation + adversarial +
+    # real Postgres/ClickHouse persistence isolation (testcontainers).
+    needs: [unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just measurement-privacy
+
+  measurement-e2e:
+    # w5-19/c5-01: the REAL composed measurement E2E — real Postgres 16 +
+    # ClickHouse 24.8 + Temporal time-skipping — plus w5-12/w5-13 boundary +
+    # fail-closed pipeline. The `just measurement-e2e` recipe arms
+    # SAENA_MEASUREMENT_E2E_REQUIRED=1, so an infra-absent/all-skipped run is a
+    # HARD FAILURE (exit 6), never a green "0 passed, N skipped". MUST-FIX C:
+    # every pytest line inside the recipe also strips a caller's PYTEST_ADDOPTS
+    # (`PYTEST_ADDOPTS=''`) so the hardcoded path set can never be shrunk by
+    # this job's (or a reusable-workflow caller's) environment.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    # Runtime EVIDENCE (Wave 5 evidence-integrity closure): the completeness
+    # guard writes a saena.gate-evidence/v1 JSON here (even on failure), bound to
+    # this commit + run; the render step below turns it into the job summary and
+    # FAILS CLOSED if the evidence is missing/stale/incomplete/not-real-container.
+    # Set at job level so the gate step AND the render step see the same path.
+    env:
+      SAENA_GATE_EVIDENCE_PATH: ${{ github.workspace }}/.evidence/gate-e2e.json
+      # Gate-UNIQUE invocation id (not just run+attempt) so a same-run evidence
+      # file from the OTHER gate invocation cannot be reused here — the strict
+      # validator requires evidence.invocation_id == this env value.
+      SAENA_GATE_INVOCATION_ID: e2e-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just measurement-e2e
+      - name: Render gate evidence (runtime-backed summary, fail-closed)
+        # `if: always()` so a FAILED/partial gate still renders the true state.
+        # The renderer's OWN exit code gates the job: it exits non-zero (and the
+        # summary says NOT PROVEN/FAILED) unless the evidence proves the full
+        # required set executed-and-PASSED against real containers on THIS
+        # commit+run — a summary can never claim success just by running.
+        if: always()
+        run: |
+          uv run python tools/validation/render_gate_evidence.py \
+            --gate e2e \
+            --evidence "$SAENA_GATE_EVIDENCE_PATH" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+      - name: Upload gate evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gate-e2e-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/.evidence/gate-e2e.json
+          if-no-files-found: warn
+
+  measurement-failure-modes:
+    # w5-06/w5-13/w5-18: fail-closed / fraud / UNDETERMINED-never-PASS
+    # discriminators (non-test_* helper files named explicitly). MUST-FIX C:
+    # every pytest line inside the recipe also strips a caller's PYTEST_ADDOPTS
+    # (`PYTEST_ADDOPTS=''`) so the hardcoded path set can never be shrunk by
+    # this job's (or a reusable-workflow caller's) environment.
+    needs: [unit]
+    runs-on: ubuntu-latest
+    # Runtime EVIDENCE (Wave 5 evidence-integrity closure) — see measurement-e2e.
+    env:
+      SAENA_GATE_EVIDENCE_PATH: ${{ github.workspace }}/.evidence/gate-failure-modes.json
+      # Gate-UNIQUE invocation id — see measurement-e2e.
+      SAENA_GATE_INVOCATION_ID: failure-modes-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked
+      - run: uv run just measurement-failure-modes
+      - name: Render gate evidence (runtime-backed summary, fail-closed)
+        if: always()
+        run: |
+          uv run python tools/validation/render_gate_evidence.py \
+            --gate failure-modes \
+            --evidence "$SAENA_GATE_EVIDENCE_PATH" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+      - name: Upload gate evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gate-failure-modes-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/.evidence/gate-failure-modes.json
+          if-no-files-found: warn
+
   helm-smoke:
     # W3 offline chart packaging gate (w2-23/w3-07 chart). No cluster contact:
     # helm lint + template + kubeconform static validation + forgectl preflight.

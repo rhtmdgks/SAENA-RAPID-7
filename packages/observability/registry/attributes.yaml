@@ -314,3 +314,149 @@
     the underlying paraphrase/query text — safe in all three contexts,
     including de-identified aggregate rollups (e.g. "graph builds by
     intent" dashboards).
+
+# ---------------------------------------------------------------------------
+# Wave 5 (Measurement / B-layer, w5-17) additions below. Same discipline as
+# every entry above: identifiers/hashes/closed-vocabulary enums only — NEVER
+# a raw query, URL, evidence excerpt, confirmer identity, or any outcome/
+# effect/lift MAGNITUDE value. Measurement is where DiD and B-layer verdicts
+# are produced (docs/architecture/wave5-plan.md deliverables 1-5), so the
+# temptation to attach an effect size / p-value / lift number as a label is
+# highest here — these entries deliberately register ONLY the opaque
+# window/bundle identifiers, the bundle content hash, and the closed
+# low-cardinality decision/verdict/reason enums. No effect-magnitude
+# attribute exists (CLAUDE.md "증거 없는 완료 선언 금지"; wave5-plan.md
+# "Unverified external-lift claims" FORBIDDEN). saena.experiment_id (w4-15)
+# is REUSED, not re-defined, to correlate a measurement with its
+# pre-registered experiment.
+# ---------------------------------------------------------------------------
+
+- name: saena.measurement.window_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: forbidden
+  description: >
+    Opaque identifier of one 7-day external-performance measurement window
+    (started only by a valid `deployment.confirmed.v1`, the sole
+    clock-start authority — Algorithm §7.3, w5-03). An opaque id, never the
+    confirmer identity, target, or any raw customer content. Forbidden in
+    AggregateContext: a per-window identifier is high-cardinality and
+    potentially re-identifying, same rationale as saena.experiment_id /
+    saena.claim_id.
+
+- name: saena.measurement.verdict
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Closed 3-value outcome-layer B-gate verdict enum (w5-06):
+    "pass|fail|undetermined" — EXACTLY three values, never widened without a
+    major-version bump (enum narrow AND widen = major, ADR-0012). A fixed
+    low-cardinality label used to partition saena.measurement.b_verdicts_total;
+    it is a category, NEVER a verdict "strength" / effect magnitude / lift
+    value (those are forbidden outright — see measurement.py
+    FORBIDDEN_OUTCOME_MAGNITUDE_TOKENS). Safe in all three contexts,
+    including de-identified aggregate rollups (e.g. "B-verdicts by outcome"
+    dashboards).
+
+- name: saena.measurement.reason_code
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Closed, bounded reason-code enum (w5-06 reason_codes / w5-03
+    confirmation-rejection reasons — the typed code-level vocabulary v1,
+    wave5-plan.md H7): a fixed low-cardinality machine code such as
+    insufficient-layers / contaminated / late-confirmation / single-layer /
+    backdate / cross-tenant / replay / identity-unverified. A category code
+    ONLY — never a free-text human message, a confirmer identity, or any
+    raw customer content (a raw message could carry PII/query text; the code
+    cannot). Used to partition saena.measurement.undetermined_reasons_total
+    and confirmations_rejected_total. Safe in all three contexts.
+
+  # NOTE (cardinality contract): verdict/reason_code/grs_decision/
+  # intake_decision are all CLOSED enums. "low" here is a contract, not a
+  # measured observation — widening any of these vocabularies is a
+  # major-version registry change (ADR-0012 enum rule), and the reason_code
+  # vocabulary in particular must stay bounded (a code enum, never an
+  # open free-text field). test_measurement.py pins the closedness.
+
+- name: saena.measurement.grs_decision
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Closed GRS eligibility decision enum (w5-07): fail-closed default
+    "deny", plus "allow" / "undetermined" for the evaluated cases. A fixed
+    low-cardinality category label used to partition
+    saena.measurement.grs_eligibility_evaluated_total — never a threshold
+    value, credit amount, or SLA number (those production values are
+    BLOCKED(human), wave5-plan.md H1; only the mechanism-level decision
+    category is telemetry-safe). Safe in all three contexts.
+
+- name: saena.measurement.intake_decision
+  type: string
+  cardinality: low
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Closed skill-bank intake decision enum (w5-16): "accepted|rejected" —
+    fail-closed boundary that consumes ONLY B-verified outcomes. A fixed
+    two-value category label used to partition
+    saena.measurement.skill_bank_intake_total; carries no strategy-card
+    content or outcome magnitude. Safe in all three contexts.
+
+- name: saena.measurement.evidence_bundle_id
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: forbidden
+  description: >
+    Opaque identifier of one sealed evidence bundle (w5-08; Algorithm
+    §3.7-3 / §11.3). An opaque id, never the bundle's own snapshot /
+    citation / raw content — those stay out of telemetry entirely (H10:
+    the bundle carries hashes/refs only, no raw content). Forbidden in
+    AggregateContext, same high-cardinality re-identification rationale as
+    saena.measurement.window_id / saena.experiment_id.
+
+- name: saena.measurement.evidence_bundle_hash
+  type: string
+  cardinality: high
+  pii: false
+  contexts:
+    tenant: optional
+    system: optional
+    aggregate: optional
+  description: >
+    Content-addressed `sha256:<64-hex>` manifest/provenance hash of a
+    sealed evidence bundle (w5-08). A HASH of the bundle manifest, NEVER the
+    bundle's own raw snapshot/citation content — this entry exists so
+    evidence-seal telemetry can correlate a bundle across signals without
+    ever carrying its content. Follows the aggregate-safe
+    opaque-version-marker precedent of saena.demand_graph_version / saena.contract_hash
+    (a content hash identifies a bundle revision, not a tenant or
+    individual), so it is optional (not forbidden) in AggregateContext —
+    contrast the per-record saena.measurement.evidence_bundle_id, which
+    stays forbidden there.

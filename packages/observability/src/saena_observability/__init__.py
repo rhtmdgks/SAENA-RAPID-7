@@ -21,6 +21,10 @@ Public API surface (Wave 2 runtime, unit w2-06):
   name constants for demand-graph, entity-resolution, claim-evidence,
   citation-normalization, browser-pool, and experiment-registration
   telemetry (w4-15).
+- `saena_observability.measurement` — Wave 5 (Measurement / B-layer)
+  metric/span name constants for deployment-confirmation + 7-day clock,
+  DiD attribution, outcome-layer B-gate, evidence-bundle seal, GRS
+  eligibility, and B-verified skill-bank intake telemetry (w5-17).
 
 This package must not import `saena_domain` (import-linter enforced,
 `observability-below-services` / boundary rules in `.importlinter`).
@@ -37,6 +41,11 @@ from saena_observability.intelligence import (
     INTELLIGENCE_SPAN_NAMES,
 )
 from saena_observability.logging import SaenaJsonFormatter, get_logger
+from saena_observability.measurement import (
+    MEASUREMENT_ATTRIBUTE_NAMES,
+    MEASUREMENT_METRIC_NAMES,
+    MEASUREMENT_SPAN_NAMES,
+)
 from saena_observability.redaction import (
     RedactionAction,
     RedactionDecision,
@@ -59,6 +68,9 @@ __all__ = [
     "INTELLIGENCE_ATTRIBUTE_NAMES",
     "INTELLIGENCE_METRIC_NAMES",
     "INTELLIGENCE_SPAN_NAMES",
+    "MEASUREMENT_ATTRIBUTE_NAMES",
+    "MEASUREMENT_METRIC_NAMES",
+    "MEASUREMENT_SPAN_NAMES",
     "TelemetryContext",
     "bind_telemetry_context",
     "current_telemetry_context",

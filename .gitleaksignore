@@ -68,3 +68,45 @@ be36856f81c68c479e49ddcfa537a524518c4067:tests/unit/analytics_clickhouse/test_gu
 21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:177
 21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:197
 21a8fbd468bee20f7848e17aeddbc51debf5d104:tests/integration/clickhouse/test_query_privacy_boundary.py:generic-api-key:223
+
+# --- Wave 5 (Measurement·B-Layer) synthetic guard-test fixtures ---
+# Verified false positives (2026-07-14). All four are secret-SHAPED literals
+# deliberately placed IN guard/adversarial tests to PROVE the raw-content /
+# secret-shape guards REJECT them — none is a real credential:
+#   - test_errors.py:48,51  — "compound-key-1/2" test lookup keys (not a key;
+#     generic-api-key false positive on a context-dict value proving the
+#     boundary error never echoes caller content).
+#   - test_guard.py:28  — a JWT-shaped literal proving the ClickHouse outcome
+#     row guard rejects secret-shaped values.
+#   - test_guard_mutation.py:65 — xoxb-/AIza/sk_live_ tokens proving the
+#     evidence-bundle guard's widened secret corpus rejects them (w5-08).
+# Suppressed by exact fingerprint per ADR-0020 (path allowlisting stays FORBIDDEN).
+d82c3bd9a6a16468658cfba7f24be47a22feab8e:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:48
+d82c3bd9a6a16468658cfba7f24be47a22feab8e:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:51
+4e9c116c606010b0fb08c154f174a1b1d50ee99f:tests/unit/analytics_clickhouse_outcome/test_guard.py:jwt:28
+7545c19a0bc75558a03007fc8f89db438ee29fbe:tests/unit/domain_measurement_evidence/test_guard_mutation.py:stripe-access-token:65
+# Same 4 fixtures, fingerprints as attributed to the author-worktree commits
+# (reachable from local agent-* refs during local dev scans; CI clones only
+# wave5-measurement and sees the integration-commit fingerprints above):
+4c9c55a285299d6b1e11bfc11576408526a19bb2:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:48
+4c9c55a285299d6b1e11bfc11576408526a19bb2:tests/unit/svc_experiment_attribution_boundary/test_errors.py:generic-api-key:51
+7e56df614a6857e58124c2d9f6c385a585e44404:tests/unit/analytics_clickhouse_outcome/test_guard.py:jwt:28
+916043d0b8b587c805880bddd0ce7daeefe35bc2:tests/unit/domain_measurement_evidence/test_guard_mutation.py:stripe-access-token:65
+
+# --- Wave 5 Closure (c5-01/c5-06) synthetic guard-test fixtures ---
+# Verified false positives (2026-07-14). All secret-SHAPED literals placed IN
+# guard/adversarial tests to PROVE the raw-content/secret guards REJECT them,
+# or as an E2E leakage sentinel asserted ABSENT from every sink — none is a
+# real credential (ADR-0020; path allowlisting stays FORBIDDEN):
+#   - test_guard_mutation.py / test_guard.py / test_intake_guard.py — the
+#     hyphen/underscore-infix Stripe-shaped sentinels the c5-06 audit A-1 fix
+#     added on the REJECT/ADMIT-guard path.
+#   - test_real_composed_measurement_e2e.py:626 — _SECRET_SENTINEL, asserted
+#     absent from events/logs/evidence/rows/exception strings (c5-01).
+# CI clones only wave5-measurement (integration-commit fingerprints); the
+# author-worktree-commit fingerprint is added too for local-dev scan parity.
+75632e086567d3ee3034e552d40ef727753d3f43:tests/unit/domain_measurement_evidence/test_guard_mutation.py:stripe-access-token:111
+75632e086567d3ee3034e552d40ef727753d3f43:tests/unit/analytics_clickhouse_outcome/test_guard.py:stripe-access-token:57
+75632e086567d3ee3034e552d40ef727753d3f43:tests/unit/svc_strategy_skill_bank/test_intake_guard.py:stripe-access-token:351
+c7daad75a64a9ba123ec7a7ca06b2a5d32f464ad:tests/integration/measurement_e2e/test_real_composed_measurement_e2e.py:generic-api-key:626
+3210dba7970311182639882d5bd66f8fc2c52fb4:tests/integration/measurement_e2e/test_real_composed_measurement_e2e.py:generic-api-key:626

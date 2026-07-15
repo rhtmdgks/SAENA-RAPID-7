@@ -63,5 +63,26 @@ helm rollback drill)은 BLOCKED(human) — `deploy/**` 보호 경로 + 라이브
 2026-07-13) — Job 5종·hook 5종·SA 3분리·synthetic E2E·evals(추출 아키텍처
 테스트)·failure-mode 9종·rollback gate 전 항목 PASS, 증거는
 `docs/architecture/wave3-exit-report.md`. production-only 항목(라이브 클러스터
-배포, 대시보드 live 구동, browser pool=W4)은 정직히 범위 밖 기록** / W4
-NOT IMPLEMENTED
+배포, 대시보드 live 구동, browser pool=W4)은 정직히 범위 밖 기록** / **W4
+CONFIRMED (Intelligence, PR #5+#6 merged to main `156568c`, 2026-07-13) —
+intelligence-worker P0 4모듈·chatgpt-observer·ClickHouse/vector·실험 등록 원장,
+증거 `docs/architecture/wave4-exit-report.md`** / **W5 PASS (code +
+static-deployment mechanism, Measurement·B-Layer, branch wave5-measurement —
+authoritative tip = PR #7 head on GitHub, not hardcoded here; Wave 5 Closure
+2026-07-14) — 24/24 seed unit 통합·유닛별 독립
+adversarial critic·`just verify` green 3×: DiD 측정 활성
+(experiment-attribution-service), deployment.confirmed.v1 7일
+clock(Temporal durable timer, time-skipping 검증), outcome_layer ≥2 독립 layer
+B-gate, evidence bundle, GRS 정책 mechanism(값은 BLOCKED §13-7), skill-bank
+B-verified-only intake, 실 composed E2E(real PG16/CH24.8/Temporal), 완전
+failure-mode matrix+F-9 repoint, conflicting-confirmation seam, w5-21
+saena-forge Helm static wiring(SecretRef-only, 하드닝, GRS 값 없음). closure
+MUST-FIX 수정+재검증: c5-03 security(multi-conflict hash crash), c5-01
+zero-collected guard(3중), c5-06 audit-a(hyphen-infix `sk-live-` secret가
+skill-bank production pool 유입 — 3 guard 수정). 증거
+`docs/architecture/wave5-exit-report.md`. LIVE OPEN: 라이브 클러스터
+install/rollback(미실행, 미주장). BLOCKED(human): 실 GRS 임계값/SLA(§13-7),
+ChatGPT 관측 methodology/ToS(§13-1), PII-vs-audit legal. c5-04 Helm은
+Lead-direct(H8 인간 승인 `9099c1d`, 독립 critic PASS); c5-06 audit-b(fail-closed/
+tenant/replay)는 spawned auditor stall로 Lead-fallback 검증(정직 공시). 외부
+lift 주장 없음. merge는 인간(PR #7).**

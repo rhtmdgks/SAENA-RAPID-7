@@ -176,8 +176,8 @@
       "fixture": "raw citation count grows but the control group's grows too (or more)",
       "injection_point": "MeasurementSignal(treatment_raw_delta, control_raw_delta) fed into the B-layer success evaluator",
       "expected_state_transition": "BLayerVerdict.granted=False — no external 'it worked' claim may be made",
-      "expected_event": "n/a (pure evaluator, no service owns this yet — see missing_owner_note)",
-      "expected_audit_record": "n/a (no owning service/audit sink yet)",
+      "expected_event": "experiment.outcome.observed.v1 (b_verdict=fail) — produced by experiment-attribution-service via saena_experiment_attribution.pipeline.run_measurement -> saena_domain.measurement.b_gate.decide_b_verdict",
+      "expected_audit_record": "OutcomeDecisionRecord (append-only) + sealed evidence bundle, owned by experiment-attribution-service",
       "retryable": false,
       "rollback_required": false,
       "operator_visible_error": "BLayerVerdict.reason (names the unaccounted-for signal(s), no raw customer data)",
@@ -188,7 +188,7 @@
       "wired_against": [
         "tests/security/measurement_fraud.py::evaluate_b_layer_success"
       ],
-      "missing_owner_note": "no experiment-attribution-service / B-layer outcome gate is implemented in this repo yet (confirmed by repo-wide search) — this is a minimal, deterministic, this-suite-only evaluator built per this patch unit's own instructions; a future service owner should adopt or explicitly supersede it, not silently duplicate it."
+      "missing_owner_note": "RESOLVED (Wave 5 / c5-02): experiment-attribution-service now owns the B-layer outcome gate. tests/security/measurement_fraud.py::evaluate_b_layer_success is a thin compatibility shim that delegates to the integrated saena_domain.measurement.b_gate.decide_b_verdict (no divergent verdict logic); the end-to-end fraud proof against the real did+b_gate engine over real Postgres is tests/integration/measurement_failure/test_f9_fraud_repoint.py."
     }
   ],
   "rollback_verification_gate": {

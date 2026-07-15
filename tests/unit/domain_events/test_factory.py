@@ -88,7 +88,13 @@ def test_build_aggregate_envelope_happy_path() -> None:
             "sha256:8f2e1c9a7b3d5f4e6a8c2b1d9f7e3a5c4b6d8f2e1c9a7b3d5f4e6a8c2b1d9f7e"
         ),
         idempotency_key="strategy-card:aggregate-scope-014:2026-07-12",
-        payload={"engine_id": "chatgpt-search", "strategy_card_id": "card-0142"},
+        payload={
+            "card_candidate_ref": "card-cand-0142",
+            "source_outcome": {
+                "b_verdict": "pass",
+                "evidence_bundle_manifest_hash": "sha256:" + "a" * 64,
+            },
+        },
     )
 
     assert envelope["context_type"] == "aggregate"
@@ -357,6 +363,55 @@ def test_engine_id_required_channel_with_no_payload_at_all_is_rejected(
         )
 
 
+# Minimal schema-valid payloads (beyond just engine_id) for the engine-id
+# -required channels that have a BOUND payload model in EVENT_PAYLOAD_MODELS
+# (w5-02: experiment.outcome.observed.v1 gained a payload contract, so its
+# bound model now requires the full DiD outcome shape, not just engine_id).
+# observation.captured.v1 / citation.normalized.v1 are NOT bound to a payload
+# model in EVENT_PAYLOAD_MODELS, so their engine_id-only payload still passes
+# the factory's model check (which is a no-op for unbound event_types).
+_ENGINE_ID_REQUIRED_VALID_PAYLOADS: dict[str, dict] = {
+    "observation.captured.v1": {"engine_id": "chatgpt-search"},
+    "citation.normalized.v1": {"engine_id": "chatgpt-search"},
+    "experiment.outcome.observed.v1": {
+        "engine_id": "chatgpt-search",
+        "experiment_id": "exp-0001",
+        "registration_canonical_hash": "sha256:" + "f" * 64,
+        "window": {
+            "started_at": "2026-07-07T00:00:00Z",
+            "ended_at": "2026-07-14T00:00:00Z",
+            "clock_anchor": "deployment_confirmed",
+        },
+        "deployment_confirmation_ref": "dep-0001",
+        "per_signal_results": [
+            {
+                "outcome_layer": "citation",
+                "metric_id": "citation_share",
+                "evidence_basis_id": "basis-citation-1",
+                "treatment_raw_delta": 0.12,
+                "control_raw_delta": 0.02,
+                "net_of_control_lift": 0.10,
+                "sample_counts": {"treatment": 120, "control": 118},
+                "insufficient": False,
+            },
+        ],
+        "b_verdict": "undetermined",
+        "raw_view": {},
+        "control_adjusted_view": {},
+        "confidence": 0.5,
+        "evidence_bundle_ref": {
+            "manifest_hash": "sha256:" + "a" * 64,
+            "artifact_ref": "https://evidence.example.com/bundles/exp-0001",
+        },
+        "grs_policy": {
+            "version": "grs-v1",
+            "hash": "sha256:" + "b" * 64,
+            "provenance": "test_fixture",
+        },
+    },
+}
+
+
 @pytest.mark.parametrize(
     ("event_type", "producer"),
     _ENGINE_ID_REQUIRED_CHANNELS,
@@ -371,7 +426,7 @@ def test_engine_id_required_channel_with_chatgpt_search_passes(
         tenant_id="acme-co",
         run_id="run-1",
         idempotency_key="k1",
-        payload={"engine_id": "chatgpt-search"},
+        payload=_ENGINE_ID_REQUIRED_VALID_PAYLOADS[event_type],
     )
     assert envelope["payload"]["engine_id"] == "chatgpt-search"
     SaenaEventEnvelopeV1.model_validate(envelope)
@@ -492,7 +547,13 @@ def test_aggregate_envelope_dual_validation_rejects_cohort_size_below_minimum() 
             de_identification_status="k_anonymized",
             lineage_audit_ref="sha256:" + "0" * 64,
             idempotency_key="k1",
-            payload={"engine_id": "chatgpt-search", "strategy_card_id": "card-1"},
+            payload={
+                "card_candidate_ref": "card-cand-1",
+                "source_outcome": {
+                    "b_verdict": "pass",
+                    "evidence_bundle_manifest_hash": "sha256:" + "a" * 64,
+                },
+            },
         )
     assert len(exc_info.value.messages) >= 1
     assert any("pydantic" in message for message in exc_info.value.messages)

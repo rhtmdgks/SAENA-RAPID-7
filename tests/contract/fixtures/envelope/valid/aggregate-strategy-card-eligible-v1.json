@@ -13,8 +13,11 @@
   "de_identification_status": "k_anonymized",
   "lineage_audit_ref": "sha256:8f2e1c9a7b3d5f4e6a8c2b1d9f7e3a5c4b6d8f2e1c9a7b3d5f4e6a8c2b1d9f7e",
   "payload": {
-    "engine_id": "chatgpt-search",
-    "strategy_card_id": "card-0142",
+    "card_candidate_ref": "card-cand-0142",
+    "source_outcome": {
+      "b_verdict": "pass",
+      "evidence_bundle_manifest_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
     "intervention_category": "structured-data-markup"
   }
 }

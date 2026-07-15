@@ -1,0 +1,12 @@
+{
+  "entries": [
+    {
+      "kind": "raw_customer_screenshot",
+      "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "ref": "https://evidence.example.com/exp-0001/registration"
+    }
+  ],
+  "manifest_hash": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+  "created_at": "2026-07-14T00:00:00Z",
+  "_expected_violation": "entries[0].kind 'raw_customer_screenshot' is not in the closed evidence-component enum (registration|deployment_confirmation|baseline_observation|treatment_observation|control_observation|raw_observation_ref|did_inputs|did_outputs|b_gate_decision|grs_policy|missingness_report|remediation|rollback). Rejected by both the schema (enum) and the generated enum pydantic field. (The manifest indexes REFS/HASHES only — never raw customer content, so no raw-content kind exists.)"
+}

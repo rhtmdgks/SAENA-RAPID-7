@@ -86,7 +86,7 @@ class TestBothNewWorkloadsRenderAsDeployments:
         10 = independent 8 + worker host 2 (compute pool)')."""
         docs = _rendered_docs(chart_dir)
         deployments = [d for d in docs if d["kind"] == "Deployment"]
-        assert len(deployments) == 10
+        assert len(deployments) == 12
 
     def test_both_new_deployments_are_in_saena_system_namespace(self, chart_dir: Path) -> None:
         docs = _rendered_docs(chart_dir)
@@ -158,7 +158,7 @@ class TestEachNewWorkloadHasServiceAccountNetworkPolicyProbesPdbAndLimits:
     def test_total_poddisruptionbudget_count_is_10(self, chart_dir: Path) -> None:
         docs = _rendered_docs(chart_dir)
         pdbs = [d for d in docs if d["kind"] == "PodDisruptionBudget"]
-        assert len(pdbs) == 10
+        assert len(pdbs) == 12
 
     def test_each_new_deployment_container_declares_resource_requests_and_limits(
         self, chart_dir: Path
@@ -320,7 +320,7 @@ class TestClickhouseAndVectorStoreConnectionWiring:
     ) -> None:
         docs = _rendered_docs(chart_dir)
         deployments = [d for d in docs if d["kind"] == "Deployment"]
-        assert len(deployments) == 10
+        assert len(deployments) == 12
         for dep in deployments:
             container = dep["spec"]["template"]["spec"]["containers"][0]
             env_names = {e["name"] for e in container.get("env", [])}

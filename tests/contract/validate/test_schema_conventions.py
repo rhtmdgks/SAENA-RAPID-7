@@ -91,6 +91,10 @@ CLOSED_CLASS_SCHEMA_RELPATHS: frozenset[str] = frozenset(
         "domain/evidence-record/v1/evidence-record.schema.json",
         "domain/platform-observation/v1/platform-observation.schema.json",
         "domain/experiment-registration/v1/experiment-registration.schema.json",
+        # w5-02 Contracts Steward (Wave 5) — closed internal measurement
+        # records (additionalProperties:false, signed:false).
+        "domain/experiment-outcome/v1/experiment-outcome.schema.json",
+        "domain/evidence-bundle-manifest/v1/evidence-bundle-manifest.schema.json",
     }
 )
 

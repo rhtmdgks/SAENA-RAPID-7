@@ -23,7 +23,9 @@ import saena_schemas.domain.approval_decision_v1 as approval_decision_v1
 import saena_schemas.domain.audit_event_v1 as audit_event_v1
 import saena_schemas.domain.change_plan_v1 as change_plan_v1
 import saena_schemas.domain.entity_record_v1 as entity_record_v1
+import saena_schemas.domain.evidence_bundle_manifest_v1 as evidence_bundle_manifest_v1
 import saena_schemas.domain.evidence_record_v1 as evidence_record_v1
+import saena_schemas.domain.experiment_outcome_v1 as experiment_outcome_v1
 import saena_schemas.domain.experiment_registration_v1 as experiment_registration_v1
 import saena_schemas.domain.extracted_claim_v1 as extracted_claim_v1
 import saena_schemas.domain.patch_artifact_v1 as patch_artifact_v1
@@ -33,8 +35,10 @@ import saena_schemas.domain.verification_result_v1 as verification_result_v1
 import saena_schemas.event.citation_normalized_v1 as citation_normalized_v1
 import saena_schemas.event.claim_evidence_versioned_v1 as claim_evidence_versioned_v1
 import saena_schemas.event.demand_graph_versioned_v1 as demand_graph_versioned_v1
+import saena_schemas.event.deployment_confirmed_v1 as deployment_confirmed_v1
 import saena_schemas.event.entity_graph_versioned_v1 as entity_graph_versioned_v1
 import saena_schemas.event.experiment_anchored_v1 as experiment_anchored_v1
+import saena_schemas.event.experiment_outcome_observed_v1 as experiment_outcome_observed_v1
 import saena_schemas.event.experiment_registered_v1 as experiment_registered_v1
 import saena_schemas.event.observation_captured_v1 as observation_captured_v1
 import saena_schemas.event.patch_unit_completed_v1 as patch_unit_completed_v1
@@ -43,6 +47,7 @@ import saena_schemas.event.plan_contract_proposed_v1 as plan_contract_proposed_v
 import saena_schemas.event.quality_gate_result_v1 as quality_gate_result_v1
 import saena_schemas.event.repo_intaken_v1 as repo_intaken_v1
 import saena_schemas.event.site_inventory_completed_v1 as site_inventory_completed_v1
+import saena_schemas.event.strategy_card_eligible_v1 as strategy_card_eligible_v1
 from _support import (
     CONTRACTS_JSON_SCHEMA_DIR,
     ENGINE_ID_SCHEMA,
@@ -243,6 +248,22 @@ BINDINGS: dict[str, ContractBinding] = {
         model_cls=experiment_registration_v1.QueryexperimentRegistration,
         fixture_dir=FIXTURES_ROOT / "experiment-registration",
     ),
+    # w5-02 Contracts Steward (Wave 5) — closed measurement domain records.
+    "experiment-outcome": ContractBinding(
+        schema_path=DOMAIN_DIR / "experiment-outcome" / "v1" / "experiment-outcome.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=experiment_outcome_v1.ExperimentoutcomeDidDecisionRecord,
+        fixture_dir=FIXTURES_ROOT / "experiment-outcome",
+    ),
+    "evidence-bundle-manifest": ContractBinding(
+        schema_path=DOMAIN_DIR
+        / "evidence-bundle-manifest"
+        / "v1"
+        / "evidence-bundle-manifest.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=evidence_bundle_manifest_v1.EvidenceBundleManifest,
+        fixture_dir=FIXTURES_ROOT / "evidence-bundle-manifest",
+    ),
 }
 
 # Event payload contracts (fixtures live under fixtures/event-payloads/<name>/).
@@ -345,5 +366,37 @@ EVENT_PAYLOAD_BINDINGS: dict[str, ContractBinding] = {
         extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
         model_cls=experiment_anchored_v1.ExperimentAnchoredV1Payload,
         fixture_dir=FIXTURES_ROOT / "event-payloads" / "experiment-anchored",
+    ),
+    # w5-02 Contracts Steward (Wave 5) measurement events.
+    "deployment-confirmed": ContractBinding(
+        schema_path=EVENT_DIR / "deployment-confirmed" / "v1" / "deployment-confirmed.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=deployment_confirmed_v1.DeploymentConfirmedV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "deployment-confirmed",
+        # missing-deployment-identity.json: the schema's root allOf/anyOf
+        # ("at least one of deployed_commit_sha / artifact_hash") rejects an
+        # instance with neither, but datamodel-code-generator leaves both fields
+        # Optional and does NOT translate the anyOf-of-required into a pydantic
+        # validator -- schema rejects, pydantic accepts. Documented gap, same
+        # class as the ActorContext/AuditEvent allOf/if-then conditional gaps.
+        known_conditional_gaps=frozenset({"missing-deployment-identity.json"}),
+    ),
+    "experiment-outcome-observed": ContractBinding(
+        schema_path=EVENT_DIR
+        / "experiment-outcome-observed"
+        / "v1"
+        / "experiment-outcome-observed.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA, ENGINE_ID_SCHEMA),
+        model_cls=experiment_outcome_observed_v1.ExperimentOutcomeObservedV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "experiment-outcome-observed",
+    ),
+    "strategy-card-eligible": ContractBinding(
+        schema_path=EVENT_DIR
+        / "strategy-card-eligible"
+        / "v1"
+        / "strategy-card-eligible.schema.json",
+        extra_resource_paths=(IDENTIFIERS_SCHEMA,),
+        model_cls=strategy_card_eligible_v1.StrategyCardEligibleV1Payload,
+        fixture_dir=FIXTURES_ROOT / "event-payloads" / "strategy-card-eligible",
     ),
 }

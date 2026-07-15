@@ -28,7 +28,9 @@ Plus envelope-specific tests:
     on dump. Exercised against all 3 valid ADR-0013 fixtures, whose
     payloads already carry non-schema-declared fields
     (patch_unit_id/worktree_commit/quality_gate_status,
-    adapter_version/changed_fields, strategy_card_id/intervention_category).
+    adapter_version/changed_fields, and -- for the aggregate
+    strategy.card.eligible.v1 fixture, post-w5-02 -- intervention_category,
+    a field the strategy-card-eligible payload contract does not declare).
   - 3-branch sealing regression (critic S4): confirms patching the nested
     Payload class with extra='allow' did NOT weaken the root/branch-level
     `unevaluatedProperties: false` sealing — system-with-run-id.json and
@@ -94,6 +96,12 @@ OPEN_CONTRACTS: dict[str, str] = {
     "event/observation_captured_v1": "event/observation-captured/v1",
     "event/experiment_registered_v1": "event/experiment-registered/v1",
     "event/experiment_anchored_v1": "event/experiment-anchored/v1",
+    # Wave 5 measurement events (w5-02) — open-class event payloads (same
+    # forward-compat rationale; undeclared-key rejection is a policy-gate
+    # obligation, not schema-enforced).
+    "event/deployment_confirmed_v1": "event/deployment-confirmed/v1",
+    "event/experiment_outcome_observed_v1": "event/experiment-outcome-observed/v1",
+    "event/strategy_card_eligible_v1": "event/strategy-card-eligible/v1",
 }
 
 CLOSED_CONTRACTS: dict[str, str] = {
@@ -114,6 +122,10 @@ CLOSED_CONTRACTS: dict[str, str] = {
     "domain/evidence_record_v1": "domain/evidence-record/v1",
     "domain/platform_observation_v1": "domain/platform-observation/v1",
     "domain/experiment_registration_v1": "domain/experiment-registration/v1",
+    # Wave 5 measurement domain records (w5-02) — closed-class
+    # (additionalProperties:false) internal decision records.
+    "domain/experiment_outcome_v1": "domain/experiment-outcome/v1",
+    "domain/evidence_bundle_manifest_v1": "domain/evidence-bundle-manifest/v1",
 }
 
 
@@ -233,6 +245,22 @@ def build_example(schema: dict[str, Any], base_dir: Path, base_file: Path | None
         # by the enum-branch preference above, so skip them here.
         for sub in schema.get("allOf", []):
             if {"if", "then", "else"} & sub.keys():
+                continue
+            # allOf branch that is a bare anyOf/oneOf-of-`required` clauses
+            # (w5-02 deployment-confirmed's "at least one of deployed_commit_sha
+            # / artifact_hash" constraint, nested under allOf so codegen emits a
+            # single root model). build_example's generic anyOf handling would
+            # descend into a `{"required": [...]}` node that has no
+            # type/properties and raise -- instead, satisfy the FIRST branch by
+            # building its required keys from THIS object's own `props`.
+            combinator_branches = sub.get("anyOf") or sub.get("oneOf")
+            if combinator_branches and all(
+                set(b.keys()) <= {"required"} for b in combinator_branches
+            ):
+                first_required = combinator_branches[0].get("required", [])
+                for key in first_required:
+                    if key in props and key not in out:
+                        out[key] = build_example(props[key], base_dir, base_file)
                 continue
             sub_instance = build_example(sub, base_dir, base_file)
             if isinstance(sub_instance, dict):

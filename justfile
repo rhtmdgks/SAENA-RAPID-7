@@ -104,6 +104,98 @@ intelligence-privacy:
     uv run pytest tests/unit/analytics_clickhouse/test_query_privacy.py -q
     uv run pytest -q -m integration tests/integration/clickhouse/test_query_privacy_boundary.py -p no:cacheprovider
 
+# ---- Wave 5 (Measurement·B-Layer) named required checks (ADR-0018 stable
+# check names; wave5-plan.md §"Named CI gates"). Same belt-and-suspenders
+# shape as the W3/W4 named checks: targeted subsets used as their own CI
+# jobs; the `test`/`test-integration` umbrellas still run the same tests.
+# Container/Temporal legs honest-skip when Docker/the time-skipping server is
+# absent. NOTE (w5-18 critic): the tests/security/measurement_*.py files use
+# non-`test_*` filenames (helper-module convention, like measurement_fraud.py)
+# so default collection SKIPS them — these gates name them EXPLICITLY so they
+# actually run in CI.
+
+# w5-03/w5-14: deployment-confirmed validation + trusted 7-day clock (domain)
+# + durable Temporal timer (time-skipping integration).
+measurement-clock:
+    uv run pytest tests/unit/domain_measurement_clock tests/unit/svc_experiment_attribution_workflow -q
+    uv run pytest -q -m integration tests/integration/measurement_workflow -p no:cacheprovider
+
+# w5-04: measurement-time experiment binding — immutability + contamination.
+experiment-registration:
+    uv run pytest tests/unit/domain_measurement_binding -q
+
+# w5-05: deterministic per-signal DiD engine.
+did-attribution:
+    uv run pytest tests/unit/domain_measurement_did -q
+
+# w5-06/w5-07: outcome-layer ≥2-independent-layer B-gate + GRS fail-closed policy.
+b-layer-gate:
+    uv run pytest tests/unit/domain_measurement_bgate tests/unit/domain_measurement_grs -q
+
+# w5-08/w5-09: evidence-bundle manifest (tamper-evident) + persistence ports.
+evidence-bundle:
+    uv run pytest tests/unit/domain_measurement_evidence tests/unit/domain_measurement_ports -q
+
+# w5-18: cross-module privacy/tenant isolation + adversarial (non-test_* files
+# named explicitly so they run) + real-Postgres persistence + ClickHouse
+# outcome projection tenant isolation.
+measurement-privacy:
+    uv run pytest tests/security/measurement_privacy_tenant.py tests/security/measurement_adversarial.py -q
+    uv run pytest tests/unit/svc_experiment_attribution_boundary -q
+    uv run pytest -q -m integration tests/integration/measurement_pg tests/integration/clickhouse_outcome -p no:cacheprovider
+
+# w5-19/c5-01: experiment-attribution boundary + fail-closed pipeline + the
+# REAL composed measurement E2E (real Postgres 16 + ClickHouse 24.8 + Temporal
+# time-skipping). SAENA_MEASUREMENT_E2E_REQUIRED=1 arms the required-lane guard:
+# an infra-absent/all-skipped run is a HARD FAILURE (exit 6), never a silent pass.
+# MUST-FIX C (defense-in-depth, belt-and-suspenders with the conftest
+# completeness guard above): `PYTEST_ADDOPTS=''` on EVERY pytest line in this
+# required recipe ONLY neutralizes a caller's environment (e.g.
+# PYTEST_ADDOPTS="-k <test>") from shrinking this recipe's hardcoded selection
+# — the env override applies to that one command each time, not the whole
+# recipe/justfile, so other (non-required) recipes still honor a caller's
+# PYTEST_ADDOPTS. SAENA_MEASUREMENT_E2E_REQUIRED=1 stays armed internally
+# (SSOT); no `| tee` / `|| true` — the pytest exit code is the recipe line's
+# exit code, untouched.
+measurement-e2e:
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/svc_experiment_attribution_boundary tests/unit/svc_experiment_attribution_pipeline -q
+    # The REAL composed E2E (w5-19/c5-01): real Postgres 16 + ClickHouse 24.8 +
+    # Temporal time-skipping. SAENA_MEASUREMENT_E2E_REQUIRED=1 arms the
+    # conftest's zero-collected AND all-skipped hard-fail guards (a naming
+    # typo / import error / partial selection in this required lane exits 6,
+    # never a silent pass); PYTEST_ADDOPTS='' strips any caller-injected
+    # -k/-m/addopts so the full hardcoded path set below always runs.
+    # Runtime EVIDENCE (Wave 5 evidence-integrity closure): the guard writes a
+    # machine-readable saena.gate-evidence/v1 JSON here (even on failure). CI
+    # sets SAENA_GATE_EVIDENCE_PATH/SAENA_GATE_INVOCATION_ID at job level so its
+    # separate renderer step reads the SAME file; locally they default. The
+    # CI summary is rendered FROM this file (never a static echo).
+    SAENA_GATE_EVIDENCE_PATH="${SAENA_GATE_EVIDENCE_PATH:-$PWD/.evidence/gate-e2e.json}" SAENA_GATE_INVOCATION_ID="${SAENA_GATE_INVOCATION_ID:-$(uuidgen 2>/dev/null || echo local-$$)}" PYTEST_ADDOPTS='' SAENA_MEASUREMENT_E2E_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_e2e tests/integration/measurement_workflow -p no:cacheprovider
+
+# w5-06/w5-13/w5-18: measurement fail-closed / fraud / UNDETERMINED-never-PASS
+# discriminators (named explicitly — non-test_* helper files).
+# MUST-FIX C (defense-in-depth, belt-and-suspenders with the conftest
+# completeness guard above): `PYTEST_ADDOPTS=''` on EVERY pytest line in this
+# required recipe ONLY neutralizes a caller's environment (e.g.
+# PYTEST_ADDOPTS="-k <test>") from shrinking this recipe's hardcoded selection
+# — the env override applies to that one command each time, not the whole
+# recipe/justfile, so other (non-required) recipes still honor a caller's
+# PYTEST_ADDOPTS. SAENA_MEASUREMENT_FAILURE_REQUIRED=1 stays armed internally
+# (SSOT); no `| tee` / `|| true` — the pytest exit code is the recipe line's
+# exit code, untouched.
+measurement-failure-modes:
+    PYTEST_ADDOPTS='' uv run pytest tests/security/measurement_fraud.py tests/security/measurement_adversarial.py -q
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/svc_experiment_attribution_pipeline -q
+    # The completed failure-mode matrix (w5-20/c5-02): real Postgres crash/
+    # replay/rollback/conflict + F-9 fraud repoint through the integrated engine.
+    # SAENA_MEASUREMENT_FAILURE_REQUIRED=1 arms the conftest's required-lane
+    # guard: any skipped required integration test (Docker/Postgres absent) or
+    # zero passed is a HARD FAILURE (exit 6) — this required gate can never pass
+    # as a green "0 passed, N skipped". PYTEST_ADDOPTS='' strips any
+    # caller-injected -k/-m/addopts so the full hardcoded path set always runs.
+    # Runtime EVIDENCE (Wave 5 evidence-integrity closure) — see measurement-e2e.
+    SAENA_GATE_EVIDENCE_PATH="${SAENA_GATE_EVIDENCE_PATH:-$PWD/.evidence/gate-failure-modes.json}" SAENA_GATE_INVOCATION_ID="${SAENA_GATE_INVOCATION_ID:-$(uuidgen 2>/dev/null || echo local-$$)}" PYTEST_ADDOPTS='' SAENA_MEASUREMENT_FAILURE_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
+
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
 helm-smoke:
@@ -162,7 +254,7 @@ contracts-validate:
 codegen:
     #!/bin/sh
     set -eu
-    OPEN_CONTRACTS="context/workspace_context_v1 context/project_context_v1 context/site_context_v1 context/run_context_lifecycle_v1 domain/verification_result_v1 event/patch_unit_completed_v1 event/quality_gate_result_v1 event/plan_contract_proposed_v1 event/plan_contract_approved_v1 event/repo_intaken_v1 event/site_inventory_completed_v1 event/demand_graph_versioned_v1 event/entity_graph_versioned_v1 event/claim_evidence_versioned_v1 event/citation_normalized_v1 event/observation_captured_v1 event/experiment_registered_v1 event/experiment_anchored_v1"
+    OPEN_CONTRACTS="context/workspace_context_v1 context/project_context_v1 context/site_context_v1 context/run_context_lifecycle_v1 domain/verification_result_v1 event/patch_unit_completed_v1 event/quality_gate_result_v1 event/plan_contract_proposed_v1 event/plan_contract_approved_v1 event/repo_intaken_v1 event/site_inventory_completed_v1 event/demand_graph_versioned_v1 event/entity_graph_versioned_v1 event/claim_evidence_versioned_v1 event/citation_normalized_v1 event/observation_captured_v1 event/experiment_registered_v1 event/experiment_anchored_v1 event/deployment_confirmed_v1 event/experiment_outcome_observed_v1 event/strategy_card_eligible_v1"
     NESTED_ALLOW="envelope/event_envelope_v1:Payload"
     PKG_ROOT=packages/schemas/saena_schemas
     rm -rf "$PKG_ROOT"/context "$PKG_ROOT"/domain "$PKG_ROOT"/event "$PKG_ROOT"/envelope "$PKG_ROOT"/common

@@ -27,6 +27,8 @@ members = [
     "services/intelligence/entity-resolution-service",
     "services/intelligence/claim-evidence-service",
     "services/intelligence/citation-intelligence-service",
+    "services/experimentation/experiment-attribution-service",
+    "services/experimentation/strategy-skill-bank-service",
     "services/platform/quality-eval-service",
     "services/foundation/tenant-control-service",
     "services/foundation/policy-gate-service",
@@ -72,6 +74,8 @@ dev = [
     "saena-entity-resolution",
     "saena-claim-evidence",
     "saena-citation-intelligence",
+    "saena-experiment-attribution",
+    "saena-strategy-skill-bank",
     "saena-repository-intake",
     "saena-quality-eval",
     "saena-chatgpt-observer",
@@ -107,6 +111,8 @@ saena-demand-graph = { workspace = true }
 saena-entity-resolution = { workspace = true }
 saena-claim-evidence = { workspace = true }
 saena-citation-intelligence = { workspace = true }
+saena-experiment-attribution = { workspace = true }
+saena-strategy-skill-bank = { workspace = true }
 saena-repository-intake = { workspace = true }
 saena-quality-eval = { workspace = true }
 saena-chatgpt-observer = { workspace = true }
@@ -204,6 +210,12 @@ omit = [
     # postgres adapter above (integration lane runs its OWN coverage; this
     # omit only affects the blocking unit-lane ratchet).
     "packages/vector-store/src/saena_vector_store/pgvector/*",
+    # services/experimentation/experiment-attribution-service/.../persistence/
+    # adapter.py (w5-10): real asyncpg/SQLAlchemy driver — meaningfully
+    # exercisable only against live Postgres (tests/integration/measurement_pg
+    # runs the full port-conformance suite vs a real container). Same
+    # treatment as the w2-13 postgres / w4-07 pgvector real adapters above.
+    "services/experimentation/experiment-attribution-service/src/saena_experiment_attribution/persistence/adapter.py",
     # services/.../chatgpt-observer-service/.../playwright_driver.py (w4-08):
     # the real Playwright/Chromium browser driver. Its `import playwright...`
     # is guarded so the module imports without the package installed, but its

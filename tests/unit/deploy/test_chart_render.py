@@ -57,7 +57,7 @@ class TestHelmTemplateRendersCleanly:
         # 8 + worker host 2 (compute pool)". Detailed per-workload assertions
         # for the 2 new Deployments live in
         # tests/unit/deploy/test_intelligence_workloads.py (w4-14).
-        assert len(deployments) == 10
+        assert len(deployments) == 12  # 8 pre-Wave-4 + 2 w4-14 + 2 w5-21
 
     def test_renders_8_services_and_8_pdbs_and_13_service_accounts(self, chart_dir: Path) -> None:
         result = _run_helm_template(chart_dir)
@@ -69,15 +69,16 @@ class TestHelmTemplateRendersCleanly:
         # (this test's name keeps its original w2-23 title for history/diff
         # continuity; the counts below are the current, w4-14-updated ones —
         # see test_intelligence_workloads.py for the itemized w4-14 proof).
-        assert kinds["Service"] == 10
-        assert kinds["PodDisruptionBudget"] == 10
-        # 10 service SAs + agent-runner + ADR-0004 SA 3-separation
-        # (quality-eval, repository-intake) + browser pool (chatgpt-observer
-        # Job SA, site-discovery) = 15 — see
-        # tests/unit/deploy/test_service_accounts.py (w3-07) and
-        # test_intelligence_workloads.py (w4-14) for the detailed per-SA
+        assert kinds["Service"] == 12
+        assert kinds["PodDisruptionBudget"] == 12
+        # 12 service SAs (8 control-plane + 2 w4-14 + 2 w5-21 measurement) +
+        # agent-runner + ADR-0004 SA 3-separation (quality-eval,
+        # repository-intake) + browser pool (chatgpt-observer Job SA,
+        # site-discovery) = 17 — see tests/unit/deploy/test_service_accounts.py
+        # (w3-07), test_intelligence_workloads.py (w4-14), and
+        # test_measurement_workloads.py (w5-21) for the detailed per-SA
         # assertions this count summarizes.
-        assert kinds["ServiceAccount"] == 15
+        assert kinds["ServiceAccount"] == 17
         # Role/RoleBinding count is UNCHANGED at 9 — neither w4-14 workload
         # adds a new Role: intelligenceWorker has empty rbac.rules (zero K8s
         # API need) and chatgptObserver's coordinator SA is deliberately
@@ -145,7 +146,7 @@ class TestHelmTemplateRendersCleanly:
         result = _run_helm_template(chart_dir)
         docs = [d for d in yaml.safe_load_all(result.stdout) if d]
         deployments = [d for d in docs if d.get("kind") == "Deployment"]
-        assert len(deployments) == 10  # 8 pre-Wave-4 + 2 w4-14
+        assert len(deployments) == 12  # 8 pre-Wave-4 + 2 w4-14 + 2 w5-21
         for dep in deployments:
             for container in dep["spec"]["template"]["spec"]["containers"]:
                 sc = container["securityContext"]

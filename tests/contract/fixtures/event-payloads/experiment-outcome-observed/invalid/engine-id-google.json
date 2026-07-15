@@ -1,0 +1,40 @@
+{
+  "engine_id": "google",
+  "experiment_id": "exp-0001",
+  "registration_canonical_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "window": {
+    "started_at": "2026-07-07T00:00:00Z",
+    "ended_at": "2026-07-14T00:00:00Z",
+    "clock_anchor": "deployment_confirmed"
+  },
+  "deployment_confirmation_ref": "dep-0001",
+  "per_signal_results": [
+    {
+      "outcome_layer": "citation",
+      "metric_id": "citation_share",
+      "evidence_basis_id": "basis-citation-1",
+      "treatment_raw_delta": 0.12,
+      "control_raw_delta": 0.02,
+      "net_of_control_lift": 0.10,
+      "sample_counts": {
+        "treatment": 120,
+        "control": 118
+      },
+      "insufficient": false
+    }
+  ],
+  "b_verdict": "undetermined",
+  "raw_view": {},
+  "control_adjusted_view": {},
+  "confidence": 0.5,
+  "evidence_bundle_ref": {
+    "manifest_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "artifact_ref": "https://evidence.example.com/bundles/exp-0001"
+  },
+  "grs_policy": {
+    "version": "grs-v1",
+    "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "provenance": "test_fixture"
+  },
+  "_expected_violation": "engine_id 'google' is outside the closed v1 engine enum ['chatgpt-search'] (CLAUDE.md Engine scope: Google/Gemini disabled). Rejected by both the schema (engine-id enum) and the generated engine_id StrEnum pydantic field."
+}

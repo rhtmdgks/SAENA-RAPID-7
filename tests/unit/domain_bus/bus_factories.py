@@ -68,7 +68,15 @@ def make_aggregate_envelope(**overrides: Any) -> dict[str, Any]:
         "de_identification_status": "k_anonymized",
         "lineage_audit_ref": LINEAGE_AUDIT_REF,
         "idempotency_key": "strategy-card:aggregate-scope-014:2026-07-12",
-        "payload": {"engine_id": "chatgpt-search", "strategy_card_id": "card-0142"},
+        # w5-02: strategy.card.eligible.v1 now has a bound payload contract
+        # (card_candidate_ref + source_outcome{b_verdict const 'pass', ...}).
+        "payload": {
+            "card_candidate_ref": "card-cand-0142",
+            "source_outcome": {
+                "b_verdict": "pass",
+                "evidence_bundle_manifest_hash": "sha256:" + "a" * 64,
+            },
+        },
     }
     base.update(overrides)
     return EnvelopeFactory.build_aggregate_envelope(**base)

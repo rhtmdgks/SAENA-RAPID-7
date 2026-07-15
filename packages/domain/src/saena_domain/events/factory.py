@@ -33,8 +33,9 @@ Every builder performs, in order:
      `payload.engine_id` (`EngineIdRequiredError`); (b) value — any present
      `engine_id` outside the v1 closed enum (`chatgpt-search` only) is
      rejected (`EngineNotPermittedError`).
-  5. Known-event-type payload binding: if `event_type` is one of the 6
-     CONFIRMED payload-bearing events, `payload` is parsed with that event's
+  5. Known-event-type payload binding: if `event_type` is one of the
+     payload-bearing events listed in `EVENT_PAYLOAD_MODELS` (that dict is the
+     single source of truth for the set), `payload` is parsed with that event's
      generated pydantic model (no duplicate DTOs) in addition to the generic
      envelope-level payload container check.
   6. Dual validation: jsonschema (2020-12, local Registry) AND pydantic
@@ -83,12 +84,15 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 from saena_schemas.envelope.event_envelope_v1 import SaenaEventEnvelopeV1
 from saena_schemas.envelope.event_envelope_v1.engine_id import Schema as EngineIdSchema
+from saena_schemas.event.deployment_confirmed_v1 import DeploymentConfirmedV1Payload
+from saena_schemas.event.experiment_outcome_observed_v1 import ExperimentOutcomeObservedV1Payload
 from saena_schemas.event.patch_unit_completed_v1 import PatchUnitCompletedV1Payload
 from saena_schemas.event.plan_contract_approved_v1 import PlanContractApprovedV1Payload
 from saena_schemas.event.plan_contract_proposed_v1 import PlanContractProposedV1Payload
 from saena_schemas.event.quality_gate_result_v1 import QualityGatePassedFailedV1Payload
 from saena_schemas.event.repo_intaken_v1 import RepoIntakenV1Payload
 from saena_schemas.event.site_inventory_completed_v1 import SiteInventoryCompletedV1Payload
+from saena_schemas.event.strategy_card_eligible_v1 import StrategyCardEligibleV1Payload
 
 from saena_domain.events._topics import TopicInfo, load_topic_catalog
 from saena_domain.events._uuid7 import generate_uuid7
@@ -102,12 +106,14 @@ from saena_domain.events.errors import (
     TopicMismatchError,
 )
 
-# The 6 CONFIRMED event payload contracts (approved plan §2 "event/ 6종";
-# tests/contract/validate/test_event_payloads.py `_CONTRACTS` is the parallel
-# contract-test-side enumeration of this same set). `quality.gate.passed.v1`
-# and `quality.gate.failed.v1` share one payload schema/model (R4
-# channel-layer split — see quality-gate-result.schema.json $comment) so both
-# event_type strings map to the same model class here.
+# Event-type -> generated payload model bindings. Originally the 6 CONFIRMED
+# event payload contracts (approved plan §2 "event/ 6종"); extended by the
+# Wave 4 intelligence events and the Wave 5 measurement events (w5-02).
+# `quality.gate.passed.v1` and `quality.gate.failed.v1` share one payload
+# schema/model (R4 channel-layer split — see quality-gate-result.schema.json
+# $comment) so both event_type strings map to the same model class here.
+# tests/contract/validate/test_event_payloads*.py `_CONTRACTS` are the parallel
+# contract-test-side enumerations of these payload contracts.
 EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "repo.intaken.v1": RepoIntakenV1Payload,
     "site.inventory.completed.v1": SiteInventoryCompletedV1Payload,
@@ -116,6 +122,13 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "patch.unit.completed.v1": PatchUnitCompletedV1Payload,
     "quality.gate.passed.v1": QualityGatePassedFailedV1Payload,
     "quality.gate.failed.v1": QualityGatePassedFailedV1Payload,
+    # Wave 5 measurement events (w5-02 Contracts Steward). deployment.confirmed
+    # and experiment.outcome.observed are tenant-context; strategy.card.eligible
+    # is aggregate-context (the factory binds by event_type independent of the
+    # context_type branch that carries it).
+    "deployment.confirmed.v1": DeploymentConfirmedV1Payload,
+    "experiment.outcome.observed.v1": ExperimentOutcomeObservedV1Payload,
+    "strategy.card.eligible.v1": StrategyCardEligibleV1Payload,
 }
 
 _PERMITTED_ENGINE_IDS = frozenset(item.value for item in EngineIdSchema)

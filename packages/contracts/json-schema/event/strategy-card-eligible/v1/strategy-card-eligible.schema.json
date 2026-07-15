@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.the-saena.ai/event/strategy-card-eligible/v1/strategy-card-eligible.schema.json",
+  "title": "strategy.card.eligible.v1 payload",
+  "description": "Payload of the strategy.card.eligible.v1 event — notification that a strategy-card candidate is eligible for the (aggregate, cross-tenant) skill bank because it is backed by a B-verified experiment outcome. AggregateContext (k-anonymity carried by the envelope's aggregate context — ADR-0006 rev.2 / ADR-0013), NOT engine-id-required. This is the fail-closed intake boundary ONLY (wave5-plan.md non-scope: no auto-approval / global sharing / production learning loop).",
+  "$comment": "compat_class: open (event payload, ADR-0012/ADR-0024 — additive-minor; no additionalProperties:false; undeclared-key rejection is a policy-gate obligation, not schema-enforced). Authority: docs/architecture/wave5-plan.md deliverable 3 exit E7 (skill-bank consumes ONLY B-verified outcomes, fail-closed), Stage-2 w5-16 (B-verified-only skill-bank intake boundary). Producer strategy-skill-bank-service (existing AsyncAPI operation summary convention). Channel context_type is 'aggregate' (already in the AsyncAPI file) — k-anonymity/lineage fields (aggregate_scope_id, cohort_size, privacy_threshold, de_identification_status, lineage_audit_ref) live on the ENVELOPE's aggregate branch (ADR-0013), NOT duplicated here. AGGREGATE-ONLY / PRIVACY: this payload carries NO tenant-identifying fields (no tenant_id/run_id/experiment_id) and NO raw customer content — only aggregate-safe references. source_outcome.b_verdict is const 'pass' — a card can only become eligible from a B-VERIFIED (pass) outcome (fail-closed: fail/undetermined outcomes never reach here). source_outcome.evidence_bundle_manifest_hash is a content-addressed hash ONLY (evidence provenance without exposing tenant data).",
+  "type": "object",
+  "required": [
+    "card_candidate_ref",
+    "source_outcome"
+  ],
+  "properties": {
+    "card_candidate_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "$comment": "Opaque aggregate-safe reference to the strategy-card candidate (skill-bank intake id) — NOT tenant-identifying."
+    },
+    "source_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "b_verdict",
+        "evidence_bundle_manifest_hash"
+      ],
+      "properties": {
+        "b_verdict": {
+          "const": "pass",
+          "$comment": "Const 'pass': eligibility is fail-closed — ONLY a B-verified (pass) source outcome can make a card eligible (E7). fail/undetermined outcomes can never satisfy this const."
+        },
+        "evidence_bundle_manifest_hash": {
+          "$ref": "../../../common/identifiers/v1/identifiers.schema.json#/$defs/sha256_ref",
+          "$comment": "Content-addressed hash of the backing evidence-bundle manifest (domain/evidence-bundle-manifest/v1.manifest_hash) — provenance anchor with NO tenant-identifying or raw-content exposure (k-anonymity preserved)."
+        }
+      }
+    }
+  }
+}
