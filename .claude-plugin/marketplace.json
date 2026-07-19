@@ -1,0 +1,24 @@
+{
+  "name": "saena-rapid-7",
+  "owner": {
+    "name": "SAENA Labs"
+  },
+  "description": "SAENA RAPID-7 marketplace: the SAENA FORGE skill pack (16 bootstrap/plan/execute/verify skills, ChatGPT Search engine scope only).",
+  "metadata": {
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "saena-skill-pack",
+      "source": "./plugins/saena-skill-pack",
+      "description": "16 SAENA FORGE skills (bootstrap/plan/execute/verify) for evidence-gated B2B SaaS AEO. ChatGPT Search engine scope only.",
+      "category": "workflow",
+      "tags": [
+        "saena",
+        "aeo",
+        "chatgpt-search",
+        "skills"
+      ]
+    }
+  ]
+}

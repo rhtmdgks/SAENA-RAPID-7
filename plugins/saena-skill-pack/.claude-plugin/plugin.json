@@ -1,0 +1,20 @@
+{
+  "name": "saena-skill-pack",
+  "displayName": "SAENA FORGE Skill Pack",
+  "version": "1.0.0",
+  "description": "The 16 SAENA FORGE skills (bootstrap/plan/execute/verify) for evidence-gated B2B SaaS AEO runs. Engine scope is ChatGPT Search only — Google AI Overviews / AI Mode / Gemini are out of scope. Canonical source lives at .claude/skills/** in SAENA-RAPID-7; this plugin is the generated, byte-identical installable copy (drift-gated by tools/validation/skill_pack_sync.py).",
+  "author": {
+    "name": "SAENA Labs"
+  },
+  "repository": "https://github.com/SAENA-Labs/SAENA-RAPID-7",
+  "license": "UNLICENSED",
+  "keywords": [
+    "saena",
+    "forge",
+    "aeo",
+    "chatgpt-search",
+    "b2b-saas",
+    "skills",
+    "evidence-gated"
+  ]
+}
