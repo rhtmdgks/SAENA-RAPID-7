@@ -1,0 +1,76 @@
+#!/bin/sh
+# Deterministic `uv` stub for bootstrap-claude.sh tests (corpus + pytest).
+# Mimics ONLY the hook-allowlisted / read-only forms the bootstrap script is
+# permitted to run. Any other invocation fails loudly (exit 97) so a policy
+# regression in the script is caught by the tests.
+# Optional invocation log: appends one argv line per call to $UV_STUB_LOG.
+if [ -n "${UV_STUB_LOG:-}" ]; then
+    printf '%s\n' "$*" >>"$UV_STUB_LOG"
+fi
+case "$1" in
+    --version)
+        echo "uv 0.10.4 (stub)"
+        ;;
+    python)
+        [ "$2" = "find" ] || {
+            echo "uv-stub: unexpected python subcommand: $*" >&2
+            exit 97
+        }
+        echo "/stub/python3.12"
+        ;;
+    sync)
+        # `uv sync --locked` — hook-allowlisted; stub mutates nothing.
+        exit 0
+        ;;
+    lock)
+        exit 0
+        ;;
+    tool)
+        case "$2" in
+            dir)
+                # `uv tool dir --bin`
+                echo "${HOME:-/nonexistent}/.local/bin"
+                ;;
+            install)
+                _spec="$3"
+                case "$_spec" in
+                    *==*) : ;;
+                    *)
+                        echo "uv-stub: UNPINNED tool install rejected: $*" >&2
+                        exit 97
+                        ;;
+                esac
+                _pkg="${_spec%%==*}"
+                _ver="${_spec##*==}"
+                _bin="${HOME:-/nonexistent}/.local/bin"
+                mkdir -p "$_bin" 2>/dev/null || exit 1
+                case "$_pkg" in
+                    rust-just)
+                        {
+                            printf '#!/bin/sh\n'
+                            printf 'echo "just %s"\n' "$_ver"
+                        } >"$_bin/just"
+                        chmod +x "$_bin/just"
+                        ;;
+                    shellcheck-py)
+                        {
+                            printf '#!/bin/sh\n'
+                            printf 'echo "version: %s"\n' "$_ver"
+                        } >"$_bin/shellcheck"
+                        chmod +x "$_bin/shellcheck"
+                        ;;
+                esac
+                echo "stub: installed $_spec"
+                ;;
+            *)
+                echo "uv-stub: unexpected tool subcommand: $*" >&2
+                exit 97
+                ;;
+        esac
+        ;;
+    *)
+        echo "uv-stub: unexpected invocation: $*" >&2
+        exit 97
+        ;;
+esac
+exit 0

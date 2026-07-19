@@ -1,0 +1,7 @@
+{
+  "description": "claude CLI absent: claude-cli check FAILs in the JSON report (exit 1)",
+  "argv": "--check --json",
+  "env": { "PATH_SHIMS": "no-claude", "TMP_HOME": "1", "TMP_CLAUDE_CONFIG_DIR": "1" },
+  "expect_exit": 1,
+  "expect_stdout_contains": "{\"id\":\"claude-cli\",\"status\":\"FAIL\""
+}

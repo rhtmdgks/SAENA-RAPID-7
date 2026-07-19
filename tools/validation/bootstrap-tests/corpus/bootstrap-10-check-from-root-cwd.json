@@ -1,0 +1,7 @@
+{
+  "description": "cwd-independence: --check run from / still finds the repo root via the script location",
+  "argv": "--check",
+  "env": { "PATH_SHIMS": "ok", "TMP_HOME": "1", "TMP_CLAUDE_CONFIG_DIR": "1", "RUN_FROM": "/" },
+  "expect_exit": 0,
+  "expect_stdout_contains": "repo root: "
+}

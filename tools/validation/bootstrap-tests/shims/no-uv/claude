@@ -1,0 +1,44 @@
+#!/bin/sh
+# Deterministic `claude` CLI stub for bootstrap-claude.sh tests.
+# Supports only the subcommands the bootstrap script may run; anything else
+# fails loudly (exit 97). Mutates nothing; CLAUDE_CONFIG_DIR is accepted via
+# the environment exactly like the real CLI (ignored by the stub).
+# Optional invocation log: appends one argv line per call to $CLAUDE_STUB_LOG.
+if [ -n "${CLAUDE_STUB_LOG:-}" ]; then
+    printf '%s\n' "$*" >>"$CLAUDE_STUB_LOG"
+fi
+case "$1" in
+    --version)
+        echo "2.1.205 (Claude Code stub)"
+        ;;
+    plugin)
+        case "$2" in
+            marketplace)
+                case "$3" in
+                    add)
+                        echo "stub: marketplace added: $4"
+                        ;;
+                    list)
+                        echo "saena-rapid-7 (stub marketplace)"
+                        ;;
+                    *)
+                        echo "claude-stub: unexpected marketplace subcommand: $*" >&2
+                        exit 97
+                        ;;
+                esac
+                ;;
+            install)
+                echo "stub: installed plugin $3"
+                ;;
+            *)
+                echo "claude-stub: unexpected plugin subcommand: $*" >&2
+                exit 97
+                ;;
+        esac
+        ;;
+    *)
+        echo "claude-stub: unexpected invocation: $*" >&2
+        exit 97
+        ;;
+esac
+exit 0

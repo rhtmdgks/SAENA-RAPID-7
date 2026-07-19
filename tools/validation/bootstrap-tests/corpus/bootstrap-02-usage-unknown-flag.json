@@ -1,0 +1,6 @@
+{
+  "description": "unknown option is a usage error: distinct exit code 2, no report",
+  "argv": "--frobnicate",
+  "expect_exit": 2,
+  "expect_stdout_not_contains": "saena.bootstrap-report/v1"
+}

@@ -1,0 +1,7 @@
+{
+  "description": "--check with stub uv+claude on a healthy checkout: human table, exit 0",
+  "argv": "--check",
+  "env": { "PATH_SHIMS": "ok", "TMP_HOME": "1", "TMP_CLAUDE_CONFIG_DIR": "1" },
+  "expect_exit": 0,
+  "expect_stdout_contains": "hook-kill-switch   PASS"
+}

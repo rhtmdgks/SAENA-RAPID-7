@@ -1,0 +1,7 @@
+{
+  "description": "--check --json emits the saena.bootstrap-report/v1 schema, exit 0",
+  "argv": "--check --json",
+  "env": { "PATH_SHIMS": "ok", "TMP_HOME": "1", "TMP_CLAUDE_CONFIG_DIR": "1" },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"schema_version\":\"saena.bootstrap-report/v1\""
+}

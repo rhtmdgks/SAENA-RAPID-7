@@ -1,0 +1,7 @@
+{
+  "description": "uv absent: required check FAILs (exit 1) with an actionable remedy",
+  "argv": "--check",
+  "env": { "PATH_SHIMS": "no-uv", "TMP_HOME": "1", "TMP_CLAUDE_CONFIG_DIR": "1" },
+  "expect_exit": 1,
+  "expect_stdout_contains": "uv not found on PATH"
+}

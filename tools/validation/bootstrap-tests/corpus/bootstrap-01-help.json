@@ -1,0 +1,6 @@
+{
+  "description": "--help prints usage (incl. Windows/WSL honesty note) and exits 0",
+  "argv": "--help",
+  "expect_exit": 0,
+  "expect_stdout_contains": "Usage: sh scripts/bootstrap-claude.sh"
+}

@@ -1,0 +1,7 @@
+{
+  "description": "--install --json with stubs is green and reports install mode",
+  "argv": "--install --json",
+  "env": { "PATH_SHIMS": "ok", "TMP_HOME": "1", "TMP_CLAUDE_CONFIG_DIR": "1" },
+  "expect_exit": 0,
+  "expect_stdout_contains": "\"mode\":\"install\""
+}
