@@ -196,6 +196,116 @@ measurement-failure-modes:
     # Runtime EVIDENCE (Wave 5 evidence-integrity closure) — see measurement-e2e.
     SAENA_GATE_EVIDENCE_PATH="${SAENA_GATE_EVIDENCE_PATH:-$PWD/.evidence/gate-failure-modes.json}" SAENA_GATE_INVOCATION_ID="${SAENA_GATE_INVOCATION_ID:-$(uuidgen 2>/dev/null || echo local-$$)}" PYTEST_ADDOPTS='' SAENA_MEASUREMENT_FAILURE_REQUIRED=1 uv run pytest -q -m integration tests/integration/measurement_failure -p no:cacheprovider
 
+# ---- Wave 6 (Skill-Pack · Bootstrap · Pilot) named required checks (ADR-0018
+# stable check names; W6-27 mission). Each recipe below is also a CI job of the
+# SAME name in .github/workflows/ci.yml (job name == stable required-check
+# name). Container-free + fast except pilot-e2e (armed completeness guard).
+# `PYTEST_ADDOPTS=''` on every pytest line strips any caller-injected -k/-m/
+# addopts so a required recipe's hardcoded selection can never be shrunk by the
+# environment (defense-in-depth, same rationale as the W5 measurement gates);
+# no `| tee` / `|| true` — the tool's exit code IS the recipe line's exit code.
+
+# w6-01/02: skill-manifest SSOT — metaschema self-check + schema-conformance of
+# the manifest + fail-closed structural/semantic validator + unit lane.
+skill-manifest:
+    uv run check-jsonschema --check-metaschema .claude/skills/manifest.schema.json
+    uv run check-jsonschema --schemafile .claude/skills/manifest.schema.json .claude/skills/manifest.json
+    uv run python tools/validation/skill_manifest.py validate-manifest --manifest .claude/skills/manifest.json --schema .claude/skills/manifest.schema.json
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/skills_manifest -q
+
+# w6-02: SKILL.md quality contract + both-direction disk<->manifest cross-check.
+skill-quality:
+    uv run python tools/validation/skill_manifest.py validate-skills --manifest .claude/skills/manifest.json --skills-root .claude/skills
+
+# w6-03: fail-closed skill-bundle enforcement (no bypass env/flag) + unit lane.
+skill-bundle-bypass:
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/skills_bundle -q
+    uv run python tools/validation/skill_bundle.py enforce
+
+# w6-09: plugin/marketplace validation. The ENFORCING layer is the drift +
+# structural gate (skill_pack_sync check = byte-equality both directions +
+# manifest consistency, plus the skill_pack unit lane) — that runs unconditionally
+# and needs no external binary. `claude plugin validate` is an ADDITIONAL
+# structural check that only runs when the claude CLI is present; it is absent in
+# most CI images (ADR-0021 pins GitHub Actions, not the claude binary), so the
+# recipe guards it and never gates on its absence (plan R-2).
+plugin-validate:
+    uv run python tools/validation/skill_pack_sync.py check
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/skill_pack -q
+    if command -v claude >/dev/null 2>&1; then claude plugin validate .claude-plugin/marketplace.json; else echo "claude CLI not present in CI — drift+structural gate (line above) is the enforcing layer (plan R-2)"; fi
+
+# w6-10: local-dev convenience — read-only bootstrap self-check. NOTE: the
+# claude-cli row FAILs only when the real PATH lacks the claude binary, so
+# `--check` may exit nonzero in a claude-absent environment (e.g. CI). That is
+# why this recipe is the LOCAL-DEV convenience form only; the DETERMINISTIC,
+# claude-independent blocking layer used by the `claude-bootstrap` CI job is the
+# `bootstrap-tests` recipe below. See the ci.yml `claude-bootstrap` job: it runs
+# `just bootstrap-tests` as the gating step and `bootstrap-claude.sh --check`
+# only as an informational (non-gating) step.
+claude-bootstrap:
+    sh scripts/bootstrap-claude.sh --check
+
+# w6-10: deterministic bootstrap corpus (shim-driven, claude-binary-independent)
+# + bootstrap-script unit lane. This is the BLOCKING layer for the bootstrap
+# gate in CI (the `claude-bootstrap` job runs `just bootstrap-tests`).
+bootstrap-tests:
+    sh tools/validation/bootstrap-tests/run-corpus.sh
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/bootstrap_script -q
+
+# w6-04/05: pilot path-boundary + read-only discovery unit lanes (customer root
+# stays read-only; no copy into RAPID-7).
+pilot-path-boundary:
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/pilot tests/unit/pilot_discovery -q
+
+# w6-06: pilot security suite — ruff clean + fail-closed / injection-as-data /
+# planted-secret quarantine tests.
+pilot-security:
+    uv run ruff check tests/security/pilot
+    PYTEST_ADDOPTS='' uv run pytest tests/security/pilot -q
+
+# w6-07/08: the composed pilot E2E. SAENA_PILOT_E2E_REQUIRED=1 ARMS the
+# completeness guard: a partial -k selection, zero-collected, or an all-skipped
+# run is a HARD FAILURE — this required lane can never pass as a shrunk subset or
+# a green "0 passed". PYTEST_ADDOPTS='' strips caller-injected addopts so the
+# full tests/e2e/pilot set always runs.
+pilot-e2e:
+    SAENA_PILOT_E2E_REQUIRED=1 PYTEST_ADDOPTS='' uv run pytest tests/e2e/pilot -q -p no:cacheprovider
+
+# w6-08: focused fail-closed family (UNARMED, so the -k subset below is allowed):
+# bundle-fail-closed, dirty-blocks-implement, malicious-quarantined, evidence
+# tamper/truncation, and resume-refused-after-drift discriminators.
+pilot-failure-modes:
+    PYTEST_ADDOPTS='' uv run pytest tests/e2e/pilot -q -p no:cacheprovider -k "bundle_fail_closed or dirty_blocks_implement or malicious_quarantined or tamper or truncation or resume_refused"
+
+# w6-08: pilot evidence-chain integrity (genesis binds skill-bundle, ordered
+# lifecycle events, tamper/truncation detection). The evidence tests live in
+# tests/unit/pilot/test_pilot_evidence.py in the integrated tree (verified real,
+# non-empty selection — `grep -n "def test_" tests/unit/pilot/test_pilot_evidence.py`).
+pilot-evidence-integrity:
+    PYTEST_ADDOPTS='' uv run pytest tests/unit/pilot/test_pilot_evidence.py -q
+
+# w6-16 (docs land in the parallel unit): this recipe validates that the KEY
+# documented entry points EXIST and are invocable, so a runbook/README command
+# block can never reference a dead recipe/script/CLI. Scope note: docs/runbooks
+# may be empty at this unit's time — the recipe still passes on these entry-point
+# existence checks; w6-16's own docs-consistency test extends coverage to parse
+# every command block under docs/runbooks/** + README once those docs exist.
+docs-consistency:
+    test -x scripts/bootstrap-claude.sh
+    uv run saena-pilot --help >/dev/null
+    uv run python tools/validation/skill_manifest.py --help >/dev/null
+    test -f .claude-plugin/marketplace.json
+    uv run just --summary | grep -q skill-manifest
+
+# Wave-6 aggregate convenience: runs ALL 11 Wave-6 CI gates (including the armed
+# pilot-e2e and the container-free-but-slower lanes). NOT part of the blocking
+# `verify` — pilot-e2e's armed guard and claude-dependent checks could be red on
+# a fresh machine, so only the fast always-green subset is folded into `verify`.
+# Mirrors the CI job set (bootstrap gate = the deterministic `bootstrap-tests`,
+# matching the `claude-bootstrap` job's gating step).
+verify-w6: skill-manifest skill-quality skill-bundle-bypass plugin-validate bootstrap-tests pilot-path-boundary pilot-security pilot-e2e pilot-failure-modes pilot-evidence-integrity docs-consistency
+    @echo "verify-w6: all Wave 6 CI gates green"
+
 # Offline chart packaging gate (no cluster contact): helm lint + template +
 # kubeconform static validation + forgectl §8.1 preflight.
 helm-smoke:
@@ -326,8 +436,13 @@ codegen-check: codegen
     git diff --exit-code -- packages/schemas
     test -z "$(git status --porcelain -- packages/schemas)"
 
-# Local gate — mirrors CI (ADR-0018)
-verify: lint typecheck test coverage-gates boundaries contracts-validate registry-validate
+# Local gate — mirrors CI (ADR-0018). The Wave-6 additions
+# (skill-manifest/skill-quality/skill-bundle-bypass/plugin-validate/
+# pilot-path-boundary) are the FAST, container-free, always-green-locally subset
+# of the W6 gate set; the slower / armed / claude-dependent W6 gates (pilot-e2e,
+# pilot-security, bootstrap-tests, etc.) run via `just verify-w6`, not here, so
+# `verify` never goes red on a fresh machine.
+verify: lint typecheck test coverage-gates boundaries contracts-validate registry-validate skill-manifest skill-quality skill-bundle-bypass plugin-validate pilot-path-boundary
     @echo "verify: all local gates green"
 
 # Worktree lifecycle (ADR-0023)
