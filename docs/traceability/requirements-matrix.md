@@ -6,11 +6,13 @@ Map bootstrap artifacts to design requirements.
 
 ## Scope
 
-Bootstrap scaffolding coverage only.
+Bootstrap scaffolding coverage plus delivered-wave traceability (the Wave 6
+rows below track IMPLEMENTED deliverables, not scaffolding).
 
 ## Current decision
 
-PROPOSED matrix for scaffolding verification.
+CONFIRMED for the delivered Wave 6 rows; PROPOSED for the earlier
+scaffolding-verification rows retained for history.
 
 | Requirement | Source | Bootstrap artifact | Status |
 |---|---|---|---|
@@ -50,6 +52,19 @@ PROPOSED matrix for scaffolding verification.
 | dev-repo 안전 hook·secret·SBOM·devenv (W0) | Prompt pkg §10-11, k3s §5.1 | ADR-0019~0022 | accepted (2026-07-12) — hook 배선은 T13/G3 게이트 |
 | worktree 실행 규약 (W0) | Algorithm §9.2, Prompt pkg §7 | ADR-0023 | accepted (2026-07-12) — worktree-ownership.md open 종결 |
 
+| Skill manifest SSOT + validator/quality checker | Prompt pkg §10; wave6-plan §3.1–3.2 | `.claude/skills/manifest.json`, `.claude/skills/manifest.schema.json`, `tools/validation/skill_manifest.py` | **IMPLEMENTED** (2026-07-19, w6-01) — validate-manifest/validate-skills green |
+| 16 mandatory SKILL.md | Prompt pkg §10–11; wave6-plan §2 | `.claude/skills/<name>/SKILL.md` ×16 | **IMPLEMENTED** (2026-07-19, w6-02..07) |
+| Skill-bundle fail-closed enforcement | wave6-plan §2, §3.1 | `tools/validation/skill_bundle.py`, `tests/unit/skills_bundle/**` | **IMPLEMENTED** (2026-07-19, w6-08) — enforce PASS, no bypass path |
+| Plugin / marketplace packaging + drift gate | wave6-plan §1 (w6-09), ADR D-3 | `.claude-plugin/marketplace.json`, `plugins/saena-skill-pack/**`, `tools/validation/skill_pack_sync.py` | **IMPLEMENTED** (2026-07-19, w6-09) — byte-equality drift + `tests/unit/skill_pack` PASS (CI-enforced); `claude plugin validate --strict` PASS on the local macOS run (claude binary absent in CI) |
+| New-computer one-command bootstrap | wave6-plan §2 (w6-10) | `scripts/bootstrap-claude.sh` (`--check/--install/--json`), `tests/unit/bootstrap_script/**` | **IMPLEMENTED** (2026-07-19, w6-10) — idempotent, shellcheck-clean |
+| saena-pilot CLI + 7 modes (external repo, referenced-not-copied) | wave6-plan §3.3 | `tools/saena-pilot/**`, `tests/unit/pilot/**` | **IMPLEMENTED** (2026-07-19, w6-11) — preflight/audit/plan/implement/verify/resume/status verified |
+| Framework discovery adapters (Next/Remix/Astro/Nuxt/SvelteKit/static/unsupported) | wave6-plan §1 (w6-12) | `tools/saena-pilot/src/saena_pilot/discovery/**`, `tests/unit/pilot_discovery/**` | **IMPLEMENTED** (2026-07-19, w6-12) — never-guessed scoring |
+| Docker preflight honesty (container-free lanes) | wave6-plan §1 (w6-12), R-4 | `tools/saena-pilot/src/saena_pilot/docker_preflight.py` | **IMPLEMENTED** (2026-07-19, w6-12) — probes and reports truthfully |
+| Adversarial security battery (path/symlink/injection/SSRF/secret/no-copy/tamper) | wave6-plan §2 (w6-13) | `tests/security/pilot/**` | **IMPLEMENTED** (2026-07-19, w6-13) |
+| Full-lifecycle E2E on synthetic fixtures + resume/failure + RAPID-7-unchanged proof | wave6-plan §2 (w6-14) | `tests/e2e/pilot/**` | **IMPLEMENTED** (2026-07-19, w6-14) |
+| Named CI gates (skill-manifest/quality/bundle-bypass, plugin-validate, claude-bootstrap, pilot-*, docs-consistency) | wave6-plan §2, §3.4 (w6-15) | `justfile`, `.github/workflows/ci.yml` (w6-15) | **IMPLEMENTED** (2026-07-19, w6-15) — all 11 named jobs in `.github/workflows/ci.yml` + `justfile` recipes (`just verify-w6`); each exits 0 locally. `plugin-validate` / `claude-bootstrap` guard the claude-binary-dependent steps (absent in CI) behind deterministic enforcing lanes |
+| Wave 6 operator runbook (only-tested commands) | wave6-plan §2 (w6-16) | `docs/runbooks/wave6-operator-runbook.md` | **IMPLEMENTED** (2026-07-19, w6-16) — every command block verified by real execution; docs-consistency enforced by the `docs-consistency` CI job (w6-15) |
+
 ## Constraints
 
 - Spec originals unchanged
@@ -65,4 +80,5 @@ See design §13 and k3s §12 rows still open.
 
 ## Status
 
-PROPOSED matrix
+Wave 6 rows IMPLEMENTED (2026-07-19); earlier scaffolding rows remain a
+PROPOSED verification matrix.

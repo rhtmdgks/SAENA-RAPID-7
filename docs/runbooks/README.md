@@ -6,11 +6,21 @@ Operational runbooks for install, upgrade, rollback, incidents.
 
 ## Scope
 
-Skeleton only. Detailed procedures in k3s spec §8 — to be copied/adapted later.
+k3s operational runbooks are skeleton only (detailed procedures in k3s spec §8
+— to be copied/adapted later). The **Wave 6 operator runbook** below is
+IMPLEMENTED and tested.
+
+## Runbooks
+
+- [`wave6-operator-runbook.md`](wave6-operator-runbook.md) — **IMPLEMENTED**
+  (2026-07-19). New-computer setup, `scripts/bootstrap-claude.sh`, skill-pack
+  plugin install/update/uninstall, starting Claude Code from RAPID-7, and
+  driving `saena-pilot` against an external customer repo (7 modes, evidence,
+  rollback, troubleshooting). Every command block verified by real execution.
 
 ## Current decision
 
-PROPOSED runbook set:
+PROPOSED k3s runbook set:
 
 - [ ] preflight
 - [ ] install/upgrade
@@ -33,4 +43,4 @@ PROPOSED runbook set:
 
 ## Status
 
-NOT IMPLEMENTED
+Wave 6 operator runbook IMPLEMENTED (2026-07-19); k3s runbooks NOT IMPLEMENTED

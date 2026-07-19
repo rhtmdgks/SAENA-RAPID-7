@@ -44,6 +44,23 @@ SAENA Labs 내부 B부서가 사용하는 k3s-based package 저장소.
 - `docs/` — specs (immutable originals), architecture, ADRs
 - `.claude/`, `.cursor/` — agent harness scaffolding
 
+## Wave 6 — Pilot Operationalization / Skill Pack / External-Project Runner
+
+Run a FORGE session on a new computer against an **external customer repo**
+(referenced, never copied; ChatGPT Search scope only):
+
+```sh
+sh scripts/bootstrap-claude.sh --check          # verify the workstation
+claude plugin marketplace add /path/to/SAENA-RAPID-7
+claude plugin install saena-skill-pack@saena-rapid-7   # 16 FORGE skills
+uv run saena-pilot --customer-repo "/abs/customer/path" \
+  --domain "https://customer.example" --mode audit
+```
+
+Full, tested procedure: **[`docs/runbooks/wave6-operator-runbook.md`](docs/runbooks/wave6-operator-runbook.md)**
+(bootstrap, plugin install/update/uninstall, the 7 `saena-pilot` modes,
+evidence, rollback, troubleshooting). Plan: `docs/architecture/wave6-plan.md`.
+
 ## Source specification references
 
 - `docs/specs/SAENA_AEO_Algorithm_and_Harness_Design_v1.md`
