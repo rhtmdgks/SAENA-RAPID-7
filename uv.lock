@@ -22,6 +22,7 @@ members = [
     "saena-monorepo",
     "saena-observability",
     "saena-orchestrator",
+    "saena-pilot",
     "saena-plan-contract",
     "saena-policy-gate",
     "saena-quality-eval",
@@ -1533,6 +1534,7 @@ dev = [
     { name = "saena-hooks-runtime" },
     { name = "saena-observability" },
     { name = "saena-orchestrator" },
+    { name = "saena-pilot" },
     { name = "saena-plan-contract" },
     { name = "saena-policy-gate" },
     { name = "saena-quality-eval" },
@@ -1581,6 +1583,7 @@ dev = [
     { name = "saena-hooks-runtime", editable = "packages/hooks-runtime" },
     { name = "saena-observability", editable = "packages/observability" },
     { name = "saena-orchestrator", editable = "services/platform/agent-orchestrator-service" },
+    { name = "saena-pilot", editable = "tools/saena-pilot" },
     { name = "saena-plan-contract", editable = "services/foundation/plan-contract-service" },
     { name = "saena-policy-gate", editable = "services/foundation/policy-gate-service" },
     { name = "saena-quality-eval", editable = "services/platform/quality-eval-service" },
@@ -1642,6 +1645,11 @@ requires-dist = [
     { name = "temporalio", specifier = ">=1.9,<2" },
     { name = "uvicorn", specifier = ">=0.32,<1" },
 ]
+
+[[package]]
+name = "saena-pilot"
+version = "0.1.0"
+source = { editable = "tools/saena-pilot" }
 
 [[package]]
 name = "saena-plan-contract"
