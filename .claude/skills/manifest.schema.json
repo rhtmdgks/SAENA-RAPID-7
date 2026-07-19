@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saena-labs.example/schemas/saena.skill-manifest/v1/manifest.schema.json",
+  "title": "SAENA FORGE skill manifest (saena.skill-manifest/v1)",
+  "description": "SSOT for the saena-forge-core skill bundle. Closed schema: unknown keys are rejected everywhere; engine scope is the closed enum [\"chatgpt-search\"] (Google AI Overviews / AI Mode / Gemini are out of scope by NR-1). Cross-field rules (path==.claude/skills/<name>/SKILL.md, dependency phase ordering, mandatory 16-skill set) are enforced by tools/validation/skill_manifest.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "engine_scope", "bundle_name", "phase_order", "skills"],
+  "properties": {
+    "schema_version": {
+      "const": "saena.skill-manifest/v1"
+    },
+    "engine_scope": {
+      "const": ["chatgpt-search"]
+    },
+    "bundle_name": {
+      "const": "saena-forge-core"
+    },
+    "phase_order": {
+      "const": ["bootstrap", "plan", "execute", "verify"]
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/skill" }
+    }
+  },
+  "$defs": {
+    "kebabName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gateName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "phase",
+        "path",
+        "engines",
+        "required_inputs",
+        "produces",
+        "agents",
+        "depends_on",
+        "safety_gates",
+        "verification_gates",
+        "failure_behavior"
+      ],
+      "properties": {
+        "name": { "$ref": "#/$defs/kebabName" },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "phase": {
+          "enum": ["bootstrap", "plan", "execute", "verify"]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^\\.claude/skills/[a-z][a-z0-9]*(-[a-z0-9]+)*/SKILL\\.md$"
+        },
+        "engines": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["chatgpt-search"] }
+        },
+        "adr0007_engine_swap_point": {
+          "const": true,
+          "description": "ADR-0007 engine-neutrality branch point marker; only valid on saena-chatgpt-search (placement enforced by skill_manifest.py)."
+        },
+        "required_inputs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "produces": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "agents": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "discovery-agent",
+              "demand-agent",
+              "evidence-agent",
+              "citation-competition-agent",
+              "technical-risk-agent",
+              "planner-agent",
+              "technical-patch-agent",
+              "content-compiler-agent",
+              "schema-agent",
+              "integrator-agent",
+              "test-agent",
+              "fidelity-critic",
+              "security-critic",
+              "independent-release-reviewer"
+            ]
+          }
+        },
+        "depends_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/kebabName" }
+        },
+        "safety_gates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/gateName" }
+        },
+        "verification_gates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/gateName" }
+        },
+        "failure_behavior": {
+          "const": "fail-closed"
+        }
+      }
+    }
+  }
+}

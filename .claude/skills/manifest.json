@@ -1,0 +1,379 @@
+{
+  "schema_version": "saena.skill-manifest/v1",
+  "engine_scope": ["chatgpt-search"],
+  "bundle_name": "saena-forge-core",
+  "phase_order": ["bootstrap", "plan", "execute", "verify"],
+  "skills": [
+    {
+      "name": "saena-intake",
+      "version": "1.0.0",
+      "phase": "bootstrap",
+      "path": ".claude/skills/saena-intake/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/run-context.json",
+        ".saena/scope-policy.yaml",
+        ".saena/source-of-truth.md",
+        ".saena/quality-gates.yaml",
+        "repo-at-pinned-base-commit"
+      ],
+      "produces": [
+        "repository-manifest",
+        "secret-scan-result",
+        "preflight-report"
+      ],
+      "agents": [],
+      "depends_on": [],
+      "safety_gates": [
+        "input-gate",
+        "verify_run_context",
+        "verify_policy_signature",
+        "secret_scan"
+      ],
+      "verification_gates": [],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-security-redteam",
+      "version": "1.0.0",
+      "phase": "bootstrap",
+      "path": ".claude/skills/saena-security-redteam/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/run-context.json",
+        ".saena/scope-policy.yaml",
+        "provenance-records",
+        "untrusted-web-content-tagged-material"
+      ],
+      "produces": ["redteam-report"],
+      "agents": ["security-critic"],
+      "depends_on": ["saena-intake"],
+      "safety_gates": [
+        "input-gate",
+        "secret_scan",
+        "inject_untrusted_content_policy"
+      ],
+      "verification_gates": ["security"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-site-discovery",
+      "version": "1.0.0",
+      "phase": "plan",
+      "path": ".claude/skills/saena-site-discovery/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/run-context.json",
+        ".saena/scope-policy.yaml",
+        "repo-at-pinned-base-commit"
+      ],
+      "produces": ["site-inventory"],
+      "agents": ["discovery-agent"],
+      "depends_on": ["saena-intake"],
+      "safety_gates": [
+        "plan-gate",
+        "enforce_role_tool_lease",
+        "inject_untrusted_content_policy"
+      ],
+      "verification_gates": [],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-demand-graph",
+      "version": "1.0.0",
+      "phase": "plan",
+      "path": ".claude/skills/saena-demand-graph/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/source-of-truth.md",
+        "approved-first-party-material",
+        ".saena/run-context.json"
+      ],
+      "produces": ["query-cluster-graph"],
+      "agents": ["demand-agent"],
+      "depends_on": ["saena-intake"],
+      "safety_gates": ["plan-gate", "inject_untrusted_content_policy"],
+      "verification_gates": [],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-b2b-saas-entity",
+      "version": "1.0.0",
+      "phase": "plan",
+      "path": ".claude/skills/saena-b2b-saas-entity/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/source-of-truth.md",
+        "site-inventory",
+        "approved-competitor-references"
+      ],
+      "produces": ["canonical-entity-map"],
+      "agents": ["planner-agent"],
+      "depends_on": ["saena-site-discovery"],
+      "safety_gates": ["plan-gate", "inject_untrusted_content_policy"],
+      "verification_gates": [],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-claim-evidence",
+      "version": "1.0.0",
+      "phase": "plan",
+      "path": ".claude/skills/saena-claim-evidence/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/source-of-truth.md",
+        ".saena/evidence-ledger.jsonl",
+        "repo-content"
+      ],
+      "produces": [
+        "evidence-ledger",
+        "blocked-claim-list",
+        "evidence-ledger-hash"
+      ],
+      "agents": [
+        "evidence-agent",
+        "content-compiler-agent",
+        "technical-patch-agent"
+      ],
+      "depends_on": ["saena-intake"],
+      "safety_gates": ["evidence-gate"],
+      "verification_gates": ["content-fidelity"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-chatgpt-search",
+      "version": "1.0.0",
+      "phase": "plan",
+      "path": ".claude/skills/saena-chatgpt-search/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "adr0007_engine_swap_point": true,
+      "required_inputs": [
+        ".saena/baseline-observation.json",
+        ".saena/run-context.json",
+        "approved-competitor-references"
+      ],
+      "produces": [
+        "observation-cells",
+        "evidence-bundle",
+        "response-observation-ledger"
+      ],
+      "agents": ["citation-competition-agent"],
+      "depends_on": ["saena-intake"],
+      "safety_gates": ["input-gate", "before_handoff"],
+      "verification_gates": ["measurement-completeness"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-technical-aeo",
+      "version": "1.0.0",
+      "phase": "execute",
+      "path": ".claude/skills/saena-technical-aeo/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/action-contract.json",
+        "assigned-patch-unit",
+        "evidence-ledger",
+        ".saena/scope-policy.yaml",
+        ".saena/quality-gates.yaml"
+      ],
+      "produces": [
+        "patch-unit-diff",
+        "unit-tests",
+        "rollback-unit",
+        "patch-unit-record"
+      ],
+      "agents": ["technical-patch-agent"],
+      "depends_on": ["saena-site-discovery", "saena-claim-evidence", "ponytail"],
+      "safety_gates": [
+        "execution-gate",
+        "require_action_contract_for_write",
+        "deny_out_of_scope_file_write",
+        "deny_deploy_push_cms_dns"
+      ],
+      "verification_gates": [
+        "build",
+        "tests",
+        "link-route",
+        "crawlability",
+        "diff-rationality"
+      ],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-answer-capsule",
+      "version": "1.0.0",
+      "phase": "execute",
+      "path": ".claude/skills/saena-answer-capsule/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/action-contract.json",
+        "evidence-ledger",
+        ".saena/source-of-truth.md",
+        "query-cluster-graph"
+      ],
+      "produces": [
+        "content-patch-unit",
+        "claim-evidence-tags",
+        "rollback-unit"
+      ],
+      "agents": ["content-compiler-agent"],
+      "depends_on": ["saena-demand-graph", "saena-claim-evidence", "ponytail"],
+      "safety_gates": [
+        "execution-gate",
+        "require_action_contract_for_write",
+        "deny_out_of_scope_file_write"
+      ],
+      "verification_gates": ["content-fidelity", "link-route", "diff-rationality"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-schema-fidelity",
+      "version": "1.0.0",
+      "phase": "execute",
+      "path": ".claude/skills/saena-schema-fidelity/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/action-contract.json",
+        "page-visible-content",
+        "evidence-ledger"
+      ],
+      "produces": [
+        "markup-patch-unit",
+        "parity-verification-record",
+        "rollback-unit"
+      ],
+      "agents": ["schema-agent"],
+      "depends_on": ["saena-claim-evidence", "ponytail"],
+      "safety_gates": ["execution-gate", "require_action_contract_for_write"],
+      "verification_gates": ["structured-data", "diff-rationality"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "ponytail",
+      "version": "1.0.0",
+      "phase": "execute",
+      "path": ".claude/skills/ponytail/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": ["approved-patch-unit", "affected-code-paths"],
+      "produces": ["ladder-pass-record", "delete-candidates"],
+      "agents": [
+        "technical-patch-agent",
+        "content-compiler-agent",
+        "schema-agent"
+      ],
+      "depends_on": [],
+      "safety_gates": ["execution-gate"],
+      "verification_gates": [],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-content-fidelity",
+      "version": "1.0.0",
+      "phase": "verify",
+      "path": ".claude/skills/saena-content-fidelity/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        "git-diff",
+        "evidence-ledger",
+        ".saena/source-of-truth.md",
+        ".saena/action-contract.json"
+      ],
+      "produces": ["fidelity-verdict", "critic-results"],
+      "agents": ["fidelity-critic"],
+      "depends_on": ["saena-claim-evidence"],
+      "safety_gates": ["before_handoff", "require_independent_critic"],
+      "verification_gates": ["content-fidelity"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-accessibility-visual",
+      "version": "1.0.0",
+      "phase": "verify",
+      "path": ".claude/skills/saena-accessibility-visual/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/quality-gates.yaml",
+        "patch-units",
+        "rendered-output"
+      ],
+      "produces": ["accessibility-visual-report"],
+      "agents": ["test-agent"],
+      "depends_on": [
+        "saena-technical-aeo",
+        "saena-answer-capsule",
+        "saena-schema-fidelity"
+      ],
+      "safety_gates": ["run_quality_matrix"],
+      "verification_gates": ["accessibility"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-patch-review",
+      "version": "1.0.0",
+      "phase": "verify",
+      "path": ".claude/skills/saena-patch-review/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        ".saena/action-contract.json",
+        ".saena/execution-manifest.json",
+        "patch-unit-artifacts",
+        "git-diff-vs-immutable-base-commit",
+        "gate-critic-policy-results"
+      ],
+      "produces": [
+        "release-decision",
+        "review-findings",
+        "remediation-list"
+      ],
+      "agents": ["independent-release-reviewer"],
+      "depends_on": [
+        "saena-content-fidelity",
+        "saena-accessibility-visual",
+        "saena-rollback",
+        "ponytail-review"
+      ],
+      "safety_gates": ["release-gate", "before_handoff"],
+      "verification_gates": ["diff-rationality"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "saena-rollback",
+      "version": "1.0.0",
+      "phase": "verify",
+      "path": ".claude/skills/saena-rollback/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": ["patch-units", ".saena/execution-manifest.json"],
+      "produces": [
+        "rollback-manifest",
+        "integrated-rollback-manifest"
+      ],
+      "agents": ["integrator-agent", "test-agent"],
+      "depends_on": [
+        "saena-technical-aeo",
+        "saena-answer-capsule",
+        "saena-schema-fidelity"
+      ],
+      "safety_gates": ["before_handoff", "require_rollback_manifest"],
+      "verification_gates": ["rollback-behavior"],
+      "failure_behavior": "fail-closed"
+    },
+    {
+      "name": "ponytail-review",
+      "version": "1.0.0",
+      "phase": "verify",
+      "path": ".claude/skills/ponytail-review/SKILL.md",
+      "engines": ["chatgpt-search"],
+      "required_inputs": [
+        "integrated-diff",
+        ".saena/execution-manifest.json",
+        "dependency-changes"
+      ],
+      "produces": ["delete-list"],
+      "agents": ["independent-release-reviewer", "security-critic"],
+      "depends_on": ["ponytail"],
+      "safety_gates": ["release-gate"],
+      "verification_gates": [],
+      "failure_behavior": "fail-closed"
+    }
+  ]
+}
